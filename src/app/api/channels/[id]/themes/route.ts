@@ -58,8 +58,7 @@ export async function GET(
   const themes = (themesRaw || []).map((t: any) => {
     const themeSnapshots = (snapshots || [])
       .filter(s => s.theme_id === t.id)
-      .slice(0, 8)
-      .reverse();
+      .sort((a: any, b: any) => a.snapshot_date.localeCompare(b.snapshot_date));
 
     const trendData = themeSnapshots.map(s => ({
       date: s.snapshot_date,
@@ -69,16 +68,25 @@ export async function GET(
     let direction: 'rising' | 'falling' | 'stable' = 'stable';
     let percentChange = 0;
 
-    if (trendData.length >= 2) {
+    // Calculate trend by comparing latest snapshot with 7 days ago (or earliest available)
+    if (trendData.length >= 1) {
       const latest = trendData[trendData.length - 1].count;
-      const previous = trendData[trendData.length - 2].count;
-      if (previous > 0) {
+      
+      // Find snapshot from ~7 days ago
+      const sevenDaysAgo = new Date();
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+      const sevenDaysAgoStr = sevenDaysAgo.toISOString().split('T')[0];
+      
+      const prevSnapshot = trendData.find(d => d.date <= sevenDaysAgoStr);
+      const previous = prevSnapshot?.count ?? trendData[0]?.count ?? 0;
+      
+      if (previous === 0 && latest > 0) {
+        direction = 'rising';
+        percentChange = 100;
+      } else if (previous > 0) {
         percentChange = Math.round(((latest - previous) / previous) * 100);
         if (percentChange > 10) direction = 'rising';
         else if (percentChange < -10) direction = 'falling';
-      } else if (latest > 0) {
-        direction = 'rising';
-        percentChange = 100;
       }
     }
 
@@ -94,7 +102,7 @@ export async function GET(
       created_at: t.created_at,
       last_updated_at: t.last_updated_at,
       topic_id: t.topic_id,
-      trend_data: trendData,
+      trend_data: trendData.slice(-8), // Last 8 snapshots for sparkline
       trend_direction: direction,
       trend_percent_change: percentChange,
       data_points: t.data_point_themes

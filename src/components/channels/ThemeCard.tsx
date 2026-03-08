@@ -146,25 +146,33 @@ export function ThemeCard({
         </div>
 
         {/* TREND VIEW */}
-        {theme.trend_data && theme.trend_data.length >= 2 && (
-          <div className="pt-2 flex items-center justify-between">
+        {theme.trend_data && theme.trend_data.length >= 1 && (
+          <div className="pt-3 border-t border-gray-100 flex items-center justify-between">
             <div className={`flex items-center gap-1 text-[10px] font-bold uppercase tracking-tight ${trendUI.color}`}>
               {trendUI.icon}
-              {theme.trend_percent_change !== 0 ? `${Math.abs(theme.trend_percent_change || 0)}%` : 'Stable'}
-              <span className="text-gray-400 font-normal lowercase ml-0.5">this week</span>
+              {theme.trend_percent_change !== undefined && theme.trend_percent_change !== 0 
+                ? `${theme.trend_percent_change > 0 ? '+' : ''}${Math.abs(theme.trend_percent_change)}%` 
+                : 'Stable'}
+              <span className="text-gray-400 font-normal lowercase ml-0.5">vs last week</span>
             </div>
-            <div className="h-8 w-20">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={theme.trend_data}>
-                  <Line 
-                    type="monotone" 
-                    dataKey="count" 
-                    stroke={trendUI.chart} 
-                    strokeWidth={2} 
-                    dot={false} 
-                  />
-                </LineChart>
-              </ResponsiveContainer>
+            <div className="h-8 w-20 flex-shrink-0">
+              {theme.trend_data.length >= 2 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={theme.trend_data}>
+                    <Line
+                      type="monotone"
+                      dataKey="count"
+                      stroke={trendUI.chart}
+                      strokeWidth={2}
+                      dot={false}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="h-full w-full flex items-center justify-center text-[9px] text-gray-400 bg-gray-50 rounded">
+                  Need more data
+                </div>
+              )}
             </div>
           </div>
         )}

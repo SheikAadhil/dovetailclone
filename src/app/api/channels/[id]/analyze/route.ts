@@ -198,7 +198,40 @@ export async function POST(
     .update({ last_analyzed_at: new Date().toISOString() })
     .eq('id', params.id);
 
-  return NextResponse.json({ 
+  // 8. Create theme snapshots for trend tracking
+  const today = new Date().toISOString().split('T')[0];
+  const snapshots = processedThemeIds.map(themeId => {
+    const theme = processedThemes.find(t => t.id === themeId);
+    return {
+      theme_id: themeId,
+      channel_id: params.id,
+      snapshot_date: today,
+      data_point_count: theme?.summary ? validMessageIds.length : 0,
+      sentiment_breakdown: {}
+    };
+  });
+
+  // Fetch actual theme data for snapshots
+  const { data: allThemes } = await supabase
+    .from('themes')
+    .select('id, data_point_count, sentiment_breakdown')
+    .in('id', processedThemeIds);
+
+  const actualSnapshots = (allThemes || []).map(theme => ({
+    theme_id: theme.id,
+    channel_id: params.id,
+    snapshot_date: today,
+    data_point_count: theme.data_point_count,
+    sentiment_breakdown: theme.sentiment_breakdown
+  }));
+
+  if (actualSnapshots.length > 0) {
+    await supabase
+      .from('theme_snapshots')
+      .upsert(actualSnapshots, { onConflict: 'theme_id,snapshot_date' });
+  }
+
+  return NextResponse.json({
     themes: processedThemeIds.length,
     topics: topicsToClassify.length
   });
