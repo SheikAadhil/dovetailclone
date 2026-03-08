@@ -13,7 +13,6 @@ const getOpenRouterClient = () => {
 
 /**
  * VERIFIED FREE MODELS (MARCH 2026)
- * These models use the :free suffix to ensure they target the free endpoints.
  */
 const MODELS_TO_TRY = [
   "meta-llama/llama-3.3-70b-instruct:free",
@@ -74,23 +73,28 @@ export async function analyzeThemes(messages: { id: string; content: string }[])
   if (messages.length === 0) return [];
 
   const system = `You are a customer feedback analyst. Your goal is to group similar messages into 2-5 clear themes.
+IMPORTANT: You MUST use the EXACT "id" strings provided in the input for the "message_ids" array in your response. Do not invent new IDs or use numbers.
 Even if the messages are varied, you MUST find common threads or group them by general intent.
 Respond ONLY with a valid JSON object. 
-Format: { "themes": [ { "name": "Theme Name", "summary": "Theme Summary", "message_ids": ["id1", "id2"], "sentiment": "positive/negative/mixed/neutral" } ] }`;
+Format: { "themes": [ { "name": "Theme Name", "summary": "Theme Summary", "message_ids": ["PROVIDED_ID_1", "PROVIDED_ID_2"], "sentiment": "positive/negative/mixed/neutral" } ] }`;
 
-  const user = `Analyze these messages and find patterns:\n${JSON.stringify(messages)}`;
+  const user = `Messages to analyze (Format: ID | Content):\n${messages.map(m => `${m.id} | ${m.content}`).join('\n')}`;
 
   try {
     const response = await getCompletion(system, user, true);
     const content = response.choices[0].message.content || "{}";
     
+    console.log("AI Raw Response:", content);
+
     const cleanJson = content.replace(/```json\n?|\n?```/g, '').trim();
     const parsed = JSON.parse(cleanJson);
     
-    if (Array.isArray(parsed)) return parsed;
-    if (parsed.themes && Array.isArray(parsed.themes)) return parsed.themes;
+    let themes = [];
+    if (Array.isArray(parsed)) themes = parsed;
+    else if (parsed.themes && Array.isArray(parsed.themes)) themes = parsed.themes;
 
-    return [];
+    console.log(`AI identified ${themes.length} potential themes.`);
+    return themes;
   } catch (error) {
     console.error('AI Theme Analysis failed:', error);
     return [];

@@ -28,7 +28,7 @@ export async function POST(
       messageIds = body.messageIds;
     }
   } catch (e) {
-    // No body or invalid JSON is fine, we just fall back to all messages
+    // No body or invalid JSON is fine
   }
 
   // 1. Fetch data points
@@ -37,11 +37,9 @@ export async function POST(
     .select('id, content, sentiment, workspace_id')
     .eq('channel_id', params.id);
 
-  // If specific IDs provided, filter by them
   if (messageIds && messageIds.length > 0) {
     query = query.in('id', messageIds);
   } else {
-    // Default fallback: latest 200 messages
     query = query.order('message_timestamp', { ascending: false }).limit(200);
   }
 
@@ -53,8 +51,7 @@ export async function POST(
 
   if (!dataPoints || dataPoints.length < 2) {
     return NextResponse.json({ 
-      error: `Not enough messages selected. Need at least 2 for analysis.`,
-      found: dataPoints?.length || 0 
+      error: `Not enough messages. Found ${dataPoints?.length || 0}, need 2.`,
     }, { status: 400 });
   }
 
@@ -68,10 +65,16 @@ export async function POST(
   const themesResult = await analyzeThemes(messagesForAi);
 
   if (!themesResult || themesResult.length === 0) {
-    return NextResponse.json({ themes: 0 });
+    return NextResponse.json({ 
+      themes: 0, 
+      debug: { 
+        messageCount: dataPoints.length, 
+        aiReason: "AI returned empty themes list" 
+      } 
+    });
   }
 
-  // 4. Fetch existing themes to handle upsert
+  // 4. Fetch existing themes
   const { data: existingThemes } = await supabase
     .from('themes')
     .select('id, name')
@@ -79,18 +82,23 @@ export async function POST(
 
   const existingThemesMap = new Map((existingThemes || []).map(t => [t.name, t.id]));
   const processedThemeIds: string[] = [];
+  const skippedThemes: any[] = [];
 
   // 5. Process themes
   for (const theme of themesResult) {
-    const validMessageIds = theme.message_ids.filter(id => 
-      dataPoints.some(dp => dp.id === id)
+    // Robust ID matching: handle potential whitespace/format issues from AI
+    const validMessageIds = (theme.message_ids || []).filter(id => 
+      dataPoints.some(dp => dp.id.trim() === id.trim())
     );
     
-    if (validMessageIds.length === 0) continue;
+    if (validMessageIds.length === 0) {
+      skippedThemes.push({ name: theme.name, reason: "No matching message IDs found in database" });
+      continue;
+    }
 
     const breakdown: Record<string, number> = { positive: 0, negative: 0, neutral: 0 };
     validMessageIds.forEach(id => {
-      const dp = dataPoints.find(d => d.id === id);
+      const dp = dataPoints.find(d => d.id.trim() === id.trim());
       if (dp?.sentiment) {
         breakdown[dp.sentiment] = (breakdown[dp.sentiment] || 0) + 1;
       } else {
@@ -132,8 +140,6 @@ export async function POST(
     processedThemeIds.push(themeId);
 
     if (themeId) {
-      // For selective analysis, we might want to APPEND instead of replace associations
-      // But for simplicity and matching standard behavior, we'll follow the original logic
       await supabase.from('data_point_themes').delete().eq('theme_id', themeId);
       
       const relations = validMessageIds.map(dpId => ({
@@ -152,5 +158,9 @@ export async function POST(
     .update({ last_analyzed_at: new Date().toISOString() })
     .eq('id', params.id);
 
-  return NextResponse.json({ themes: processedThemeIds.length });
+  return NextResponse.json({ 
+    themes: processedThemeIds.length, 
+    skipped: skippedThemes.length,
+    debug: skippedThemes.length > 0 ? { skippedThemes } : undefined
+  });
 }
