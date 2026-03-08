@@ -11,15 +11,14 @@ const getOpenRouterClient = () => {
   });
 };
 
-const PRIMARY_MODEL = process.env.PRIMARY_MODEL || "google/gemini-2.0-flash-exp:free";
-const FALLBACK_MODEL = process.env.FALLBACK_MODEL || "meta-llama/llama-3.1-8b-instruct:free";
-
-export interface ThemeResult {
-  name: string;
-  summary: string;
-  message_ids: string[];
-  sentiment: 'positive' | 'negative' | 'mixed' | 'neutral';
-}
+// Verified Free Models as of March 2026
+const MODELS_TO_TRY = [
+  "google/gemini-2.0-flash-001", // Currently free/cheap tier
+  "meta-llama/llama-3.1-8b-instruct",
+  "mistralai/pixtral-12b",
+  "google/gemini-flash-1.5",
+  "meta-llama/llama-3.2-3b-instruct:free"
+];
 
 async function getCompletion(system: string, user: string, useJson = false) {
   const client = getOpenRouterClient();
@@ -28,28 +27,28 @@ async function getCompletion(system: string, user: string, useJson = false) {
     throw new Error("OPENROUTER_API_KEY is missing");
   }
 
-  try {
-    return await client.chat.completions.create({
-      model: PRIMARY_MODEL,
-      messages: [
-        { role: "system", content: system },
-        { role: "user", content: user },
-      ],
-      // Some models via OpenRouter handle JSON mode better than others
-      response_format: useJson ? { type: "json_object" } : undefined,
-    });
-  } catch (error: any) {
-    console.warn(`Primary model (${PRIMARY_MODEL}) failed, switching to fallback. Error:`, error.message);
-    
-    return await client.chat.completions.create({
-      model: FALLBACK_MODEL,
-      messages: [
-        { role: "system", content: system },
-        { role: "user", content: user },
-      ],
-      response_format: useJson ? { type: "json_object" } : undefined,
-    });
+  let lastError: any;
+
+  // Attempt each model in order until one works
+  for (const model of MODELS_TO_TRY) {
+    try {
+      console.log(`Attempting AI analysis with model: ${model}`);
+      return await client.chat.completions.create({
+        model: model,
+        messages: [
+          { role: "system", content: system },
+          { role: "user", content: user },
+        ],
+        response_format: useJson ? { type: "json_object" } : undefined,
+      });
+    } catch (error: any) {
+      console.warn(`Model ${model} failed: ${error.message}`);
+      lastError = error;
+      continue; // Try next model
+    }
   }
+
+  throw lastError || new Error("All AI models failed");
 }
 
 export async function analyzeSentiment(content: string): Promise<'positive' | 'negative' | 'neutral' | null> {
@@ -83,23 +82,22 @@ Format: { "themes": [ { "name": "Theme Name", "summary": "Theme Summary", "messa
     const response = await getCompletion(system, user, true);
     const content = response.choices[0].message.content || "{}";
     
-    // Clean up content (remove markdown if any)
     const cleanJson = content.replace(/```json\n?|\n?```/g, '').trim();
     const parsed = JSON.parse(cleanJson);
     
-    // Robustness: Handle cases where model returns array directly instead of { themes: [] }
-    if (Array.isArray(parsed)) {
-      return parsed;
-    }
-    
-    if (parsed.themes && Array.isArray(parsed.themes)) {
-      return parsed.themes;
-    }
+    if (Array.isArray(parsed)) return parsed;
+    if (parsed.themes && Array.isArray(parsed.themes)) return parsed.themes;
 
-    console.warn("AI returned unexpected JSON structure:", parsed);
     return [];
   } catch (error) {
     console.error('AI Theme Analysis failed:', error);
     return [];
   }
+}
+
+export interface ThemeResult {
+  name: string;
+  summary: string;
+  message_ids: string[];
+  sentiment: 'positive' | 'negative' | 'mixed' | 'neutral';
 }
