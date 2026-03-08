@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Loader2, Trash2, Brain, Check, Info } from "lucide-react";
+import { UsageStats } from "./UsageStats";
 
 interface ChannelSettingsFormProps {
   channel: Channel;
@@ -88,6 +89,8 @@ export function ChannelSettingsForm({ channel }: ChannelSettingsFormProps) {
 
   return (
     <div className="space-y-6 max-w-2xl">
+      <UsageStats />
+
       {/* AI Context Section */}
       <Card className="border-indigo-100 shadow-sm">
         <CardHeader>
