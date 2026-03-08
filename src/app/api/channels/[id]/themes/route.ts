@@ -48,7 +48,6 @@ export async function GET(
 
   if (thError) return new NextResponse('Database error', { status: 500 });
 
-  // 3. Fetch snapshots for trends
   const themeIds = (themesRaw || []).map(t => t.id);
   const { data: snapshots } = await supabase
     .from('theme_snapshots')
@@ -67,7 +66,6 @@ export async function GET(
       count: s.data_point_count
     }));
 
-    // Calculate direction (latest vs 7 days ago approx)
     let direction: 'rising' | 'falling' | 'stable' = 'stable';
     let percentChange = 0;
 
@@ -111,4 +109,53 @@ export async function GET(
     total_data_points: totalDataPoints || 0,
     last_analyzed_at: channel?.last_analyzed_at
   });
+}
+
+export async function POST(
+  request: Request,
+  { params }: { params: { id: string } }
+) {
+  const { userId } = await auth();
+  if (!userId) return new NextResponse('Unauthorized', { status: 401 });
+
+  try {
+    const { name, description, topic_id } = await request.json();
+    const supabase = await createSupabaseServerClient();
+
+    const { data: channel, error: chanError } = await supabase
+      .from('channels')
+      .select('workspace_id')
+      .eq('id', params.id)
+      .single();
+
+    if (chanError || !channel) {
+      console.error("Error fetching channel:", chanError);
+      return new NextResponse('Channel not found', { status: 404 });
+    }
+
+    const { data: theme, error: insertError } = await supabase
+      .from('themes')
+      .insert({
+        channel_id: params.id,
+        workspace_id: channel.workspace_id,
+        name,
+        description,
+        topic_id: (!topic_id || topic_id === 'none') ? null : topic_id,
+        summary: description || '', // Use description as summary for manual themes
+        is_manual: true,
+        data_point_count: 0
+      })
+      .select()
+      .single();
+
+    if (insertError) {
+      console.error("Database Insert Error:", insertError);
+      return NextResponse.json({ error: insertError.message }, { status: 500 });
+    }
+
+    return NextResponse.json(theme);
+  } catch (e: any) {
+    console.error("General Theme POST Error:", e);
+    return new NextResponse(e.message, { status: 500 });
+  }
 }
