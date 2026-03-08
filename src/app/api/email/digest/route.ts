@@ -5,17 +5,20 @@ import { Resend } from 'resend';
 import { WeeklyDigestEmail } from '@/components/email/WeeklyDigestEmail';
 import * as React from 'react';
 
-// Note: Prompt requested /components/email/WeeklyDigestEmail.tsx
-// I created it in /components/email/WeeklyDigestEmail.tsx earlier?
-// Let me check. I used /components/email/WeeklyDigestEmail.tsx in write_file.
-// Wait, I used /components/email/WeeklyDigestEmail.tsx. Correct.
-
-const resend = new Resend(process.env.RESEND_API_KEY);
+export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {
   const authHeader = request.headers.get('Authorization');
   if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
     return new NextResponse('Unauthorized', { status: 401 });
+  }
+
+  // Initialize Resend inside the handler to prevent build-time errors
+  const resend = new Resend(process.env.RESEND_API_KEY || 're_dummy_key');
+
+  if (!process.env.RESEND_API_KEY) {
+    console.error('RESEND_API_KEY is missing');
+    return new NextResponse('Internal Server Error', { status: 500 });
   }
 
   const supabase = createSupabaseAdminClient();
