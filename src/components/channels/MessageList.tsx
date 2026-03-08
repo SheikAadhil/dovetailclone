@@ -135,6 +135,22 @@ export function MessageList({ channelId }: MessageListProps) {
     } catch (e) { alert("Analysis failed."); } finally { setAnalyzingBatch(false); }
   };
 
+  const handleAnalyzeSingle = async (id: string) => {
+    try {
+      const res = await fetch(`/api/channels/${channelId}/analyze`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messageIds: [id], forceRefresh: true })
+      });
+      const data = await res.json();
+      if (data.error) alert(data.error);
+      else {
+        alert("Individual signal analysis complete.");
+        router.refresh();
+      }
+    } catch (e) { alert("Analysis failed."); }
+  };
+
   const handleTagWithTheme = async (themeId: string) => {
     setTagging(true);
     try {
@@ -207,7 +223,13 @@ export function MessageList({ channelId }: MessageListProps) {
 
       <div className="space-y-4">
         {messages && messages.map((msg) => (
-          <MessageCard key={msg.id} message={msg} selected={selectedIds.has(msg.id)} onSelect={handleToggleSelect} />
+          <MessageCard 
+            key={msg.id} 
+            message={msg} 
+            selected={selectedIds.has(msg.id)} 
+            onSelect={handleToggleSelect} 
+            onAnalyze={handleAnalyzeSingle}
+          />
         ))}
         {loading && <div className="flex justify-center py-10"><Loader2 className="w-6 h-6 animate-spin text-indigo-600" /></div>}
         {!loading && messages.length === 0 && <div className="text-center py-20 bg-gray-50 rounded-xl border border-dashed text-gray-500">No messages found.</div>}

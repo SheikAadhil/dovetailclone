@@ -62,20 +62,28 @@ export async function POST(
     return NextResponse.json({ error: 'Database error fetching messages' }, { status: 500 });
   }
 
-  if (!dataPoints || dataPoints.length < 2) {
-    return NextResponse.json({ 
-      error: `Not enough messages. Found ${dataPoints?.length || 0}, need 2.`,
-    }, { status: 400 });
+  if (!dataPoints || dataPoints.length === 0) {
+    return NextResponse.json({ error: 'No signals found to analyze' }, { status: 400 });
   }
 
   // 2. Prepare for AI
+  // SPECIAL CASE: If it's a single data point (likely a large Markdown Node), 
+  // we might want to split it or treat it as a high-density source.
+  const isSingleNode = dataPoints.length === 1 && (dataPoints[0].source === 'node' || dataPoints[0].source === 'markdown');
+  
   const messagesForAi = dataPoints.map(dp => ({
     id: dp.id,
     content: dp.content
   }));
 
   // 3. Call AI with optional context
-  const themesResult = await analyzeThemes(messagesForAi, channel?.ai_context);
+  // Pass hint if it's a single high-density node
+  const themesResult = await analyzeThemes(
+    messagesForAi, 
+    isSingleNode 
+      ? `${channel?.ai_context || ''}\nNOTE: This is a single high-density observation node. Extract all distinct themes and insights from this specific text.` 
+      : channel?.ai_context
+  );
 
   if (!themesResult || themesResult.length === 0) {
     return NextResponse.json({ 

@@ -86,7 +86,7 @@ export function NodeImportDialog({ channelId, isOpen, onClose, onSuccess }: Node
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
-      <DialogContent className="rounded-[2.5rem] p-0 border-none shadow-2xl w-[95vw] max-w-2xl max-h-[90vh] flex flex-col overflow-hidden">
+      <DialogContent className="rounded-[2.5rem] p-0 border-none shadow-2xl w-[95vw] max-w-4xl max-h-[90vh] flex flex-col overflow-hidden">
         <div className="p-10 pb-0 shrink-0">
           <DialogHeader className="mb-6">
             <div className="w-12 h-12 bg-indigo-50 rounded-2xl flex items-center justify-center text-indigo-600 mb-4 shadow-sm">

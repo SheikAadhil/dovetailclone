@@ -103,17 +103,20 @@ export function CSVImportDialog({ channelId, isOpen, onClose, onSuccess }: CSVIm
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-hidden flex flex-col p-0">
-        <DialogHeader className="p-6 border-b">
-          <DialogTitle>Import CSV</DialogTitle>
-          <DialogDescription>
-            {step === 1 && "Upload a .csv file to import messages into this channel."}
-            {step === 2 && "Map your CSV columns to Pulse fields."}
-            {step === 3 && "Import complete!"}
+      <DialogContent className="rounded-[2.5rem] p-0 border-none shadow-2xl w-[95vw] max-w-4xl max-h-[90vh] flex flex-col overflow-hidden">
+        <DialogHeader className="p-8 pb-6 border-b border-gray-50 bg-gray-50/30 shrink-0">
+          <div className="w-12 h-12 bg-indigo-50 rounded-2xl flex items-center justify-center text-indigo-600 mb-4 shadow-sm">
+            <FileText className="w-6 h-6" />
+          </div>
+          <DialogTitle className="text-3xl font-black tracking-tighter">Import Dataset (CSV)</DialogTitle>
+          <DialogDescription className="text-gray-500 font-bold mt-2">
+            {step === 1 && "Ingest bulk message data to reconstruct historical semantic trends."}
+            {step === 2 && "Map your operational columns to Pulse intelligence fields."}
+            {step === 3 && "Synchronization complete!"}
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex-1 overflow-auto p-6">
+        <div className="flex-1 overflow-auto p-8">
           {step === 1 && (
             <div className="flex flex-col items-center justify-center py-12 border-2 border-dashed rounded-xl bg-gray-50 hover:bg-gray-100 transition-colors cursor-pointer relative">
               <input type="file" accept=".csv" className="absolute inset-0 opacity-0 cursor-pointer" onChange={handleFileChange} disabled={loading} />
