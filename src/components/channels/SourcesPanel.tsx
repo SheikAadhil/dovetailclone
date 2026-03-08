@@ -13,6 +13,8 @@ import { formatDistanceToNow } from "date-fns";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
+import { CSVImportDialog } from "./CSVImportDialog";
 
 interface SourcesPanelProps {
   channelId: string;
@@ -22,8 +24,10 @@ export function SourcesPanel({ channelId }: SourcesPanelProps) {
   const [sources, setSources] = useState<ChannelSource[]>([]);
   const [loading, setLoading] = useState(true);
   
-  // Add Slack Source Dialog State
+  // Dialog States
   const [isAddSlackOpen, setIsAddSlackOpen] = useState(false);
+  const [isCSVImportOpen, setIsCSVImportOpen] = useState(false);
+  
   const [slackChannels, setSlackChannels] = useState<{ id: string; name: string }[]>([]);
   const [selectedSlackChannel, setSelectedSlackChannel] = useState("");
   const [addingSource, setCreatingSource] = useState(false);
@@ -189,15 +193,22 @@ export function SourcesPanel({ channelId }: SourcesPanelProps) {
               </Button>
               <Button 
                 variant="outline" 
-                disabled
-                className="w-full justify-start gap-2 border-dashed text-gray-400 border-gray-200"
+                className="w-full justify-start gap-2 border-dashed text-blue-600 border-blue-200 hover:bg-blue-50"
+                onClick={() => setIsCSVImportOpen(true)}
               >
-                <Plus className="w-4 h-4" /> Import CSV (Coming Soon)
+                <Plus className="w-4 h-4" /> Import CSV
               </Button>
             </div>
           </div>
         </SheetContent>
       </Sheet>
+
+      <CSVImportDialog 
+        channelId={channelId} 
+        isOpen={isCSVImportOpen} 
+        onClose={() => setIsCSVImportOpen(false)} 
+        onSuccess={fetchSources} 
+      />
 
       <Dialog open={isAddSlackOpen} onOpenChange={setIsAddSlackOpen}>
         <DialogContent>
