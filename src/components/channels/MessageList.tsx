@@ -5,11 +5,19 @@ import { createSupabaseClient } from "@/lib/supabase";
 import { DataPoint, ChannelField, Theme } from "@/types";
 import { MessageCard } from "./MessageCard";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Loader2, Search, Brain, X, CheckSquare, Filter, Tag } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { 
+  DropdownMenu, 
+  DropdownMenuContent, 
+  DropdownMenuItem, 
+  DropdownMenuLabel, 
+  DropdownMenuSeparator, 
+  DropdownMenuTrigger 
+} from "@/components/ui/dropdown-menu";
+import { cn } from "@/lib/utils";
 
 interface MessageListProps {
   channelId: string;
@@ -67,7 +75,7 @@ export function MessageList({ channelId }: MessageListProps) {
       .select('*')
       .eq('channel_id', channelId)
       .order('message_timestamp', { ascending: false })
-      .range(reset ? 0 : (reset ? 0 : page) * 20, reset ? 19 : (page + 1) * 20 - 1);
+      .range(reset ? 0 : page * 20, reset ? 19 : (page + 1) * 20 - 1);
 
     if (search) query = query.ilike('content', `%${search}%`);
     if (sentiment && sentiment !== 'all') query = query.eq('sentiment', sentiment);
@@ -138,7 +146,6 @@ export function MessageList({ channelId }: MessageListProps) {
       if (res.ok) {
         alert(`Successfully tagged ${selectedIds.size} messages.`);
         setSelectedIds(new Set());
-        fetchMessages(true);
         router.refresh();
       } else {
         throw new Error("Tagging failed");
@@ -212,44 +219,60 @@ export function MessageList({ channelId }: MessageListProps) {
         {!loading && hasMore && messages.length > 0 && <div className="text-center py-4"><Button variant="outline" onClick={() => fetchMessages(false)}>Load More</Button></div>}
       </div>
 
+      {/* Floating Batch Action Bar */}
       {selectedIds.size > 0 && (
-        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 bg-white border border-indigo-100 shadow-xl rounded-full px-6 py-3 flex items-center gap-4 z-50 animate-in fade-in slide-in-from-bottom-4">
+        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 bg-white border border-indigo-100 shadow-2xl rounded-full px-6 py-3 flex items-center gap-4 z-[100] animate-in fade-in slide-in-from-bottom-4">
           <div className="flex items-center gap-2 border-r pr-4 border-gray-100">
             <CheckSquare className="w-5 h-5 text-indigo-600" />
             <span className="font-semibold text-sm text-gray-900">{selectedIds.size} selected</span>
           </div>
           
           <div className="flex items-center gap-2">
-            <DropdownMenu modal={false}>
-              <DropdownMenuTrigger asChild>
-                <Button size="sm" variant="outline" className="rounded-full gap-2 border-indigo-200 text-indigo-600" disabled={tagging}>
-                  {tagging ? <Loader2 className="w-4 h-4 animate-spin" /> : <Tag className="w-4 h-4" />}
-                  Tag with Theme
-                </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger 
+                className={cn(
+                  buttonVariants({ variant: "outline", size: "sm" }),
+                  "rounded-full gap-2 border-indigo-200 text-indigo-600 hover:bg-indigo-50"
+                )}
+                disabled={tagging}
+              >
+                {tagging ? <Loader2 className="w-4 h-4 animate-spin" /> : <Tag className="w-4 h-4" />}
+                Tag with Theme
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56 max-h-64 overflow-auto z-[60]">
+              <DropdownMenuContent align="end" className="w-56 max-h-64 overflow-auto z-[110]">
                 <DropdownMenuLabel className="text-[10px] font-bold uppercase text-gray-400 px-3 py-2">Select Target Theme</DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 {!themes || themes.length === 0 ? (
-                  <div className="p-4 text-xs text-gray-400 italic">No themes found. Create one first.</div>
+                  <div className="p-4 text-xs text-gray-400 italic">No themes found.</div>
                 ) : (
                   themes.map(t => (
-                    <DropdownMenuItem key={t.id} onClick={() => handleTagWithTheme(t.id)} className="cursor-pointer px-3 py-2">
-                      <div className="flex flex-col">
-                        <span className="font-medium text-sm">{t.name}</span>
-                        <span className="text-[10px] text-gray-400">{t.data_point_count} messages</span>
-                      </div>
+                    <DropdownMenuItem key={t.id} onClick={() => handleTagWithTheme(t.id)} className="cursor-pointer px-3 py-2 flex flex-col items-start gap-0.5">
+                      <span className="font-medium text-sm text-gray-900">{t.name}</span>
+                      <span className="text-[10px] text-gray-400">{t.data_point_count} messages</span>
                     </DropdownMenuItem>
                   ))
                 )}
               </DropdownMenuContent>
             </DropdownMenu>
 
-            <Button size="sm" className="rounded-full bg-indigo-600 hover:bg-indigo-700" onClick={handleAnalyzeSelected} disabled={analyzingBatch}>
+            <Button 
+              size="sm" 
+              className="rounded-full bg-indigo-600 hover:bg-indigo-700" 
+              onClick={handleAnalyzeSelected} 
+              disabled={analyzingBatch}
+            >
               {analyzingBatch ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Brain className="w-4 h-4 mr-2" />}
               Analyze Selection
             </Button>
-            <Button size="sm" variant="ghost" className="rounded-full h-8 w-8 p-0 text-gray-400 hover:text-gray-600" onClick={clearSelection}><X className="w-4 h-4" /></Button>
+            
+            <Button 
+              size="sm" 
+              variant="ghost" 
+              className="rounded-full h-8 w-8 p-0 text-gray-400 hover:text-gray-600" 
+              onClick={clearSelection}
+            >
+              <X className="w-4 h-4" />
+            </Button>
           </div>
         </div>
       )}
