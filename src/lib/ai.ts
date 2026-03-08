@@ -11,7 +11,7 @@ const getOpenRouterClient = () => {
   });
 };
 
-const PRIMARY_MODEL = process.env.PRIMARY_MODEL || "anthropic/claude-3.5-sonnet";
+const PRIMARY_MODEL = process.env.PRIMARY_MODEL || "google/gemini-2.0-flash-exp:free";
 const FALLBACK_MODEL = process.env.FALLBACK_MODEL || "meta-llama/llama-3.1-8b-instruct:free";
 
 export interface ThemeResult {
