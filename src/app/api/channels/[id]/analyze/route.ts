@@ -31,7 +31,13 @@ export async function POST(
     // No body or invalid JSON is fine
   }
 
-  // 1. Fetch data points
+  // 1. Fetch data points and channel context
+  const { data: channel } = await supabase
+    .from('channels')
+    .select('ai_context')
+    .eq('id', params.id)
+    .single();
+
   let query = supabase
     .from('data_points')
     .select('id, content, sentiment, workspace_id')
@@ -61,8 +67,8 @@ export async function POST(
     content: dp.content
   }));
 
-  // 3. Call AI
-  const themesResult = await analyzeThemes(messagesForAi);
+  // 3. Call AI with optional context
+  const themesResult = await analyzeThemes(messagesForAi, channel?.ai_context);
 
   if (!themesResult || themesResult.length === 0) {
     return NextResponse.json({ 

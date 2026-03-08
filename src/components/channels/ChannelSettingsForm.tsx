@@ -8,8 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Loader2, Trash2 } from "lucide-react";
+import { Loader2, Trash2, Brain, Check, Info } from "lucide-react";
 
 interface ChannelSettingsFormProps {
   channel: Channel;
@@ -17,15 +16,13 @@ interface ChannelSettingsFormProps {
 
 export function ChannelSettingsForm({ channel }: ChannelSettingsFormProps) {
   const router = useRouter();
-  // useToast from shadcn usually needs Toaster in layout. I installed 'toast' but components/ui/toast exists?
-  // shadcn v4 uses 'hooks/use-toast' or 'sonner'.
-  // I'll assume use-toast is available or I skip toast for now and use alert/state.
-  // I didn't install toast properly maybe? "The item ... toast.json was not found".
-  // I skipped toast. So I'll use simple alerts or error state.
   
   const [name, setName] = useState(channel.name);
   const [description, setDescription] = useState(channel.description || "");
+  const [aiContext, setAiContext] = useState(channel.ai_context || "");
   const [loading, setLoading] = useState(false);
+  const [enhancing, setEnhancing] = useState(false);
+  const [enhancedSuccess, setEnhancedSuccess] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
 
   const handleSave = async () => {
@@ -34,16 +31,37 @@ export function ChannelSettingsForm({ channel }: ChannelSettingsFormProps) {
       const res = await fetch(`/api/channels/${channel.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, description })
+        body: JSON.stringify({ name, description, ai_context: aiContext })
       });
       if (!res.ok) throw new Error('Failed to update');
-      // Refresh
       router.refresh();
       alert('Saved successfully');
     } catch (e) {
       alert('Error updating channel');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleEnhanceContext = async () => {
+    if (!aiContext) return;
+    setEnhancing(true);
+    try {
+      const res = await fetch(`/api/channels/${channel.id}/enhance-context`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ context: aiContext })
+      });
+      const data = await res.json();
+      if (data.enhanced) {
+        setAiContext(data.enhanced);
+        setEnhancedSuccess(true);
+        setTimeout(() => setEnhancedSuccess(false), 2000);
+      }
+    } catch (e) {
+      alert('Failed to enhance context');
+    } finally {
+      setEnhancing(false);
     }
   };
 
@@ -64,6 +82,68 @@ export function ChannelSettingsForm({ channel }: ChannelSettingsFormProps) {
 
   return (
     <div className="space-y-6 max-w-2xl">
+      {/* AI Context Section */}
+      <Card className="border-indigo-100 shadow-sm">
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <div className="p-1.5 bg-indigo-100 rounded-md text-indigo-600">
+              <Brain className="w-4 h-4" />
+            </div>
+            <CardTitle>AI Analysis Context</CardTitle>
+          </div>
+          <CardDescription>
+            Tell the AI about your role and what insights you are looking for.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="aiContext">What should the AI focus on?</Label>
+            <div className="relative">
+              <Textarea 
+                id="aiContext" 
+                rows={4}
+                placeholder="Describe your role and goals. E.g. I am a Product Manager. I want to understand what internal tool users are confused about." 
+                value={aiContext} 
+                onChange={e => setAiContext(e.target.value.substring(0, 400))}
+                className="resize-none pr-12"
+              />
+              <div className={`absolute bottom-2 right-2 text-[10px] font-mono ${aiContext.length >= 380 ? 'text-red-500 font-bold' : 'text-gray-400'}`}>
+                {aiContext.length}/400
+              </div>
+            </div>
+          </div>
+          
+          <div className="flex items-center gap-3">
+            <Button 
+              variant="outline" 
+              onClick={handleEnhanceContext} 
+              disabled={enhancing || !aiContext}
+              className="gap-2 border-indigo-200 text-indigo-600 hover:bg-indigo-50 hover:text-indigo-700"
+            >
+              {enhancedSuccess ? (
+                <>
+                  <Check className="w-4 h-4" />
+                  Enhanced
+                </>
+              ) : (
+                <>
+                  {enhancing ? <Loader2 className="w-4 h-4 animate-spin" /> : "✨"}
+                  Enhance with AI
+                </>
+              )}
+            </Button>
+            <Button onClick={handleSave} disabled={loading}>
+              {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Save Context
+            </Button>
+          </div>
+          <p className="text-[11px] text-gray-400 flex items-center gap-1 italic">
+            <Info className="w-3 h-3" />
+            Context guides future analyses only. Existing themes are not affected.
+          </p>
+        </CardContent>
+      </Card>
+
       <Card>
         <CardHeader>
           <CardTitle>Channel Settings</CardTitle>

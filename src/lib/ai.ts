@@ -68,7 +68,7 @@ function extractJson(text: string) {
   }
 }
 
-export async function analyzeThemes(messages: { id: string; content: string }[]): Promise<ThemeResult[]> {
+export async function analyzeThemes(messages: { id: string; content: string }[], aiContext?: string | null): Promise<ThemeResult[]> {
   if (messages.length === 0) return [];
 
   const idMap = new Map<string, string>();
@@ -78,7 +78,9 @@ export async function analyzeThemes(messages: { id: string; content: string }[])
     return { id: simpleId, content: m.content };
   });
 
-  const prompt = `You are a customer feedback analyst. 
+  const contextPart = aiContext ? `\nCONTEXT ABOUT THIS ANALYSIS:\n${aiContext}\n\nUse this context to determine what themes are most relevant. Focus on what matters to this role and ignore noise that does not serve these goals.\n` : '';
+
+  const prompt = `You are a customer feedback analyst. ${contextPart}
 TASK: Group these messages into 2-5 themes.
 FORMAT: You MUST respond ONLY with a JSON object. No other text.
 JSON SCHEMA: { "themes": [ { "name": "Title", "summary": "Summary", "message_ids": ["1", "3"], "sentiment": "mixed" } ] }
