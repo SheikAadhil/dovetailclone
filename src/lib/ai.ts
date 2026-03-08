@@ -11,12 +11,15 @@ const getOpenRouterClient = () => {
   });
 };
 
-// Verified Free Models as of March 2026
+/**
+ * VERIFIED FREE MODELS (MARCH 2026)
+ * These models use the :free suffix to ensure they target the free endpoints.
+ */
 const MODELS_TO_TRY = [
-  "google/gemini-2.0-flash-001", // Currently free/cheap tier
-  "meta-llama/llama-3.1-8b-instruct",
-  "mistralai/pixtral-12b",
-  "google/gemini-flash-1.5",
+  "meta-llama/llama-3.3-70b-instruct:free",
+  "google/gemini-2.0-flash:free",
+  "deepseek/deepseek-r1:free",
+  "google/gemma-3-27b-it:free",
   "meta-llama/llama-3.2-3b-instruct:free"
 ];
 
@@ -29,7 +32,6 @@ async function getCompletion(system: string, user: string, useJson = false) {
 
   let lastError: any;
 
-  // Attempt each model in order until one works
   for (const model of MODELS_TO_TRY) {
     try {
       console.log(`Attempting AI analysis with model: ${model}`);
@@ -44,7 +46,7 @@ async function getCompletion(system: string, user: string, useJson = false) {
     } catch (error: any) {
       console.warn(`Model ${model} failed: ${error.message}`);
       lastError = error;
-      continue; // Try next model
+      continue; 
     }
   }
 
