@@ -73,8 +73,9 @@ export async function analyzeThemes(messages: { id: string; content: string }[])
   if (messages.length === 0) return [];
 
   const system = `You are a customer feedback analyst. Your goal is to group similar messages into 2-5 clear themes.
-IMPORTANT: You MUST respond with a valid JSON object. 
-Format: { "themes": [ { "name": "...", "summary": "...", "message_ids": ["...", "..."], "sentiment": "..." } ] }`;
+Even if the messages are varied, you MUST find common threads or group them by general intent.
+Respond ONLY with a valid JSON object. 
+Format: { "themes": [ { "name": "Theme Name", "summary": "Theme Summary", "message_ids": ["id1", "id2"], "sentiment": "positive/negative/mixed/neutral" } ] }`;
 
   const user = `Analyze these messages and find patterns:\n${JSON.stringify(messages)}`;
 
