@@ -12,6 +12,7 @@ interface SnapshotDebugProps {
 export function SnapshotDebug({ channelId }: SnapshotDebugProps) {
   const [loading, setLoading] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [generating, setGenerating] = useState(false);
   const [data, setData] = useState<any>(null);
 
   const fetchSnapshots = async () => {
@@ -43,6 +44,23 @@ export function SnapshotDebug({ channelId }: SnapshotDebugProps) {
     }
   };
 
+  const generateHistory = async () => {
+    if (!confirm('Generate 15 days of fake snapshot data for testing? This will simulate trend data.')) return;
+    setGenerating(true);
+    try {
+      const res = await fetch(`/api/channels/${channelId}/snapshots/generate-history`, {
+        method: 'POST'
+      });
+      const result = await res.json();
+      alert(`Generated ${result.snapshots_created} snapshots over ${result.days_generated} days for ${result.themes_count} themes!`);
+      fetchSnapshots();
+    } catch (e) {
+      alert('Failed to generate history');
+    } finally {
+      setGenerating(false);
+    }
+  };
+
   return (
     <Card className="border-amber-200 bg-amber-50">
       <CardHeader>
@@ -50,14 +68,18 @@ export function SnapshotDebug({ channelId }: SnapshotDebugProps) {
         <CardDescription>Check and create theme snapshots for trend view</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button size="sm" variant="outline" onClick={fetchSnapshots} disabled={loading}>
             {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
             Check Snapshots
           </Button>
           <Button size="sm" onClick={createSnapshots} disabled={creating}>
             {creating ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <CheckCircle2 className="w-4 h-4 mr-2" />}
-            Create Snapshots
+            Create Today's Snapshot
+          </Button>
+          <Button size="sm" variant="secondary" onClick={generateHistory} disabled={generating}>
+            {generating ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+            📈 Generate 15 Days History
           </Button>
         </div>
 
@@ -91,8 +113,8 @@ export function SnapshotDebug({ channelId }: SnapshotDebugProps) {
         )}
 
         <p className="text-[10px] text-amber-700">
-          💡 Tip: Snapshots are automatically created when you run "Analyze Now". 
-          You need at least 2 snapshots on different dates to see the sparkline chart.
+          💡 Tip: Click "Generate 15 Days History" to create fake snapshot data for testing. 
+          The sparkline chart needs snapshots from different dates to show trends.
         </p>
       </CardContent>
     </Card>
