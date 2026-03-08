@@ -8,8 +8,9 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Loader2, Trash2, Brain, Check, Info } from "lucide-react";
+import { Loader2, Trash2, Brain, Check, Info, Mail, Slack as SlackIcon, BellRing, Send } from "lucide-react";
 import { UsageStats } from "./UsageStats";
+import { Switch } from "@/components/ui/switch";
 
 interface ChannelSettingsFormProps {
   channel: Channel;
@@ -22,6 +23,12 @@ export function ChannelSettingsForm({ channel }: ChannelSettingsFormProps) {
   const [description, setDescription] = useState(channel.description || "");
   const [aiContext, setAiContext] = useState(channel.ai_context || "");
   const [alertThreshold, setAlertThreshold] = useState(channel.alert_threshold_percent || 50);
+  
+  // Digest State
+  const [slackEnabled, setSlackEnabled] = useState(channel.digest_slack_enabled || false);
+  const [slackUrl, setSlackUrl] = useState(channel.digest_slack_webhook_url || "");
+  const [testingSlack, setTestingSlack] = useState(false);
+
   const [loading, setLoading] = useState(false);
   const [enhancing, setEnhancing] = useState(false);
   const [enhancedSuccess, setEnhancedSuccess] = useState(false);
@@ -37,7 +44,9 @@ export function ChannelSettingsForm({ channel }: ChannelSettingsFormProps) {
           name, 
           description, 
           ai_context: aiContext,
-          alert_threshold_percent: alertThreshold
+          alert_threshold_percent: alertThreshold,
+          digest_slack_enabled: slackEnabled,
+          digest_slack_webhook_url: slackUrl
         })
       });
       if (!res.ok) throw new Error('Failed to update');
@@ -47,6 +56,25 @@ export function ChannelSettingsForm({ channel }: ChannelSettingsFormProps) {
       alert('Error updating channel');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleTestSlack = async () => {
+    if (!slackUrl) return;
+    setTestingSlack(true);
+    try {
+      const res = await fetch(`/api/channels/${channel.id}/test-digest-slack`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: slackUrl })
+      });
+      const data = await res.json();
+      if (data.success) alert("Test notification sent!");
+      else alert(data.error || "Failed to send test");
+    } catch (e) {
+      alert("Test failed");
+    } finally {
+      setTestingSlack(false);
     }
   };
 
@@ -88,7 +116,7 @@ export function ChannelSettingsForm({ channel }: ChannelSettingsFormProps) {
   };
 
   return (
-    <div className="space-y-6 max-w-2xl">
+    <div className="space-y-6 max-w-2xl pb-20">
       <UsageStats />
 
       {/* AI Context Section */}
@@ -130,15 +158,9 @@ export function ChannelSettingsForm({ channel }: ChannelSettingsFormProps) {
               className="gap-2 border-indigo-200 text-indigo-600 hover:bg-indigo-50 hover:text-indigo-700"
             >
               {enhancedSuccess ? (
-                <>
-                  <Check className="w-4 h-4" />
-                  Enhanced
-                </>
+                <><Check className="w-4 h-4" /> Enhanced</>
               ) : (
-                <>
-                  {enhancing ? <Loader2 className="w-4 h-4 animate-spin" /> : "✨"}
-                  Enhance with AI
-                </>
+                <>{enhancing ? <Loader2 className="w-4 h-4 animate-spin" /> : "✨"} Enhance with AI</>
               )}
             </Button>
             <Button onClick={handleSave} disabled={loading}>
@@ -146,17 +168,75 @@ export function ChannelSettingsForm({ channel }: ChannelSettingsFormProps) {
               Save Context
             </Button>
           </div>
-          <p className="text-[11px] text-gray-400 flex items-center gap-1 italic">
-            <Info className="w-3 h-3" />
-            Context guides future analyses only. Existing themes are not affected.
-          </p>
+        </CardContent>
+      </Card>
+
+      {/* Digest Notifications */}
+      <Card className="border-indigo-50 shadow-sm">
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <div className="p-1.5 bg-indigo-50 rounded-md text-indigo-500">
+              <BellRing className="w-4 h-4" />
+            </div>
+            <CardTitle>Digest Notifications</CardTitle>
+          </div>
+          <CardDescription>Get a weekly summary of themes and spikes.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="flex items-center justify-between p-4 border rounded-xl bg-gray-50/50">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-white border rounded-lg text-gray-400"><Mail className="w-4 h-4" /></div>
+              <div>
+                <p className="text-sm font-bold text-gray-900">Email Digest</p>
+                <p className="text-xs text-gray-500">Sent every Monday morning.</p>
+              </div>
+            </div>
+            <Switch checked={true} disabled />
+          </div>
+
+          <div className="space-y-4 p-4 border rounded-xl bg-white shadow-sm">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-[#4A154B]/10 rounded-lg text-[#4A154B]"><SlackIcon className="w-4 h-4" /></div>
+                <div>
+                  <p className="text-sm font-bold text-gray-900">Slack Digest</p>
+                  <p className="text-xs text-gray-500">Post summary to a team channel.</p>
+                </div>
+              </div>
+              <Switch checked={slackEnabled} onCheckedChange={setSlackEnabled} />
+            </div>
+
+            {slackEnabled && (
+              <div className="pt-4 space-y-4 border-t border-gray-50 animate-in fade-in slide-in-from-top-2">
+                <div className="space-y-2">
+                  <Label className="text-xs">Incoming Webhook URL</Label>
+                  <Input 
+                    placeholder="https://hooks.slack.com/services/..." 
+                    value={slackUrl}
+                    onChange={e => setSlackUrl(e.target.value)}
+                    className="font-mono text-xs"
+                  />
+                  <p className="text-[10px] text-gray-400">
+                    Create a webhook in your Slack App under "Incoming Webhooks".
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" className="h-8 gap-2 text-xs" onClick={handleTestSlack} disabled={!slackUrl || testingSlack}>
+                    {testingSlack ? <Loader2 className="w-3 h-3 animate-spin" /> : <Send className="w-3 h-3" />}
+                    Test Notification
+                  </Button>
+                  <Button size="sm" className="h-8 text-xs bg-indigo-600" onClick={handleSave} disabled={loading}>Save Settings</Button>
+                </div>
+              </div>
+            )}
+          </div>
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader>
-          <CardTitle>Channel Settings</CardTitle>
-          <CardDescription>Update your channel details.</CardDescription>
+          <CardTitle>Channel Information</CardTitle>
+          <CardDescription>Update your channel metadata.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
@@ -185,9 +265,9 @@ export function ChannelSettingsForm({ channel }: ChannelSettingsFormProps) {
           </div>
         </CardContent>
         <CardFooter>
-          <Button onClick={handleSave} disabled={loading}>
+          <Button onClick={handleSave} disabled={loading} className="w-full">
             {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Save Changes
+            Save All Changes
           </Button>
         </CardFooter>
       </Card>
