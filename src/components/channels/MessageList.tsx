@@ -7,19 +7,25 @@ import { MessageCard } from "./MessageCard";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, Search } from "lucide-react";
+import { Loader2, Search, Brain, X, CheckSquare } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 interface MessageListProps {
   channelId: string;
 }
 
 export function MessageList({ channelId }: MessageListProps) {
+  const router = useRouter();
   const [messages, setMessages] = useState<DataPoint[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [sentiment, setSentiment] = useState<string>("all");
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
+
+  // Selection state
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [analyzingBatch, setAnalyzingBatch] = useState(false);
 
   const fetchMessages = useCallback(async (reset = false) => {
     setLoading(true);
@@ -30,7 +36,7 @@ export function MessageList({ channelId }: MessageListProps) {
       .select('*')
       .eq('channel_id', channelId)
       .order('message_timestamp', { ascending: false })
-      .range(reset ? 0 : page * 20, reset ? 19 : (page + 1) * 20 - 1); // 20 per page
+      .range(reset ? 0 : page * 20, reset ? 19 : (page + 1) * 20 - 1);
 
     if (search) {
       query = query.ilike('content', `%${search}%`);
@@ -40,7 +46,7 @@ export function MessageList({ channelId }: MessageListProps) {
       query = query.eq('sentiment', sentiment);
     }
 
-    const { data, error } = await query;
+    const { data } = await query;
 
     if (data) {
       if (reset) {
@@ -56,23 +62,57 @@ export function MessageList({ channelId }: MessageListProps) {
     setLoading(false);
   }, [channelId, search, sentiment, page]);
 
-  // Initial load
   useEffect(() => {
     fetchMessages(true);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [channelId]); // Only on mount/channel change
+  }, [channelId]);
 
-  // Filter change
   useEffect(() => {
     const timer = setTimeout(() => {
       fetchMessages(true);
-    }, 300); // Debounce search
+    }, 300);
     return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search, sentiment]);
 
+  const handleToggleSelect = (id: string, checked: boolean) => {
+    const newSet = new Set(selectedIds);
+    if (checked) newSet.add(id);
+    else newSet.delete(id);
+    setSelectedIds(newSet);
+  };
+
+  const handleAnalyzeSelected = async () => {
+    if (selectedIds.size < 2) {
+      alert("Please select at least 2 messages to analyze.");
+      return;
+    }
+
+    setAnalyzingBatch(true);
+    try {
+      const res = await fetch(`/api/channels/${channelId}/analyze`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messageIds: Array.from(selectedIds) })
+      });
+
+      const data = await res.json();
+      if (data.error) {
+        alert(data.error);
+      } else {
+        alert(`Successfully analyzed ${selectedIds.size} messages. ${data.themes} themes updated!`);
+        setSelectedIds(new Set());
+        router.refresh(); // Refresh to update themes in other tab
+      }
+    } catch (e) {
+      alert("Analysis failed.");
+    } finally {
+      setAnalyzingBatch(false);
+    }
+  };
+
+  const clearSelection = () => setSelectedIds(new Set());
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 relative pb-20">
       <div className="flex flex-col sm:flex-row gap-4">
         <div className="relative flex-1">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
@@ -98,7 +138,12 @@ export function MessageList({ channelId }: MessageListProps) {
 
       <div className="space-y-4">
         {messages.map((msg) => (
-          <MessageCard key={msg.id} message={msg} />
+          <MessageCard 
+            key={msg.id} 
+            message={msg} 
+            selected={selectedIds.has(msg.id)}
+            onSelect={handleToggleSelect}
+          />
         ))}
 
         {loading && (
@@ -121,6 +166,40 @@ export function MessageList({ channelId }: MessageListProps) {
           </div>
         )}
       </div>
+
+      {/* Floating Batch Action Bar */}
+      {selectedIds.size > 0 && (
+        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 bg-white border border-indigo-100 shadow-xl rounded-full px-6 py-3 flex items-center gap-6 z-50 animate-in fade-in slide-in-from-bottom-4 duration-300">
+          <div className="flex items-center gap-2 border-r pr-6 border-gray-100">
+            <CheckSquare className="w-5 h-5 text-indigo-600" />
+            <span className="font-semibold text-gray-900">{selectedIds.size} selected</span>
+          </div>
+          
+          <div className="flex items-center gap-2">
+            <Button 
+              size="sm" 
+              className="rounded-full bg-indigo-600 hover:bg-indigo-700"
+              onClick={handleAnalyzeSelected}
+              disabled={analyzingBatch}
+            >
+              {analyzingBatch ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <Brain className="w-4 h-4 mr-2" />
+              )}
+              Analyze Selected
+            </Button>
+            <Button 
+              size="sm" 
+              variant="ghost" 
+              className="rounded-full h-8 w-8 p-0 text-gray-400 hover:text-gray-600"
+              onClick={clearSelection}
+            >
+              <X className="w-4 h-4" />
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

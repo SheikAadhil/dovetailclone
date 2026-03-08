@@ -6,12 +6,13 @@ import { Smile, Frown, Meh } from "lucide-react";
 
 interface MessageCardProps {
   message: DataPoint;
-  themes?: Theme[]; // Optional themes associated with this message
+  themes?: Theme[];
   onClick?: () => void;
+  selected?: boolean;
+  onSelect?: (id: string, checked: boolean) => void;
 }
 
-export function MessageCard({ message, themes, onClick }: MessageCardProps) {
-  // Sentiment Badge
+export function MessageCard({ message, themes, onClick, selected, onSelect }: MessageCardProps) {
   const getSentimentIcon = (sentiment: string | null) => {
     switch (sentiment) {
       case 'positive': return <Smile className="w-3 h-3 text-green-500" />;
@@ -34,12 +35,29 @@ export function MessageCard({ message, themes, onClick }: MessageCardProps) {
 
   return (
     <div 
-      className={`p-4 border rounded-lg bg-white hover:bg-gray-50 transition-colors ${onClick ? 'cursor-pointer' : ''}`}
-      onClick={onClick}
+      className={`p-4 border rounded-lg transition-colors flex gap-4 ${
+        selected ? 'bg-indigo-50 border-indigo-200 shadow-sm' : 'bg-white hover:bg-gray-50'
+      } ${onClick ? 'cursor-pointer' : ''}`}
+      onClick={(e) => {
+        // If clicking the text/area, trigger the detail click
+        // But if clicking specifically near the checkbox, handle selection
+        onClick?.();
+      }}
     >
-      <div className="flex items-start gap-3">
-        <Avatar className="w-8 h-8">
-          <AvatarImage src="" /> {/* Slack avatar URL not stored yet, TODO */}
+      {/* Checkbox for selection */}
+      {onSelect && (
+        <div className="flex items-center" onClick={(e) => e.stopPropagation()}>
+          <input
+            type="checkbox"
+            checked={selected}
+            onChange={(e) => onSelect(message.id, e.target.checked)}
+            className="w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-600 cursor-pointer"
+          />
+        </div>
+      )}
+
+      <div className="flex flex-1 items-start gap-3">
+        <Avatar className="w-8 h-8 flex-shrink-0">
           <AvatarFallback className="bg-indigo-100 text-indigo-700 text-xs font-bold">
             {initials}
           </AvatarFallback>

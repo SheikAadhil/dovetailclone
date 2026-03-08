@@ -1,7 +1,7 @@
 import { auth } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
 import { createSupabaseServerClient, createSupabaseAdminClient } from '@/lib/supabase-server';
-import { analyzeThemes, ThemeResult } from '@/lib/ai';
+import { analyzeThemes } from '@/lib/ai';
 
 export async function POST(
   request: Request,
@@ -20,21 +20,40 @@ export async function POST(
     supabase = await createSupabaseServerClient();
   }
 
-  // 1. Fetch data points
-  const { data: dataPoints, error: dpError } = await supabase
-    .from('data_points')
-    .select('id, content, sentiment, workspace_id')
-    .eq('channel_id', params.id)
-    .order('message_timestamp', { ascending: false })
-    .limit(200);
-
-  if (dpError) {
-    return NextResponse.json({ error: 'Database error fetching messages', details: dpError }, { status: 500 });
+  // Parse optional messageIds from body
+  let messageIds: string[] | null = null;
+  try {
+    const body = await request.json();
+    if (body.messageIds && Array.isArray(body.messageIds)) {
+      messageIds = body.messageIds;
+    }
+  } catch (e) {
+    // No body or invalid JSON is fine, we just fall back to all messages
   }
 
-  if (!dataPoints || dataPoints.length < 5) {
+  // 1. Fetch data points
+  let query = supabase
+    .from('data_points')
+    .select('id, content, sentiment, workspace_id')
+    .eq('channel_id', params.id);
+
+  // If specific IDs provided, filter by them
+  if (messageIds && messageIds.length > 0) {
+    query = query.in('id', messageIds);
+  } else {
+    // Default fallback: latest 200 messages
+    query = query.order('message_timestamp', { ascending: false }).limit(200);
+  }
+
+  const { data: dataPoints, error: dpError } = await query;
+
+  if (dpError) {
+    return NextResponse.json({ error: 'Database error fetching messages' }, { status: 500 });
+  }
+
+  if (!dataPoints || dataPoints.length < 2) {
     return NextResponse.json({ 
-      error: `Not enough data. Found ${dataPoints?.length || 0} messages, need at least 5.`,
+      error: `Not enough messages selected. Need at least 2 for analysis.`,
       found: dataPoints?.length || 0 
     }, { status: 400 });
   }
@@ -49,17 +68,10 @@ export async function POST(
   const themesResult = await analyzeThemes(messagesForAi);
 
   if (!themesResult || themesResult.length === 0) {
-    return NextResponse.json({ 
-      themes: 0, 
-      debug: { 
-        messageCount: dataPoints.length,
-        aiCalled: true,
-        reason: 'AI returned no themes'
-      } 
-    });
+    return NextResponse.json({ themes: 0 });
   }
 
-  // 4. Fetch existing themes to handle upsert manually
+  // 4. Fetch existing themes to handle upsert
   const { data: existingThemes } = await supabase
     .from('themes')
     .select('id, name')
@@ -74,6 +86,8 @@ export async function POST(
       dataPoints.some(dp => dp.id === id)
     );
     
+    if (validMessageIds.length === 0) continue;
+
     const breakdown: Record<string, number> = { positive: 0, negative: 0, neutral: 0 };
     validMessageIds.forEach(id => {
       const dp = dataPoints.find(d => d.id === id);
@@ -111,45 +125,25 @@ export async function POST(
         .select('id')
         .single();
       
-      if (insertError || !newTheme) {
-        console.error('Error inserting theme:', insertError);
-        continue;
-      }
+      if (insertError || !newTheme) continue;
       themeId = newTheme.id;
     }
 
     processedThemeIds.push(themeId);
 
     if (themeId) {
-      await supabase
-        .from('data_point_themes')
-        .delete()
-        .eq('theme_id', themeId);
+      // For selective analysis, we might want to APPEND instead of replace associations
+      // But for simplicity and matching standard behavior, we'll follow the original logic
+      await supabase.from('data_point_themes').delete().eq('theme_id', themeId);
       
-      if (validMessageIds.length > 0) {
-        const relations = validMessageIds.map(dpId => ({
-          data_point_id: dpId,
-          theme_id: themeId,
-          relevance_score: 1.0
-        }));
-        
-        await supabase
-          .from('data_point_themes')
-          .insert(relations);
-      }
+      const relations = validMessageIds.map(dpId => ({
+        data_point_id: dpId,
+        theme_id: themeId,
+        relevance_score: 1.0
+      }));
+      
+      await supabase.from('data_point_themes').insert(relations);
     }
-  }
-
-  // 6. Delete stale themes
-  const themesToDelete = (existingThemes || [])
-    .filter(t => !processedThemeIds.includes(t.id))
-    .map(t => t.id);
-
-  if (themesToDelete.length > 0) {
-    await supabase
-      .from('themes')
-      .delete()
-      .in('id', themesToDelete);
   }
 
   // 7. Update channel timestamp
