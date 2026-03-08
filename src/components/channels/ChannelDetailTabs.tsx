@@ -8,6 +8,7 @@ import { ThemeDrawer } from "./ThemeDrawer";
 import { MessageList } from "./MessageList";
 import { ChannelSettingsForm } from "./ChannelSettingsForm";
 import { BackfillDialog } from "./BackfillDialog";
+import { SourcesPanel } from "./SourcesPanel";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { 
