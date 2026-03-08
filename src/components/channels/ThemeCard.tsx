@@ -146,13 +146,13 @@ export function ThemeCard({
         </div>
 
         {/* TREND VIEW */}
-        {theme.trend_data && theme.trend_data.length >= 1 && (
+        {theme.trend_data && (
           <div className="pt-3 border-t border-gray-100 flex items-center justify-between">
             <div className={`flex items-center gap-1 text-[10px] font-bold uppercase tracking-tight ${trendUI.color}`}>
               {trendUI.icon}
-              {theme.trend_percent_change !== undefined && theme.trend_percent_change !== 0 
+              {theme.trend_percent_change !== undefined && theme.trend_percent_change !== 0 && theme.trend_data.length >= 2 
                 ? `${theme.trend_percent_change > 0 ? '+' : ''}${Math.abs(theme.trend_percent_change)}%` 
-                : 'Stable'}
+                : 'Steady'}
               <span className="text-gray-400 font-normal lowercase ml-0.5">vs last week</span>
             </div>
             <div className="h-8 w-20 flex-shrink-0">
@@ -170,7 +170,7 @@ export function ThemeCard({
                 </ResponsiveContainer>
               ) : (
                 <div className="h-full w-full flex items-center justify-center text-[9px] text-gray-400 bg-gray-50 rounded">
-                  Need more data
+                  {theme.trend_data.length === 1 ? "Wait 24h" : "No trend"}
                 </div>
               )}
             </div>

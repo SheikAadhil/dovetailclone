@@ -161,6 +161,16 @@ export async function POST(
       return NextResponse.json({ error: insertError.message }, { status: 500 });
     }
 
+    // Create initial snapshot
+    const today = new Date().toISOString().split('T')[0];
+    await supabase.from('theme_snapshots').insert({
+      theme_id: theme.id,
+      channel_id: params.id,
+      snapshot_date: today,
+      data_point_count: 0,
+      sentiment_breakdown: {}
+    });
+
     return NextResponse.json(theme);
   } catch (e: any) {
     console.error("General Theme POST Error:", e);
