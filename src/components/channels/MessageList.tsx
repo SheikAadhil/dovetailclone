@@ -21,6 +21,7 @@ export function MessageList({ channelId }: MessageListProps) {
   const [fields, setFields] = useState<ChannelField[]>([]);
   const [themes, setThemes] = useState<Theme[]>([]);
   const [loading, setLoading] = useState(true);
+  const [mounted, setMounted] = useState(false);
   
   const [search, setSearch] = useState("");
   const [sentiment, setSentiment] = useState<string>("all");
@@ -33,19 +34,27 @@ export function MessageList({ channelId }: MessageListProps) {
   const [analyzingBatch, setAnalyzingBatch] = useState(false);
   const [tagging, setTagging] = useState(false);
 
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   const fetchFields = async () => {
     try {
       const res = await fetch(`/api/channels/${channelId}/fields`);
+      if (!res.ok) return;
       const data = await res.json();
-      setFields(data);
+      if (Array.isArray(data)) setFields(data);
     } catch (e) { console.error(e); }
   };
 
   const fetchThemesList = async () => {
     try {
       const res = await fetch(`/api/channels/${channelId}/themes`);
+      if (!res.ok) return;
       const data = await res.json();
-      setThemes(data.themes);
+      if (data && Array.isArray(data.themes)) {
+        setThemes(data.themes);
+      }
     } catch (e) { console.error(e); }
   };
 
@@ -58,7 +67,7 @@ export function MessageList({ channelId }: MessageListProps) {
       .select('*')
       .eq('channel_id', channelId)
       .order('message_timestamp', { ascending: false })
-      .range(reset ? 0 : page * 20, reset ? 19 : (page + 1) * 20 - 1);
+      .range(reset ? 0 : (reset ? 0 : page) * 20, reset ? 19 : (page + 1) * 20 - 1);
 
     if (search) query = query.ilike('content', `%${search}%`);
     if (sentiment && sentiment !== 'all') query = query.eq('sentiment', sentiment);
@@ -77,15 +86,19 @@ export function MessageList({ channelId }: MessageListProps) {
   }, [channelId, search, sentiment, metadataFilters, page]);
 
   useEffect(() => {
-    fetchFields();
-    fetchThemesList();
-    fetchMessages(true);
-  }, [channelId]);
+    if (mounted) {
+      fetchFields();
+      fetchThemesList();
+      fetchMessages(true);
+    }
+  }, [channelId, mounted]);
 
   useEffect(() => {
-    const timer = setTimeout(() => fetchMessages(true), 300);
-    return () => clearTimeout(timer);
-  }, [search, sentiment, metadataFilters]);
+    if (mounted) {
+      const timer = setTimeout(() => fetchMessages(true), 300);
+      return () => clearTimeout(timer);
+    }
+  }, [search, sentiment, metadataFilters, mounted]);
 
   const handleToggleSelect = (id: string, checked: boolean) => {
     const newSet = new Set(selectedIds);
@@ -114,6 +127,7 @@ export function MessageList({ channelId }: MessageListProps) {
   };
 
   const handleTagWithTheme = async (themeId: string) => {
+    if (selectedIds.size === 0) return;
     setTagging(true);
     try {
       const res = await fetch(`/api/channels/${channelId}/themes/${themeId}/assign`, {
@@ -126,8 +140,15 @@ export function MessageList({ channelId }: MessageListProps) {
         setSelectedIds(new Set());
         fetchMessages(true);
         router.refresh();
+      } else {
+        throw new Error("Tagging failed");
       }
-    } catch (e) { alert("Tagging failed"); } finally { setTagging(false); }
+    } catch (e) { 
+      console.error(e);
+      alert("Tagging failed. Please try again."); 
+    } finally { 
+      setTagging(false); 
+    }
   };
 
   const updateMetadataFilter = (column: string, value: string) => {
@@ -135,6 +156,8 @@ export function MessageList({ channelId }: MessageListProps) {
   };
 
   const clearSelection = () => setSelectedIds(new Set());
+
+  if (!mounted) return null;
 
   return (
     <div className="space-y-4 relative pb-20">
@@ -145,7 +168,9 @@ export function MessageList({ channelId }: MessageListProps) {
             <Input placeholder="Search message content..." className="pl-9 bg-white" value={search} onChange={(e) => setSearch(e.target.value)} />
           </div>
           <Select value={sentiment} onValueChange={setSentiment}>
-            <SelectTrigger className="w-[160px] bg-white"><SelectValue placeholder="All Sentiments" /></SelectTrigger>
+            <SelectTrigger className="w-[160px] bg-white border-gray-200">
+              <SelectValue placeholder="All Sentiments" />
+            </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Sentiments</SelectItem>
               <SelectItem value="positive">Positive</SelectItem>
@@ -155,7 +180,7 @@ export function MessageList({ channelId }: MessageListProps) {
           </Select>
         </div>
 
-        {fields.length > 0 && (
+        {fields && fields.length > 0 && (
           <div className="flex flex-wrap gap-3 pt-3 border-t border-gray-200/60">
             <div className="flex items-center gap-2 text-xs font-bold text-gray-400 uppercase tracking-wider mr-2"><Filter className="w-3 h-3" /> Segment by:</div>
             {fields.map(field => (
@@ -179,7 +204,7 @@ export function MessageList({ channelId }: MessageListProps) {
       </div>
 
       <div className="space-y-4">
-        {messages.map((msg) => (
+        {messages && messages.map((msg) => (
           <MessageCard key={msg.id} message={msg} selected={selectedIds.has(msg.id)} onSelect={handleToggleSelect} />
         ))}
         {loading && <div className="flex justify-center py-10"><Loader2 className="w-6 h-6 animate-spin text-indigo-600" /></div>}
@@ -195,21 +220,21 @@ export function MessageList({ channelId }: MessageListProps) {
           </div>
           
           <div className="flex items-center gap-2">
-            <DropdownMenu>
+            <DropdownMenu modal={false}>
               <DropdownMenuTrigger asChild>
                 <Button size="sm" variant="outline" className="rounded-full gap-2 border-indigo-200 text-indigo-600" disabled={tagging}>
                   {tagging ? <Loader2 className="w-4 h-4 animate-spin" /> : <Tag className="w-4 h-4" />}
                   Tag with Theme
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56 max-h-64 overflow-auto">
-                <DropdownMenuLabel className="text-[10px] font-bold uppercase text-gray-400">Select Target Theme</DropdownMenuLabel>
+              <DropdownMenuContent align="end" className="w-56 max-h-64 overflow-auto z-[60]">
+                <DropdownMenuLabel className="text-[10px] font-bold uppercase text-gray-400 px-3 py-2">Select Target Theme</DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                {themes.length === 0 ? (
+                {!themes || themes.length === 0 ? (
                   <div className="p-4 text-xs text-gray-400 italic">No themes found. Create one first.</div>
                 ) : (
                   themes.map(t => (
-                    <DropdownMenuItem key={t.id} onClick={() => handleTagWithTheme(t.id)}>
+                    <DropdownMenuItem key={t.id} onClick={() => handleTagWithTheme(t.id)} className="cursor-pointer px-3 py-2">
                       <div className="flex flex-col">
                         <span className="font-medium text-sm">{t.name}</span>
                         <span className="text-[10px] text-gray-400">{t.data_point_count} messages</span>
