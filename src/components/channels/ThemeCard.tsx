@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { 
   ArrowRight, MessageSquare, Smile, Frown, Meh, MoreHorizontal, 
-  Pin, PinOff, Pencil, Trash2, Merge, CheckCircle2 
+  Pin, PinOff, Pencil, Trash2, Merge, CheckCircle2, TrendingUp, TrendingDown, Minus
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -13,6 +13,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { LineChart, Line, ResponsiveContainer } from "recharts";
 
 interface ThemeCardProps {
   theme: Theme;
@@ -65,6 +66,14 @@ export function ThemeCard({
   const negPct = (negative / total) * 100;
   const neuPct = (neutral / total) * 100;
 
+  // Trend color/icon
+  const getTrendUI = () => {
+    if (theme.trend_direction === 'rising') return { color: 'text-green-600', icon: <TrendingUp className="w-3 h-3" />, chart: '#10b981' };
+    if (theme.trend_direction === 'falling') return { color: 'text-red-600', icon: <TrendingDown className="w-3 h-3" />, chart: '#ef4444' };
+    return { color: 'text-gray-400', icon: <Minus className="w-3 h-3" />, chart: '#9ca3af' };
+  };
+  const trendUI = getTrendUI();
+
   return (
     <Card className={`flex flex-col h-full transition-all relative ${
       isMergeSource ? 'border-indigo-500 ring-2 ring-indigo-500/20' : 'hover:shadow-md'
@@ -78,7 +87,11 @@ export function ThemeCard({
       <CardHeader className="pb-2 flex flex-row items-start justify-between space-y-0">
         <div className="flex-1 min-w-0 pr-2">
           <div className="flex items-center gap-2 mb-1">
-            {theme.is_pinned && <Pin className="w-3 h-3 text-indigo-600 fill-indigo-600" />}
+            {theme.is_pinned && (
+              <div className="p-1 bg-indigo-50 rounded">
+                <Pin className="w-3.5 h-3.5 text-indigo-600 fill-indigo-600" />
+              </div>
+            )}
             {theme.is_manual && <Badge variant="outline" className="text-[9px] h-4 px-1 uppercase border-orange-200 text-orange-600 bg-orange-50">Manual</Badge>}
           </div>
           <CardTitle className="text-lg font-bold line-clamp-2">{theme.name}</CardTitle>
@@ -93,11 +106,7 @@ export function ThemeCard({
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48">
               <DropdownMenuItem onClick={() => onPin(theme)}>
-                {theme.is_pinned ? (
-                  <><PinOff className="w-4 h-4 mr-2" /> Unpin</>
-                ) : (
-                  <><Pin className="w-4 h-4 mr-2" /> Pin to top</>
-                )}
+                {theme.is_pinned ? <><PinOff className="w-4 h-4 mr-2" /> Unpin</> : <><Pin className="w-4 h-4 mr-2" /> Pin to top</>}
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => onEdit(theme)}>
                 <Pencil className="w-4 h-4 mr-2" /> Edit theme
@@ -135,6 +144,30 @@ export function ThemeCard({
           {neuPct > 0 && <div style={{ width: `${neuPct}%` }} className="bg-gray-300" />}
           {negPct > 0 && <div style={{ width: `${negPct}%` }} className="bg-red-400" />}
         </div>
+
+        {/* TREND VIEW */}
+        {theme.trend_data && theme.trend_data.length >= 2 && (
+          <div className="pt-2 flex items-center justify-between">
+            <div className={`flex items-center gap-1 text-[10px] font-bold uppercase tracking-tight ${trendUI.color}`}>
+              {trendUI.icon}
+              {theme.trend_percent_change !== 0 ? `${Math.abs(theme.trend_percent_change || 0)}%` : 'Stable'}
+              <span className="text-gray-400 font-normal lowercase ml-0.5">this week</span>
+            </div>
+            <div className="h-8 w-20">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={theme.trend_data}>
+                  <Line 
+                    type="monotone" 
+                    dataKey="count" 
+                    stroke={trendUI.chart} 
+                    strokeWidth={2} 
+                    dot={false} 
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        )}
       </CardContent>
 
       <CardFooter className="pt-2 border-t bg-gray-50/50">
@@ -146,9 +179,7 @@ export function ThemeCard({
               isMergeSource ? 'bg-gray-100 text-gray-400 border-dashed border-2' : 'bg-indigo-600 hover:bg-indigo-700 text-white'
             }`}
           >
-            {isMergeSource ? "Source" : (
-              <><CheckCircle2 className="w-4 h-4" /> Merge Here</>
-            )}
+            {isMergeSource ? "Source" : <><CheckCircle2 className="w-4 h-4" /> Merge Here</>}
           </Button>
         ) : (
           <Button 

@@ -6,8 +6,6 @@ export const dynamic = 'force-dynamic';
 export async function GET(request: Request) {
   const authHeader = request.headers.get('Authorization');
   if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-    // Check if it's called by Vercel Cron which uses x-vercel-cron header or similar
-    // But prompt says "Verify request has CRON_SECRET header matching env var"
     return new NextResponse('Unauthorized', { status: 401 });
   }
 
@@ -15,8 +13,7 @@ export async function GET(request: Request) {
   const oneDayAgo = new Date();
   oneDayAgo.setHours(oneDayAgo.getHours() - 23);
 
-  // Fetch channels to analyze
-  // (last_analyzed_at is null OR last_analyzed_at < now() - interval '23 hours')
+  // 1. Fetch channels to analyze
   const { data: channels } = await supabase
     .from('channels')
     .select('id')
@@ -30,12 +27,6 @@ export async function GET(request: Request) {
 
   for (const channel of channels) {
     try {
-      // Call internal analyze endpoint
-      // Note: analyze endpoint expects Clerk auth.
-      // But we are in a Cron job.
-      // I should update /api/channels/[id]/analyze to also accept CRON_SECRET.
-      // I'll do that next.
-      
       const res = await fetch(`${appUrl}/api/channels/${channel.id}/analyze`, {
         method: 'POST',
         headers: {
@@ -43,7 +34,29 @@ export async function GET(request: Request) {
         }
       });
       
-      if (res.ok) analyzedCount++;
+      if (res.ok) {
+        analyzedCount++;
+        
+        // 2. FEATURE 5: Take snapshots for trends after analysis
+        const { data: themes } = await supabase
+          .from('themes')
+          .select('id, data_point_count, sentiment_breakdown')
+          .eq('channel_id', channel.id);
+
+        if (themes && themes.length > 0) {
+          const snapshots = themes.map(theme => ({
+            theme_id: theme.id,
+            channel_id: channel.id,
+            snapshot_date: new Date().toISOString().split('T')[0], // YYYY-MM-DD
+            data_point_count: theme.data_point_count,
+            sentiment_breakdown: theme.sentiment_breakdown
+          }));
+
+          await supabase
+            .from('theme_snapshots')
+            .upsert(snapshots, { onConflict: 'theme_id,snapshot_date' });
+        }
+      }
     } catch (e) {
       console.error(`Error analyzing channel ${channel.id}:`, e);
     }

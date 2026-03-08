@@ -14,14 +14,14 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { 
   Brain, RefreshCcw, LayoutPanelLeft, MessageSquare, 
   Settings as SettingsIcon, AlertCircle, History, Plus, MoreVertical, 
-  FolderOpen, Pencil, Trash2, X, Merge, CheckCircle2
+  FolderOpen, Pencil, Trash2, X, Merge, CheckCircle2, Clock
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface ChannelDetailTabsProps {
@@ -33,6 +33,8 @@ export function ChannelDetailTabs({ channel }: ChannelDetailTabsProps) {
   const [themes, setThemes] = useState<Theme[]>([]);
   const [topics, setTopics] = useState<Topic[]>([]);
   const [selectedTopicId, setSelectedTopicId] = useState<string>("all");
+  const [period, setPeriod] = useState<string>("30"); // "7", "30", "90", "all"
+  
   const [loadingThemes, setLoadingThemes] = useState(true);
   const [loadingTopics, setLoadingTopics] = useState(true);
   const [analyzing, setAnalyzing] = useState(false);
@@ -74,10 +76,10 @@ export function ChannelDetailTabs({ channel }: ChannelDetailTabsProps) {
     }
   };
 
-  const fetchThemes = async (topicId = selectedTopicId) => {
+  const fetchThemes = async (topicId = selectedTopicId, timePeriod = period) => {
     setLoadingThemes(true);
     try {
-      const url = `/api/channels/${channel.id}/themes?topicId=${topicId}`;
+      const url = `/api/channels/${channel.id}/themes?topicId=${topicId}&period=${timePeriod}`;
       const res = await fetch(url);
       const data = await res.json();
       setThemes(data.themes);
@@ -98,8 +100,8 @@ export function ChannelDetailTabs({ channel }: ChannelDetailTabsProps) {
   }, [channel.id]);
 
   useEffect(() => {
-    fetchThemes(selectedTopicId);
-  }, [selectedTopicId]);
+    fetchThemes(selectedTopicId, period);
+  }, [selectedTopicId, period]);
 
   const handleAnalyze = async () => {
     setAnalyzing(true);
@@ -272,6 +274,7 @@ export function ChannelDetailTabs({ channel }: ChannelDetailTabsProps) {
               Last analyzed {formatDistanceToNow(new Date(stats.last_analyzed_at), { addSuffix: true })}
             </span>
           )}
+          <SourcesPanel channelId={channel.id} />
           <Button variant="outline" size="sm" onClick={() => setIsBackfillOpen(true)} className="gap-2">
             <History className="w-4 h-4" />
             Sync History
@@ -300,139 +303,164 @@ export function ChannelDetailTabs({ channel }: ChannelDetailTabsProps) {
         </TabsList>
 
         <TabsContent value="themes" className="mt-6">
-          <div className="flex gap-8 min-h-[600px]">
-            {/* LEFT PANEL: TOPICS */}
-            <div className="w-60 flex-shrink-0 flex flex-col gap-4">
-              <div className="flex items-center justify-between px-2">
-                <div className="flex items-center gap-2 font-semibold text-sm text-gray-900">
-                  Topics
-                  <span className="bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded text-[10px]">{topics.length}</span>
-                </div>
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  className="h-7 w-7 p-0" 
-                  onClick={() => setIsTopicOpen(true)}
-                  disabled={topics.length >= 10 || mergeMode}
-                >
-                  <Plus className="w-4 h-4" />
-                </Button>
-              </div>
-
-              <div className="space-y-1">
+          <div className="flex flex-col gap-6">
+            {/* Time Period Filter */}
+            <div className="flex items-center gap-2 bg-gray-100/50 p-1 rounded-lg w-fit">
+              <Clock className="w-3.5 h-3.5 text-gray-400 ml-2 mr-1" />
+              {[
+                { label: '7d', value: '7' },
+                { label: '30d', value: '30' },
+                { label: '90d', value: '90' },
+                { label: 'All', value: 'all' }
+              ].map(opt => (
                 <button
-                  disabled={mergeMode}
-                  onClick={() => setSelectedTopicId("all")}
-                  className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors flex items-center justify-between ${
-                    selectedTopicId === "all" 
-                      ? 'bg-indigo-50 text-indigo-700 font-medium border-l-2 border-indigo-600 rounded-l-none' 
-                      : 'text-gray-600 hover:bg-gray-50'
-                  } ${mergeMode ? 'opacity-50' : ''}`}
+                  key={opt.value}
+                  onClick={() => setPeriod(opt.value)}
+                  className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${
+                    period === opt.value 
+                      ? 'bg-white text-indigo-600 shadow-sm' 
+                      : 'text-gray-500 hover:text-gray-700'
+                  }`}
                 >
-                  All Topics
+                  {opt.label}
                 </button>
-                
-                {loadingTopics ? (
-                  [1, 2, 3].map(i => <Skeleton key={i} className="h-9 w-full rounded-md" />)
-                ) : (
-                  topics.map(topic => (
-                    <div key={topic.id} className="group relative">
-                      <button
-                        disabled={mergeMode}
-                        onClick={() => setSelectedTopicId(topic.id)}
-                        className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors flex items-center justify-between ${
-                          selectedTopicId === topic.id 
-                            ? 'bg-indigo-50 text-indigo-700 font-medium border-l-2 border-indigo-600 rounded-l-none' 
-                            : 'text-gray-600 hover:bg-gray-50'
-                        } ${mergeMode ? 'opacity-50' : ''}`}
-                      >
-                        <span className="truncate pr-4">{topic.name}</span>
-                        <span className="bg-gray-100 group-hover:bg-white text-gray-500 px-1.5 py-0.5 rounded text-[10px]">
-                          {topic.theme_count}
-                        </span>
-                      </button>
-                      {!mergeMode && (
-                        <div className="absolute right-8 top-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" className="h-6 w-6 p-0"><MoreVertical className="w-3.5 h-3.5" /></Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={() => handleDeleteTopic(topic.id)} className="text-red-600">
-                                <Trash2 className="w-4 h-4 mr-2" /> Delete
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </div>
-                      )}
-                    </div>
-                  ))
-                )}
-              </div>
-              
-              <div className="mt-auto p-3 bg-gray-50 rounded-lg border border-gray-100">
-                <p className="text-[10px] text-gray-400 leading-tight">
-                  <Brain className="w-3 h-3 inline mr-1 mb-0.5" />
-                  AI generates topics during analysis if none exist.
-                </p>
-              </div>
+              ))}
             </div>
 
-            {/* RIGHT PANEL: THEMES */}
-            <div className="flex-1 space-y-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  {selectedTopicId !== "all" && selectedTopic ? (
-                    <div className="bg-gray-50 border rounded-lg p-4">
-                      <div className="flex items-center gap-2 text-gray-900 font-semibold mb-1">
-                        <FolderOpen className="w-4 h-4 text-indigo-600" />
-                        {selectedTopic.name}
-                      </div>
-                      <p className="text-xs text-gray-500">{selectedTopic.description || "No description provided."}</p>
-                    </div>
+            <div className="flex gap-8 min-h-[600px]">
+              {/* LEFT PANEL: TOPICS */}
+              <div className="w-60 flex-shrink-0 flex flex-col gap-4">
+                <div className="flex items-center justify-between px-2">
+                  <div className="flex items-center gap-2 font-semibold text-sm text-gray-900">
+                    Topics
+                    <span className="bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded text-[10px]">{topics.length}</span>
+                  </div>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="h-7 w-7 p-0" 
+                    onClick={() => setIsTopicOpen(true)}
+                    disabled={topics.length >= 10 || mergeMode}
+                  >
+                    <Plus className="w-4 h-4" />
+                  </Button>
+                </div>
+
+                <div className="space-y-1">
+                  <button
+                    disabled={mergeMode}
+                    onClick={() => setSelectedTopicId("all")}
+                    className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors flex items-center justify-between ${
+                      selectedTopicId === "all" 
+                        ? 'bg-indigo-50 text-indigo-700 font-medium border-l-2 border-indigo-600 rounded-l-none' 
+                        : 'text-gray-600 hover:bg-gray-50'
+                    } ${mergeMode ? 'opacity-50' : ''}`}
+                  >
+                    All Topics
+                  </button>
+                  
+                  {loadingTopics ? (
+                    [1, 2, 3].map(i => <Skeleton key={i} className="h-9 w-full rounded-md" />)
                   ) : (
-                    <h2 className="text-lg font-semibold text-gray-900">All Themes</h2>
+                    topics.map(topic => (
+                      <div key={topic.id} className="group relative">
+                        <button
+                          disabled={mergeMode}
+                          onClick={() => setSelectedTopicId(topic.id)}
+                          className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors flex items-center justify-between ${
+                            selectedTopicId === topic.id 
+                              ? 'bg-indigo-50 text-indigo-700 font-medium border-l-2 border-indigo-600 rounded-l-none' 
+                              : 'text-gray-600 hover:bg-gray-50'
+                          } ${mergeMode ? 'opacity-50' : ''}`}
+                        >
+                          <span className="truncate pr-4">{topic.name}</span>
+                          <span className="bg-gray-100 group-hover:bg-white text-gray-500 px-1.5 py-0.5 rounded text-[10px]">
+                            {topic.theme_count}
+                          </span>
+                        </button>
+                        {!mergeMode && (
+                          <div className="absolute right-8 top-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" className="h-6 w-6 p-0"><MoreVertical className="w-3.5 h-3.5" /></Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => handleDeleteTopic(topic.id)} className="text-red-600">
+                                  <Trash2 className="w-4 h-4 mr-2" /> Delete
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </div>
+                        )}
+                      </div>
+                    ))
                   )}
                 </div>
-                {!mergeMode && (
-                  <Button size="sm" onClick={() => handleOpenThemeDialog()} className="gap-2">
-                    <Plus className="w-4 h-4" /> New Theme
-                  </Button>
-                )}
-              </div>
-
-              {loadingThemes ? (
-                <div className="grid gap-6 grid-cols-1 md:grid-cols-2">
-                  {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-40 w-full rounded-lg" />)}
-                </div>
-              ) : themes.length > 0 ? (
-                <div className="grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
-                  {themes.map((theme) => (
-                    <ThemeCard 
-                      key={theme.id} 
-                      theme={theme} 
-                      onView={handleViewTheme}
-                      onEdit={handleOpenThemeDialog}
-                      onDelete={handleDeleteTheme}
-                      onPin={handlePinTheme}
-                      onMergeStart={startMerge}
-                      onMergeSelect={handleMergeComplete}
-                      mergeMode={mergeMode}
-                      isMergeSource={mergeSource?.id === theme.id}
-                    />
-                  ))}
-                </div>
-              ) : (
-                <div className="flex flex-col items-center justify-center h-64 border-2 border-dashed rounded-lg bg-gray-50 text-center p-6">
-                  <AlertCircle className="w-10 h-10 text-gray-300 mb-4" />
-                  <h3 className="text-lg font-medium text-gray-900">No themes here</h3>
-                  <p className="text-gray-500 mt-2 max-w-sm">
-                    {selectedTopicId === "all" 
-                      ? "Re-analyze to discover recurring themes in your messages."
-                      : "No themes categorized under this topic yet."}
+                
+                <div className="mt-auto p-3 bg-gray-50 rounded-lg border border-gray-100">
+                  <p className="text-[10px] text-gray-400 leading-tight">
+                    <Brain className="w-3 h-3 inline mr-1 mb-0.5" />
+                    AI generates topics during analysis if none exist.
                   </p>
                 </div>
-              )}
+              </div>
+
+              {/* RIGHT PANEL: THEMES */}
+              <div className="flex-1 space-y-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    {selectedTopicId !== "all" && selectedTopic ? (
+                      <div className="bg-gray-50 border rounded-lg p-4">
+                        <div className="flex items-center gap-2 text-gray-900 font-semibold mb-1">
+                          <FolderOpen className="w-4 h-4 text-indigo-600" />
+                          {selectedTopic.name}
+                        </div>
+                        <p className="text-xs text-gray-500">{selectedTopic.description || "No description provided."}</p>
+                      </div>
+                    ) : (
+                      <h2 className="text-lg font-semibold text-gray-900">All Themes</h2>
+                    )}
+                  </div>
+                  {!mergeMode && (
+                    <Button size="sm" onClick={() => handleOpenThemeDialog()} className="gap-2">
+                      <Plus className="w-4 h-4" /> New Theme
+                    </Button>
+                  )}
+                </div>
+
+                {loadingThemes ? (
+                  <div className="grid gap-6 grid-cols-1 md:grid-cols-2">
+                    {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-40 w-full rounded-lg" />)}
+                  </div>
+                ) : themes.length > 0 ? (
+                  <div className="grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
+                    {themes.map((theme) => (
+                      <ThemeCard 
+                        key={theme.id} 
+                        theme={theme} 
+                        onView={handleViewTheme}
+                        onEdit={handleOpenThemeDialog}
+                        onDelete={handleDeleteTheme}
+                        onPin={handlePinTheme}
+                        onMergeStart={startMerge}
+                        onMergeSelect={handleMergeComplete}
+                        mergeMode={mergeMode}
+                        isMergeSource={mergeSource?.id === theme.id}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center h-64 border-2 border-dashed rounded-lg bg-gray-50 text-center p-6">
+                    <AlertCircle className="w-10 h-10 text-gray-300 mb-4" />
+                    <h3 className="text-lg font-medium text-gray-900">No themes here</h3>
+                    <p className="text-gray-500 mt-2 max-w-sm">
+                      {selectedTopicId === "all" 
+                        ? "Re-analyze to discover recurring themes in your messages."
+                        : "No themes categorized under this topic yet."}
+                    </p>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </TabsContent>
