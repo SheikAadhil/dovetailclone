@@ -200,18 +200,8 @@ export async function POST(
 
   // 8. Create theme snapshots for trend tracking
   const today = new Date().toISOString().split('T')[0];
-  const snapshots = processedThemeIds.map(themeId => {
-    const theme = processedThemes.find(t => t.id === themeId);
-    return {
-      theme_id: themeId,
-      channel_id: params.id,
-      snapshot_date: today,
-      data_point_count: theme?.summary ? validMessageIds.length : 0,
-      sentiment_breakdown: {}
-    };
-  });
 
-  // Fetch actual theme data for snapshots
+  // Fetch actual theme data for snapshots to ensure accuracy
   const { data: allThemes } = await supabase
     .from('themes')
     .select('id, data_point_count, sentiment_breakdown')
