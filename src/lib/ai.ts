@@ -11,29 +11,27 @@ const getOpenRouterClient = () => {
   });
 };
 
+// Simplified list focusing on the most robust free models
 const MODELS_TO_TRY = [
   "meta-llama/llama-3.3-70b-instruct:free",
-  "google/gemini-2.0-flash:free",
-  "deepseek/deepseek-r1:free",
+  "google/gemini-2.0-flash-001",
+  "mistralai/mistral-7b-instruct:free",
+  "meta-llama/llama-3.2-3b-instruct:free",
   "google/gemma-3-27b-it:free"
 ];
 
-async function getCompletion(system: string, user: string, useJson = false) {
+async function getCompletion(prompt: string) {
   const client = getOpenRouterClient();
   if (!process.env.OPENROUTER_API_KEY) throw new Error("OPENROUTER_API_KEY is missing");
 
   let lastError: any;
   for (const model of MODELS_TO_TRY) {
     try {
-      // Robust message structure: Combine system and user into one prompt for maximum compatibility
-      const fullPrompt = `INSTRUCTIONS: ${system}\n\nINPUT DATA: ${user}`;
-      
+      console.log(`Trying model: ${model}`);
       return await client.chat.completions.create({
         model: model,
-        messages: [
-          { role: "user", content: fullPrompt },
-        ],
-        response_format: useJson ? { type: "json_object" } : undefined,
+        messages: [{ role: "user", content: prompt }],
+        // We disable strict JSON mode here to prevent 400 errors from picky providers
       });
     } catch (error: any) {
       console.warn(`Model ${model} failed: ${error.message}`);
@@ -41,7 +39,33 @@ async function getCompletion(system: string, user: string, useJson = false) {
       continue; 
     }
   }
-  throw lastError || new Error("All AI models failed");
+  throw lastError || new Error("All models failed");
+}
+
+function extractJson(text: string) {
+  try {
+    // 1. Try direct parse
+    return JSON.parse(text);
+  } catch (e) {
+    // 2. Try to find the first '{' and last '}'
+    const start = text.indexOf('{');
+    const end = text.lastIndexOf('}');
+    if (start !== -1 && end !== -1) {
+      try {
+        const jsonStr = text.substring(start, end + 1);
+        return JSON.parse(jsonStr);
+      } catch (e2) {
+        // 3. Try to find the first '[' and last ']' if it returned an array
+        const startArr = text.indexOf('[');
+        const endArr = text.lastIndexOf(']');
+        if (startArr !== -1 && endArr !== -1) {
+          const arrStr = text.substring(startArr, endArr + 1);
+          return JSON.parse(arrStr);
+        }
+      }
+    }
+    throw new Error("Could not find valid JSON in AI response");
+  }
 }
 
 export async function analyzeThemes(messages: { id: string; content: string }[]): Promise<ThemeResult[]> {
@@ -54,22 +78,16 @@ export async function analyzeThemes(messages: { id: string; content: string }[])
     return { id: simpleId, content: m.content };
   });
 
-  const systemPrompt = `You are a customer feedback analyst. Group similar messages into 2-5 clear themes.
-Each theme MUST have: 
-- "name": Short title (max 5 words)
-- "summary": 1-2 sentence description
-- "message_ids": An array of the numeric IDs (e.g. ["1", "3"]) that belong to this theme.
-- "sentiment": positive, negative, mixed, or neutral.
-
-Respond ONLY with valid JSON in this format: { "themes": [...] }`;
-
-  const userPrompt = `Analyze these messages:\n${JSON.stringify(simplifiedMessages)}`;
+  const prompt = `You are a customer feedback analyst. 
+TASK: Group these messages into 2-5 themes.
+FORMAT: You MUST respond ONLY with a JSON object. No other text.
+JSON SCHEMA: { "themes": [ { "name": "Title", "summary": "Summary", "message_ids": ["1", "3"], "sentiment": "mixed" } ] }
+MESSAGES: ${JSON.stringify(simplifiedMessages)}`;
 
   try {
-    const response = await getCompletion(systemPrompt, userPrompt, true);
-    const content = response.choices[0].message.content || "{}";
-    const cleanJson = content.replace(/```json\n?|\n?```/g, '').trim();
-    const parsed = JSON.parse(cleanJson);
+    const response = await getCompletion(prompt);
+    const text = response.choices[0].message.content || "{}";
+    const parsed = extractJson(text);
     
     const rawThemes = Array.isArray(parsed) ? parsed : (parsed.themes || []);
 
@@ -88,16 +106,15 @@ Respond ONLY with valid JSON in this format: { "themes": [...] }`;
 }
 
 export async function analyzeSentiment(content: string): Promise<'positive' | 'negative' | 'neutral' | null> {
-  const system = "Classify the sentiment of the message as exactly one word: positive, negative, or neutral.";
-  const user = `Message: "${content}"`;
+  const prompt = `Classify this message sentiment as positive, negative, or neutral. Respond with exactly one word.\nMessage: "${content}"`;
   try {
-    const response = await getCompletion(system, user);
+    const response = await getCompletion(prompt);
     const result = response.choices[0].message.content?.trim().toLowerCase();
     if (result?.includes('positive')) return 'positive';
     if (result?.includes('negative')) return 'negative';
     return 'neutral';
   } catch (error) {
-    return null;
+    return 'neutral';
   }
 }
 
