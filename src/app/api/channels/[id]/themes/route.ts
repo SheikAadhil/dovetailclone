@@ -49,10 +49,21 @@ export async function GET(
   if (thError) return new NextResponse('Database error', { status: 500 });
 
   const themeIds = (themesRaw || []).map(t => t.id);
+  
+  // Calculate start date based on period
+  const startDate = new Date();
+  if (period !== 'all') {
+    startDate.setDate(startDate.getDate() - parseInt(period));
+  } else {
+    startDate.setFullYear(startDate.getFullYear() - 1); // Default 'all' to 1 year
+  }
+  const startDateStr = startDate.toISOString().split('T')[0];
+
   const { data: snapshots } = await supabase
     .from('theme_snapshots')
     .select('*')
     .in('theme_id', themeIds)
+    .gte('snapshot_date', startDateStr)
     .order('snapshot_date', { ascending: false });
 
   const themes = (themesRaw || []).map((t: any) => {
@@ -68,23 +79,16 @@ export async function GET(
     let direction: 'rising' | 'falling' | 'stable' = 'stable';
     let percentChange = 0;
 
-    // Calculate trend by comparing latest snapshot with 7 days ago (or earliest available)
-    if (trendData.length >= 1) {
+    // Calculate trend by comparing latest snapshot with the beginning of the selected period (or earliest available)
+    if (trendData.length >= 2) {
       const latest = trendData[trendData.length - 1].count;
+      const earliest = trendData[0].count;
       
-      // Find snapshot from ~7 days ago
-      const sevenDaysAgo = new Date();
-      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-      const sevenDaysAgoStr = sevenDaysAgo.toISOString().split('T')[0];
-      
-      const prevSnapshot = trendData.find(d => d.date <= sevenDaysAgoStr);
-      const previous = prevSnapshot?.count ?? trendData[0]?.count ?? 0;
-      
-      if (previous === 0 && latest > 0) {
+      if (earliest === 0 && latest > 0) {
         direction = 'rising';
         percentChange = 100;
-      } else if (previous > 0) {
-        percentChange = Math.round(((latest - previous) / previous) * 100);
+      } else if (earliest > 0) {
+        percentChange = Math.round(((latest - earliest) / earliest) * 100);
         if (percentChange > 10) direction = 'rising';
         else if (percentChange < -10) direction = 'falling';
       }
@@ -102,7 +106,7 @@ export async function GET(
       created_at: t.created_at,
       last_updated_at: t.last_updated_at,
       topic_id: t.topic_id,
-      trend_data: trendData.slice(-8), // Last 8 snapshots for sparkline
+      trend_data: trendData, // Return all data for the requested period
       trend_direction: direction,
       trend_percent_change: percentChange,
       data_points: t.data_point_themes
