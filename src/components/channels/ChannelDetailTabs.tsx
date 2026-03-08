@@ -1,9 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { Channel, Theme, Topic, AnomalyAlert } from "@/types";
 import { ThemeCard } from "./ThemeCard";
-import { ThemeDrawer } from "./ThemeDrawer";
 import { MessageList } from "./MessageList";
 import { ChannelSettingsForm } from "./ChannelSettingsForm";
 import { BackfillDialog } from "./BackfillDialog";
@@ -12,9 +11,9 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { 
   Brain, RefreshCcw, LayoutPanelLeft, MessageSquare, 
-  Settings as SettingsIcon, AlertCircle, History, Plus, MoreVertical, 
-  FolderOpen, Trash2, Merge, CheckCircle2, Clock, AlertTriangle, TrendingUp, 
-  Filter, BarChart3, ChevronRight, Search, Activity, Layers, Sparkles
+  Settings as SettingsIcon, History, Plus, MoreVertical, 
+  FolderOpen, Merge, Clock, TrendingUp, 
+  Filter, BarChart3, ChevronRight, Search, Activity, Layers, Sparkles, X, Check, Loader2
 } from "lucide-react";
 import { formatDistanceToNow, format, parseISO } from "date-fns";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -25,11 +24,12 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as ChartTooltip, 
-  ResponsiveContainer, Legend, Cell
+  ResponsiveContainer, Legend
 } from "recharts";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 interface ChannelDetailTabsProps {
   channel: Channel;
@@ -77,10 +77,13 @@ export function ChannelDetailTabs({ channel }: ChannelDetailTabsProps) {
   const [selectedTopicId, setSelectedTopicId] = useState<string>("all");
   const [period, setPeriod] = useState<string>("30");
   
+  // Chart Selection State
+  const [visibleThemeIds, setVisibleThemeIds] = useState<string[]>([]);
+  
   const [loadingThemes, setLoadingThemes] = useState(true);
   const [loadingTopics, setLoadingTopics] = useState(true);
   const [analyzing, setAnalyzing] = useState(false);
-  const [channelAlerts, setChannelAlerts] = useState<AnomalyAlert[]>([]);
+  const [, setChannelAlerts] = useState<AnomalyAlert[]>([]);
   
   const [selectedTheme, setSelectedTheme] = useState<Theme | null>(null);
   const [isBackfillOpen, setIsBackfillOpen] = useState(false);
@@ -105,7 +108,7 @@ export function ChannelDetailTabs({ channel }: ChannelDetailTabsProps) {
   const [newTopicDesc, setNewTopicDesc] = useState("");
   const [creatingTopic, setCreatingTopic] = useState(false);
 
-  const fetchChannelAlerts = async () => {
+  const fetchChannelAlerts = useCallback(async () => {
     try {
       const res = await fetch('/api/alerts');
       const data = await res.json();
@@ -113,9 +116,9 @@ export function ChannelDetailTabs({ channel }: ChannelDetailTabsProps) {
     } catch (e) {
       console.error(e);
     }
-  };
+  }, [channel.id]);
 
-  const fetchTopics = async () => {
+  const fetchTopics = useCallback(async () => {
     setLoadingTopics(true);
     try {
       const res = await fetch(`/api/channels/${channel.id}/topics`);
@@ -126,15 +129,21 @@ export function ChannelDetailTabs({ channel }: ChannelDetailTabsProps) {
     } finally {
       setLoadingTopics(false);
     }
-  };
+  }, [channel.id]);
 
-  const fetchThemes = async (topicId = selectedTopicId, timePeriod = period) => {
+  const fetchThemes = useCallback(async (topicId = selectedTopicId, timePeriod = period) => {
     setLoadingThemes(true);
     try {
       const url = `/api/channels/${channel.id}/themes?topicId=${topicId}&period=${timePeriod}`;
       const res = await fetch(url);
       const data = await res.json();
       setThemes(data.themes);
+      
+      // Initialize visible themes for chart if not set (top 8)
+      if (visibleThemeIds.length === 0 && data.themes.length > 0) {
+        setVisibleThemeIds(data.themes.slice(0, 8).map((t: Theme) => t.id));
+      }
+
       setStats({
         total_data_points: data.total_data_points,
         last_analyzed_at: data.last_analyzed_at
@@ -144,17 +153,16 @@ export function ChannelDetailTabs({ channel }: ChannelDetailTabsProps) {
     } finally {
       setLoadingThemes(false);
     }
-  };
+  }, [channel.id, period, selectedTopicId, visibleThemeIds.length]);
 
   useEffect(() => {
     fetchTopics();
-    fetchThemes();
     fetchChannelAlerts();
-  }, [channel.id]);
+  }, [fetchTopics, fetchChannelAlerts]);
 
   useEffect(() => {
     fetchThemes(selectedTopicId, period);
-  }, [selectedTopicId, period]);
+  }, [fetchThemes, selectedTopicId, period]);
 
   const handleAnalyze = async () => {
     setAnalyzing(true);
@@ -193,17 +201,6 @@ export function ChannelDetailTabs({ channel }: ChannelDetailTabsProps) {
       alert(e.message);
     } finally {
       setCreatingTopic(false);
-    }
-  };
-
-  const handleDeleteTopic = async (topicId: string) => {
-    if (!confirm("Are you sure? Themes in this topic will be unassigned.")) return;
-    try {
-      await fetch(`/api/channels/${channel.id}/topics/${topicId}`, { method: 'DELETE' });
-      await fetchTopics();
-      if (selectedTopicId === topicId) setSelectedTopicId("all");
-    } catch (e) {
-      alert("Delete failed");
     }
   };
 
@@ -310,10 +307,14 @@ export function ChannelDetailTabs({ channel }: ChannelDetailTabsProps) {
     setSelectedTheme(theme);
   };
 
+  // Filtered chart themes based on user selection
+  const chartThemes = useMemo(() => {
+    return themes.filter(t => visibleThemeIds.includes(t.id));
+  }, [themes, visibleThemeIds]);
+
   // Transform theme trend data for stacked chart
   const getChartData = () => {
     const dateMap: Record<string, any> = {};
-    const chartThemes = themes.slice(0, 10);
     
     chartThemes.forEach(theme => {
       if (!theme.trend_data) return;
@@ -331,11 +332,17 @@ export function ChannelDetailTabs({ channel }: ChannelDetailTabsProps) {
   const chartData = getChartData();
   const selectedTopic = topics.find(t => t.id === selectedTopicId);
 
+  const toggleThemeVisibility = (id: string) => {
+    setVisibleThemeIds(prev => 
+      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+    );
+  };
+
   return (
     <div className="flex h-[calc(100vh-64px)] -m-8 overflow-hidden bg-white">
       {/* 1. CHANNEL SIDEBAR */}
-      <aside className="w-72 border-r border-gray-100 flex flex-col bg-gray-50/30">
-        <div className="p-6">
+      <aside className="w-72 border-r border-gray-100 flex flex-col bg-gray-50/30 overflow-hidden shrink-0">
+        <div className="p-6 pb-4 shrink-0">
           <div className="flex items-center gap-3 mb-6">
             <div className="w-10 h-10 rounded-2xl bg-indigo-600 flex items-center justify-center text-white shadow-lg shadow-indigo-200">
               <Activity className="w-5 h-5" />
@@ -374,10 +381,10 @@ export function ChannelDetailTabs({ channel }: ChannelDetailTabsProps) {
           </nav>
         </div>
 
-        <Separator className="bg-gray-100" />
+        <Separator className="bg-gray-100 mx-6 w-auto shrink-0" />
 
-        <ScrollArea className="flex-1">
-          <div className="p-6">
+        <ScrollArea className="flex-1 min-h-0">
+          <div className="p-6 pt-4 pb-12">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Topics</h3>
               <Button variant="ghost" size="sm" className="h-6 w-6 p-0 hover:bg-indigo-50" onClick={() => setIsTopicOpen(true)}>
@@ -388,18 +395,24 @@ export function ChannelDetailTabs({ channel }: ChannelDetailTabsProps) {
             <div className="space-y-1">
               <button
                 onClick={() => setSelectedTopicId("all")}
-                className={`w-full flex items-center justify-between px-4 py-2 rounded-xl text-xs font-bold transition-all ${selectedTopicId === "all" ? 'text-indigo-600 bg-indigo-50/50' : 'text-gray-500 hover:text-gray-900'}`}
+                className={`w-full flex items-center justify-between px-4 py-2 rounded-xl text-xs font-bold transition-all ${selectedTopicId === "all" ? 'text-indigo-600 bg-indigo-50/50 shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
               >
-                <span>All Signals</span>
+                <div className="flex items-center gap-2">
+                  <LayoutPanelLeft className="w-3.5 h-3.5 opacity-50" />
+                  <span>All Signals</span>
+                </div>
                 <span className="text-[10px] opacity-50">{themes.length}</span>
               </button>
               {topics.map(topic => (
                 <button
                   key={topic.id}
                   onClick={() => setSelectedTopicId(topic.id)}
-                  className={`w-full flex items-center justify-between px-4 py-2 rounded-xl text-xs font-bold transition-all ${selectedTopicId === topic.id ? 'text-indigo-600 bg-indigo-50/50' : 'text-gray-500 hover:text-gray-900'}`}
+                  className={`w-full flex items-center justify-between px-4 py-2 rounded-xl text-xs font-bold transition-all ${selectedTopicId === topic.id ? 'text-indigo-600 bg-indigo-50/50 shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
                 >
-                  <span className="truncate pr-2">{topic.name}</span>
+                  <div className="flex items-center gap-2 truncate">
+                    <FolderOpen className="w-3.5 h-3.5 opacity-50 flex-shrink-0" />
+                    <span className="truncate">{topic.name}</span>
+                  </div>
                   <span className="text-[10px] opacity-50">{topic.theme_count}</span>
                 </button>
               ))}
@@ -407,8 +420,9 @@ export function ChannelDetailTabs({ channel }: ChannelDetailTabsProps) {
           </div>
         </ScrollArea>
 
-        <div className="p-6">
-          <div className="bg-indigo-600 rounded-[1.5rem] p-4 text-white shadow-xl shadow-indigo-100">
+        <div className="p-6 pt-0 mt-auto shrink-0">
+          <div className="bg-indigo-600 rounded-[1.5rem] p-4 text-white shadow-xl shadow-indigo-100 group overflow-hidden relative">
+            <div className="absolute top-0 right-0 w-16 h-16 bg-white/10 rounded-full -mr-8 -mt-8 blur-xl group-hover:scale-150 transition-transform duration-700" />
             <Brain className="w-6 h-6 mb-2 opacity-80" />
             <h4 className="text-xs font-black uppercase tracking-widest mb-1">Pulse AI</h4>
             <p className="text-[10px] font-medium opacity-70 leading-relaxed">Signal detection is active and categorizing incoming messages.</p>
@@ -417,9 +431,9 @@ export function ChannelDetailTabs({ channel }: ChannelDetailTabsProps) {
       </aside>
 
       {/* 2. MAIN CONTENT AREA */}
-      <main className="flex-1 flex flex-col min-w-0 bg-white">
+      <main className="flex-1 flex flex-col min-w-0 bg-white relative overflow-hidden">
         {/* Header */}
-        <header className="h-16 border-b border-gray-100 flex items-center justify-between px-8 bg-white/80 backdrop-blur-md sticky top-0 z-20">
+        <header className="h-16 border-b border-gray-100 flex items-center justify-between px-8 bg-white/80 backdrop-blur-md sticky top-0 z-20 shrink-0">
           <div className="flex items-center gap-4">
             <h2 className="text-sm font-black text-gray-900 uppercase tracking-widest">
               {activeView === "overview" && "Dashboard Overview"}
@@ -436,13 +450,17 @@ export function ChannelDetailTabs({ channel }: ChannelDetailTabsProps) {
 
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-1 bg-gray-100/50 p-1 rounded-full mr-2">
-              {['7', '30', '90'].map(v => (
+              {[
+                { l: '7D', v: '7' },
+                { l: '30D', v: '30' },
+                { l: '90D', v: '90' }
+              ].map(opt => (
                 <button
-                  key={v}
-                  onClick={() => setPeriod(v)}
-                  className={`px-3 py-1 text-[10px] font-black rounded-full transition-all ${period === v ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
+                  key={opt.v}
+                  onClick={() => setPeriod(opt.v)}
+                  className={`px-3 py-1 text-[10px] font-black rounded-full transition-all ${period === opt.v ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
                 >
-                  {v}D
+                  {opt.l}
                 </button>
               ))}
             </div>
@@ -454,8 +472,8 @@ export function ChannelDetailTabs({ channel }: ChannelDetailTabsProps) {
           </div>
         </header>
 
-        <ScrollArea className="flex-1">
-          <div className="p-8 max-w-7xl mx-auto w-full">
+        <ScrollArea className="flex-1 min-h-0">
+          <div className="p-8 max-w-7xl mx-auto w-full pb-24">
             {activeView === "overview" && (
               <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
                 {/* Stats Grid */}
@@ -493,8 +511,8 @@ export function ChannelDetailTabs({ channel }: ChannelDetailTabsProps) {
                 </div>
 
                 {/* Main Dashboard Chart */}
-                <div className="bg-white border border-gray-100 rounded-[2.5rem] p-8 shadow-sm">
-                  <div className="flex items-center justify-between mb-8">
+                <div className="bg-white border border-gray-100 rounded-[2.5rem] p-8 shadow-sm relative group/chart">
+                  <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
                     <div>
                       <h3 className="text-xl font-black text-gray-900 tracking-tight flex items-center gap-2">
                         Theme Dynamics
@@ -502,13 +520,53 @@ export function ChannelDetailTabs({ channel }: ChannelDetailTabsProps) {
                       </h3>
                       <p className="text-xs font-medium text-gray-400 mt-1">Cross-sectional volume distribution over time.</p>
                     </div>
-                    <Button variant="outline" size="sm" onClick={() => setIsBackfillOpen(true)} className="rounded-xl border-gray-100 text-[10px] font-black uppercase tracking-widest h-8 px-4">
-                      <History className="w-3 h-3 mr-2" /> History Sync
-                    </Button>
+                    
+                    <div className="flex items-center gap-2">
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button variant="outline" size="sm" className="rounded-xl border-gray-100 text-[10px] font-black uppercase tracking-widest h-9 px-4 gap-2 bg-gray-50 hover:bg-white transition-all">
+                            <Filter className="w-3.5 h-3.5" />
+                            Filter Themes ({visibleThemeIds.length})
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-72 p-0 rounded-2xl border-gray-100 shadow-2xl overflow-hidden" align="end">
+                          <div className="p-4 bg-gray-50/50 border-b border-gray-100 flex items-center justify-between">
+                            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Select Signal Layers</span>
+                            <button 
+                              onClick={() => setVisibleThemeIds(visibleThemeIds.length === themes.length ? [] : themes.map(t => t.id))}
+                              className="text-[10px] font-bold text-indigo-600 hover:underline"
+                            >
+                              {visibleThemeIds.length === themes.length ? "Clear All" : "Select All"}
+                            </button>
+                          </div>
+                          <ScrollArea className="h-64">
+                            <div className="p-2 space-y-0.5">
+                              {themes.map((theme, idx) => (
+                                <div 
+                                  key={theme.id}
+                                  onClick={() => toggleThemeVisibility(theme.id)}
+                                  className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-gray-50 cursor-pointer transition-colors group/item"
+                                >
+                                  <div className={`w-4 h-4 rounded border flex items-center justify-center transition-all ${visibleThemeIds.includes(theme.id) ? 'bg-indigo-600 border-indigo-600 shadow-sm' : 'border-gray-200'}`}>
+                                    {visibleThemeIds.includes(theme.id) && <Check className="w-3 h-3 text-white stroke-[4]" />}
+                                  </div>
+                                  <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: THEME_COLORS[idx % THEME_COLORS.length] }} />
+                                  <span className="text-xs font-bold text-gray-700 truncate flex-1 group-hover/item:text-indigo-600">{theme.name}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </ScrollArea>
+                        </PopoverContent>
+                      </Popover>
+
+                      <Button variant="outline" size="sm" onClick={() => setIsBackfillOpen(true)} className="rounded-xl border-gray-100 text-[10px] font-black uppercase tracking-widest h-9 px-4 gap-2">
+                        <History className="w-3.5 h-3.5" /> History Sync
+                      </Button>
+                    </div>
                   </div>
 
-                  <div className="h-[350px] w-full -ml-6">
-                    {chartData.length >= 2 ? (
+                  <div className="h-[380px] w-full -ml-6">
+                    {chartData.length >= 2 && chartThemes.length > 0 ? (
                       <ResponsiveContainer width="100%" height="100%">
                         <BarChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
                           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f8fafc" />
@@ -532,22 +590,27 @@ export function ChannelDetailTabs({ channel }: ChannelDetailTabsProps) {
                             iconType="circle"
                             wrapperStyle={{ fontSize: '9px', fontWeight: '900', textTransform: 'uppercase', letterSpacing: '1px', paddingTop: '30px' }}
                           />
-                          {themes.slice(0, 10).map((theme, index) => (
+                          {chartThemes.map((theme, index) => (
                             <Bar 
                               key={theme.id} 
                               dataKey={theme.name} 
                               stackId="a" 
-                              fill={THEME_COLORS[index % THEME_COLORS.length]} 
-                              radius={index === themes.slice(0, 10).length - 1 ? [6, 6, 0, 0] : [0, 0, 0, 0]}
+                              fill={THEME_COLORS[themes.findIndex(t => t.id === theme.id) % THEME_COLORS.length]} 
+                              radius={index === chartThemes.length - 1 ? [6, 6, 0, 0] : [0, 0, 0, 0]}
                               barSize={40}
                             />
                           ))}
                         </BarChart>
                       </ResponsiveContainer>
                     ) : (
-                      <div className="h-full w-full flex flex-col items-center justify-center bg-gray-50/50 rounded-[2rem] border border-dashed border-gray-200">
-                        <BarChart3 className="w-12 h-12 text-gray-200 mb-4" />
-                        <p className="text-gray-400 font-bold uppercase tracking-widest text-[10px]">Awaiting Signal Accumulation</p>
+                      <div className="h-full w-full flex flex-col items-center justify-center bg-gray-50/50 rounded-[2rem] border border-dashed border-gray-200 p-12 text-center">
+                        <BarChart3 className="w-16 h-16 text-gray-200 mb-4" />
+                        <h4 className="text-sm font-black text-gray-400 uppercase tracking-widest">Awaiting Visualization Data</h4>
+                        <p className="text-[10px] font-bold text-gray-300 mt-2 max-w-xs">
+                          {chartThemes.length === 0 
+                            ? "Please select at least one theme to visualize its trend dynamics."
+                            : "Daily message ingestion records are required to construct time-series trends."}
+                        </p>
                       </div>
                     )}
                   </div>
@@ -558,7 +621,7 @@ export function ChannelDetailTabs({ channel }: ChannelDetailTabsProps) {
                   <div className="flex items-center justify-between mb-6 px-2">
                     <h3 className="text-xs font-black text-gray-400 uppercase tracking-[0.2em]">Trending Signals</h3>
                     <button onClick={() => setActiveView("themes")} className="text-[10px] font-black text-indigo-600 uppercase tracking-widest flex items-center gap-1 hover:gap-2 transition-all">
-                      View All <ChevronRight className="w-3 h-3" />
+                      View All Library <ChevronRight className="w-3 h-3" />
                     </button>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -581,7 +644,7 @@ export function ChannelDetailTabs({ channel }: ChannelDetailTabsProps) {
 
             {activeView === "themes" && (
               <div className="space-y-8 animate-in fade-in duration-500">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
                   <div>
                     <h2 className="text-2xl font-black text-gray-900 tracking-tight">
                       {selectedTopicId === "all" ? "Theme Library" : selectedTopic?.name}
@@ -606,7 +669,7 @@ export function ChannelDetailTabs({ channel }: ChannelDetailTabsProps) {
                     {[1, 2, 3, 4, 5, 6, 7, 8].map(i => <Skeleton key={i} className="h-64 w-full rounded-[2rem]" />)}
                   </div>
                 ) : themes.length > 0 ? (
-                  <div className="grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                  <div className="grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 pb-12">
                     {themes.map((theme) => (
                       <ThemeCard 
                         key={theme.id} 
@@ -635,13 +698,13 @@ export function ChannelDetailTabs({ channel }: ChannelDetailTabsProps) {
             )}
 
             {activeView === "messages" && (
-              <div className="bg-white border border-gray-100 rounded-[2.5rem] p-4 shadow-sm min-h-[600px] animate-in fade-in duration-500">
+              <div className="bg-white border border-gray-100 rounded-[2.5rem] p-4 shadow-sm min-h-[600px] animate-in fade-in duration-500 overflow-hidden">
                 <MessageList channelId={channel.id} />
               </div>
             )}
 
             {activeView === "settings" && (
-              <div className="bg-white border border-gray-100 rounded-[2.5rem] p-10 shadow-sm max-w-3xl mx-auto animate-in fade-in duration-500">
+              <div className="max-w-5xl mx-auto py-4 animate-in fade-in duration-500">
                 <ChannelSettingsForm channel={channel} />
               </div>
             )}
@@ -650,13 +713,13 @@ export function ChannelDetailTabs({ channel }: ChannelDetailTabsProps) {
       </main>
 
       {/* 3. INSPECTOR PANEL (Right Sidebar) */}
-      <aside className={`w-[450px] border-l border-gray-100 bg-white transition-all duration-500 ease-in-out flex flex-col z-30 ${selectedTheme ? 'mr-0' : '-mr-[450px]'}`}>
+      <aside className={`w-[450px] border-l border-gray-100 bg-white transition-all duration-500 ease-in-out flex flex-col z-30 shrink-0 relative overflow-hidden ${selectedTheme ? 'mr-0 shadow-2xl' : '-mr-[450px]'}`}>
         {selectedTheme && (
           <>
             <div className="p-8 border-b border-gray-50 bg-gray-50/30">
               <div className="flex items-center justify-between mb-6">
                 <button onClick={() => setSelectedTheme(null)} className="p-2 hover:bg-white rounded-xl text-gray-400 transition-colors shadow-none hover:shadow-sm">
-                  <ChevronRight className="w-5 h-5" />
+                  <X className="w-5 h-5" />
                 </button>
                 <div className="flex items-center gap-2">
                   <Badge className="bg-emerald-50 text-emerald-600 border-none font-black text-[9px] uppercase px-2 py-0.5">Primary Signal</Badge>
@@ -664,9 +727,10 @@ export function ChannelDetailTabs({ channel }: ChannelDetailTabsProps) {
                     <DropdownMenuTrigger asChild>
                       <Button variant="ghost" className="h-8 w-8 p-0"><MoreVertical className="w-4 h-4" /></Button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => handleOpenThemeDialog(selectedTheme)}>Edit Theme</DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => handleDeleteTheme(selectedTheme.id)} className="text-red-600">Delete</DropdownMenuItem>
+                    <DropdownMenuContent align="end" className="rounded-xl border-gray-100">
+                      <DropdownMenuItem onClick={() => handleOpenThemeDialog(selectedTheme)} className="font-bold text-xs p-3">Edit theme Details</DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={() => handleDeleteTheme(selectedTheme.id)} className="text-red-600 font-bold text-xs p-3">Purge theme</DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>
@@ -677,13 +741,13 @@ export function ChannelDetailTabs({ channel }: ChannelDetailTabsProps) {
               
               <div className="flex items-center gap-4">
                 <div className="flex flex-col">
-                  <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Volume</span>
+                  <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Total Volume</span>
                   <span className="text-lg font-black text-gray-900">{selectedTheme.data_point_count}</span>
                 </div>
                 <Separator orientation="vertical" className="h-8" />
                 <div className="flex flex-col">
-                  <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Impact</span>
-                  <span className="text-lg font-black text-emerald-600">High</span>
+                  <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Signal Status</span>
+                  <span className="text-lg font-black text-emerald-600">Active</span>
                 </div>
               </div>
             </div>
@@ -692,22 +756,22 @@ export function ChannelDetailTabs({ channel }: ChannelDetailTabsProps) {
               <div className="p-8">
                 <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-6 flex items-center gap-2">
                   <MessageSquare className="w-3.5 h-3.5" />
-                  Signal Instances
+                  Recent Occurrences
                 </h4>
                 <div className="space-y-4">
                   {selectedTheme.data_points && selectedTheme.data_points.length > 0 ? (
                     selectedTheme.data_points.map((msg) => (
-                      <div key={msg.id} className="p-5 rounded-[1.5rem] border border-gray-50 bg-gray-50/30 hover:bg-gray-50 transition-colors">
+                      <div key={msg.id} className="p-5 rounded-[1.5rem] border border-gray-50 bg-gray-50/30 hover:bg-gray-50 transition-colors group/msg">
                         <div className="flex items-center justify-between mb-3">
-                          <span className="text-[10px] font-black text-gray-900 uppercase tracking-widest">{msg.sender_name || 'Anonymous'}</span>
+                          <span className="text-[10px] font-black text-gray-900 uppercase tracking-widest group-hover/msg:text-indigo-600 transition-colors">{msg.sender_name || 'Anonymous Signal'}</span>
                           <span className="text-[9px] font-bold text-gray-400">{format(new Date(msg.message_timestamp), 'MMM dd, HH:mm')}</span>
                         </div>
-                        <p className="text-xs font-medium text-gray-600 leading-relaxed">{msg.content}</p>
+                        <p className="text-xs font-medium text-gray-600 leading-relaxed line-clamp-4 group-hover/msg:line-clamp-none transition-all">{msg.content}</p>
                       </div>
                     ))
                   ) : (
-                    <div className="text-center py-12">
-                      <p className="text-xs font-bold text-gray-400 italic">No message detail linked.</p>
+                    <div className="text-center py-12 bg-gray-50/50 rounded-3xl border border-dashed border-gray-100">
+                      <p className="text-xs font-bold text-gray-400 italic px-6">Detailed message records are currently being indexed for this theme.</p>
                     </div>
                   )}
                 </div>
@@ -716,6 +780,27 @@ export function ChannelDetailTabs({ channel }: ChannelDetailTabsProps) {
           </>
         )}
       </aside>
+
+      {/* FLOATING MERGE OVERLAY */}
+      {mergeMode && (
+        <div className="fixed bottom-10 left-1/2 -translate-x-1/2 bg-gray-900/95 backdrop-blur-md shadow-2xl rounded-3xl px-8 py-4 flex items-center gap-8 z-50 animate-in fade-in slide-in-from-bottom-8">
+          <div className="flex items-center gap-3 border-r pr-8 border-white/10">
+            <div className="p-2 bg-indigo-500 rounded-xl shadow-lg shadow-indigo-500/20">
+              <Merge className="w-5 h-5 text-white" />
+            </div>
+            <div className="flex flex-col">
+              <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">Merge Source</span>
+              <span className="text-sm font-bold text-white italic truncate max-w-[120px]">{mergeSource?.name}</span>
+            </div>
+          </div>
+          <div className="text-[10px] font-bold text-white/50 max-w-[160px] leading-tight uppercase tracking-widest">
+            Select target theme card to consolidate data.
+          </div>
+          <Button size="sm" variant="ghost" className="rounded-xl h-10 px-6 text-white hover:bg-white/10 font-black text-xs uppercase tracking-widest" onClick={cancelMerge} disabled={merging}>
+            Abort
+          </Button>
+        </div>
+      )}
 
       {/* MODALS */}
       <BackfillDialog
@@ -726,84 +811,86 @@ export function ChannelDetailTabs({ channel }: ChannelDetailTabsProps) {
       />
 
       <Dialog open={isTopicDialogOpen} onOpenChange={setIsTopicOpen}>
-        <DialogContent className="rounded-[2rem] p-8 border-none shadow-2xl">
-          <DialogHeader className="mb-4">
-            <DialogTitle className="text-2xl font-black tracking-tight">Define Topic Signal</DialogTitle>
-            <DialogDescription className="text-gray-500 font-medium font-bold">Classify semantic patterns into operational categories.</DialogDescription>
+        <DialogContent className="rounded-[2.5rem] p-10 border-none shadow-2xl max-w-xl">
+          <DialogHeader className="mb-8">
+            <DialogTitle className="text-3xl font-black tracking-tighter">Establish Topic Signal</DialogTitle>
+            <DialogDescription className="text-gray-500 font-bold mt-2">Map semantic patterns into functional operational silos.</DialogDescription>
           </DialogHeader>
-          <div className="space-y-6 py-2">
+          <div className="space-y-8 py-2">
             <div className="space-y-3">
-              <Label className="font-bold text-gray-700 ml-1">Topic Label</Label>
+              <Label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Topic Label</Label>
               <Input 
                 value={newTopicName} 
                 onChange={e => setNewTopicName(e.target.value.substring(0, 30))} 
-                placeholder="e.g. UX Friction"
-                className="rounded-2xl h-12 border-gray-100 bg-gray-50/50 focus:bg-white transition-all font-bold"
+                placeholder="e.g. Navigation Friction"
+                className="rounded-2xl h-14 border-gray-100 bg-gray-50/50 focus:bg-white transition-all font-bold text-lg px-6 shadow-none"
               />
             </div>
             <div className="space-y-3">
-              <Label className="font-bold text-gray-700 ml-1">Context / Intent</Label>
+              <Label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Operational Scope</Label>
               <Textarea 
                 value={newTopicDesc} 
                 onChange={e => setNewTopicDesc(e.target.value.substring(0, 200))} 
-                placeholder="Operational definition..."
-                className="rounded-2xl min-h-[120px] border-gray-100 bg-gray-50/50 focus:bg-white transition-all font-medium leading-relaxed"
+                placeholder="Declare the intent of this topic category..."
+                className="rounded-[1.5rem] min-h-[140px] border-gray-100 bg-gray-50/50 focus:bg-white transition-all font-medium leading-relaxed px-6 py-4 resize-none"
               />
             </div>
           </div>
-          <DialogFooter className="mt-6 gap-3">
-            <Button variant="outline" onClick={() => setIsTopicOpen(false)} className="rounded-2xl h-12 px-6 font-bold border-gray-200">Cancel</Button>
-            <Button onClick={handleCreateTopic} disabled={!newTopicName || creatingTopic} className="rounded-2xl h-12 px-8 bg-indigo-600 hover:bg-indigo-700 font-bold shadow-lg shadow-indigo-100">
-              {creatingTopic ? "Creating..." : "Establish Topic"}
+          <DialogFooter className="mt-10 gap-4">
+            <Button variant="outline" onClick={() => setIsTopicOpen(false)} className="rounded-2xl h-14 px-8 font-black text-xs uppercase tracking-widest border-gray-200">Cancel</Button>
+            <Button onClick={handleCreateTopic} disabled={!newTopicName || creatingTopic} className="rounded-2xl h-14 px-10 bg-indigo-600 hover:bg-indigo-700 font-black text-xs uppercase tracking-widest text-white shadow-xl shadow-indigo-100">
+              {creatingTopic ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+              Authorize Topic
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       <Dialog open={isThemeDialogOpen} onOpenChange={setIsThemeDialogOpen}>
-        <DialogContent className="rounded-[2rem] p-8 border-none shadow-2xl">
-          <DialogHeader className="mb-4">
-            <DialogTitle className="text-2xl font-black tracking-tight">{editingTheme ? "Refine Theme" : "Manual Theme Discovery"}</DialogTitle>
-            <DialogDescription className="text-gray-500 font-medium font-bold">Declare a custom signal for manual classification.</DialogDescription>
+        <DialogContent className="rounded-[2.5rem] p-10 border-none shadow-2xl max-w-xl">
+          <DialogHeader className="mb-8">
+            <DialogTitle className="text-3xl font-black tracking-tighter">{editingTheme ? "Refine Theme" : "Declare Manual Theme"}</DialogTitle>
+            <DialogDescription className="text-gray-500 font-bold mt-2">Fine-tune the identifier and categorization for this signal cluster.</DialogDescription>
           </DialogHeader>
-          <div className="space-y-6 py-2">
+          <div className="space-y-8 py-2">
             <div className="space-y-3">
-              <Label className="font-bold text-gray-700 ml-1">Theme Identifier</Label>
+              <Label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Theme Identifier</Label>
               <Input 
                 value={themeName} 
                 onChange={e => setThemeName(e.target.value.substring(0, 60))} 
-                placeholder="e.g. API Latency"
-                className="rounded-2xl h-12 border-gray-100 bg-gray-50/50 focus:bg-white transition-all font-bold"
+                placeholder="e.g. Latency spikes"
+                className="rounded-2xl h-14 border-gray-100 bg-gray-50/50 focus:bg-white transition-all font-bold text-lg px-6 shadow-none"
               />
             </div>
             <div className="space-y-3">
-              <Label className="font-bold text-gray-700 ml-1">Definition</Label>
+              <Label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Signal definition</Label>
               <Textarea 
                 value={themeDesc} 
                 onChange={e => setThemeDesc(e.target.value.substring(0, 200))} 
-                placeholder="Describe what messages belong here..."
-                className="rounded-2xl min-h-[100px] border-gray-100 bg-gray-50/50 focus:bg-white transition-all font-medium leading-relaxed"
+                placeholder="Describe the nature of messages identified by this theme..."
+                className="rounded-[1.5rem] min-h-[120px] border-gray-100 bg-gray-50/50 focus:bg-white transition-all font-medium leading-relaxed px-6 py-4 resize-none"
               />
             </div>
             <div className="space-y-3">
-              <Label className="font-bold text-gray-700 ml-1">Topic Categorization</Label>
+              <Label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Operational Silo</Label>
               <Select value={themeTopicId} onValueChange={setThemeTopicId}>
-                <SelectTrigger className="rounded-2xl h-12 border-gray-100 bg-gray-50/50 focus:bg-white transition-all font-bold">
-                  <SelectValue placeholder="Select a topic" />
+                <SelectTrigger className="rounded-2xl h-14 border-gray-100 bg-gray-50/50 focus:bg-white transition-all font-bold px-6 shadow-none">
+                  <SelectValue placeholder="Assign to topic" />
                 </SelectTrigger>
-                <SelectContent className="rounded-xl border-gray-100">
-                  <SelectItem value="none" className="rounded-lg">No Categorization</SelectItem>
+                <SelectContent className="rounded-2xl border-gray-100 shadow-2xl p-2">
+                  <SelectItem value="none" className="rounded-xl p-3 font-bold text-xs uppercase tracking-widest">Uncategorized</SelectItem>
                   {topics.map(t => (
-                    <SelectItem key={t.id} value={t.id} className="rounded-lg">{t.name}</SelectItem>
+                    <SelectItem key={t.id} value={t.id} className="rounded-xl p-3 font-bold text-xs uppercase tracking-widest">{t.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
           </div>
-          <DialogFooter className="mt-8 gap-3">
-            <Button variant="outline" onClick={() => setIsThemeDialogOpen(false)} className="rounded-2xl h-12 px-6 font-bold border-gray-200">Cancel</Button>
-            <Button onClick={handleSaveTheme} disabled={!themeName || savingTheme} className="rounded-2xl h-12 px-8 bg-indigo-600 hover:bg-indigo-700 font-bold shadow-lg shadow-indigo-100">
-              {savingTheme ? "Saving..." : "Declare Theme"}
+          <DialogFooter className="mt-10 gap-4">
+            <Button variant="outline" onClick={() => setIsThemeDialogOpen(false)} className="rounded-2xl h-14 px-8 font-black text-xs uppercase tracking-widest border-gray-200">Cancel</Button>
+            <Button onClick={handleSaveTheme} disabled={!themeName || savingTheme} className="rounded-2xl h-14 px-10 bg-indigo-600 hover:bg-indigo-700 font-black text-xs uppercase tracking-widest text-white shadow-xl shadow-indigo-100">
+              {savingTheme ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+              Commit theme
             </Button>
           </DialogFooter>
         </DialogContent>

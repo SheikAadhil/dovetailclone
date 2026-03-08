@@ -7,11 +7,16 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Loader2, Trash2, Brain, Check, Info, Mail, Slack as SlackIcon, BellRing, Send } from "lucide-react";
+import { 
+  Loader2, Trash2, Brain, Check, Mail, Slack as SlackIcon, 
+  BellRing, Send, Sparkles, ShieldAlert, Globe, Zap, Database
+} from "lucide-react";
 import { UsageStats } from "./UsageStats";
 import { Switch } from "@/components/ui/switch";
 import { SnapshotDebug } from "./SnapshotDebug";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
 
 interface ChannelSettingsFormProps {
   channel: Channel;
@@ -19,13 +24,13 @@ interface ChannelSettingsFormProps {
 
 export function ChannelSettingsForm({ channel }: ChannelSettingsFormProps) {
   const router = useRouter();
+  const [activeSection, setActiveView] = useState<"general" | "ai" | "notifications" | "advanced">("general");
   
   const [name, setName] = useState(channel.name);
   const [description, setDescription] = useState(channel.description || "");
   const [aiContext, setAiContext] = useState(channel.ai_context || "");
   const [alertThreshold, setAlertThreshold] = useState(channel.alert_threshold_percent || 50);
   
-  // Digest State
   const [slackEnabled, setSlackEnabled] = useState(channel.digest_slack_enabled || false);
   const [slackUrl, setSlackUrl] = useState(channel.digest_slack_webhook_url || "");
   const [testingSlack, setTestingSlack] = useState(false);
@@ -52,8 +57,9 @@ export function ChannelSettingsForm({ channel }: ChannelSettingsFormProps) {
       });
       if (!res.ok) throw new Error('Failed to update');
       router.refresh();
-      alert('Saved successfully');
+      alert('Operational parameters updated.');
     } catch (e) {
+      console.error(e);
       alert('Error updating channel');
     } finally {
       setLoading(false);
@@ -70,9 +76,10 @@ export function ChannelSettingsForm({ channel }: ChannelSettingsFormProps) {
         body: JSON.stringify({ url: slackUrl })
       });
       const data = await res.json();
-      if (data.success) alert("Test notification sent!");
+      if (data.success) alert("Test notification dispatched.");
       else alert(data.error || "Failed to send test");
     } catch (e) {
+      console.error(e);
       alert("Test failed");
     } finally {
       setTestingSlack(false);
@@ -95,6 +102,7 @@ export function ChannelSettingsForm({ channel }: ChannelSettingsFormProps) {
         setTimeout(() => setEnhancedSuccess(false), 2000);
       }
     } catch (e) {
+      console.error(e);
       alert('Failed to enhance context');
     } finally {
       setEnhancing(false);
@@ -102,7 +110,7 @@ export function ChannelSettingsForm({ channel }: ChannelSettingsFormProps) {
   };
 
   const handleDelete = async () => {
-    if (!confirm('Are you sure you want to delete this channel? This cannot be undone.')) return;
+    if (!confirm('This action will purge all channel data permanently. Proceed?')) return;
     setDeleteLoading(true);
     try {
       const res = await fetch(`/api/channels/${channel.id}`, {
@@ -111,182 +119,247 @@ export function ChannelSettingsForm({ channel }: ChannelSettingsFormProps) {
       if (!res.ok) throw new Error('Failed to delete');
       router.push('/channels');
     } catch (e) {
+      console.error(e);
       alert('Error deleting channel');
       setDeleteLoading(false);
     }
   };
 
   return (
-    <div className="space-y-6 max-w-2xl pb-20">
-      <UsageStats />
+    <div className="flex gap-12 max-w-6xl mx-auto items-start animate-in fade-in duration-700">
+      {/* Sub-Sidebar */}
+      <aside className="w-64 flex-shrink-0 space-y-8 sticky top-0">
+        <div>
+          <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-4 px-4">Configuration</h3>
+          <nav className="space-y-1">
+            {[
+              { id: 'general', label: 'General Identity', icon: Globe },
+              { id: 'ai', label: 'AI Intelligence', icon: Brain },
+              { id: 'notifications', label: 'Notifications', icon: BellRing },
+              { id: 'advanced', label: 'Diagnostics', icon: Database },
+            ].map((item) => (
+              <button
+                key={item.id}
+                onClick={() => setActiveView(item.id as any)}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-bold transition-all ${
+                  activeSection === item.id 
+                    ? 'bg-indigo-600 text-white shadow-xl shadow-indigo-100' 
+                    : 'text-gray-500 hover:bg-gray-100/80 hover:text-gray-900'
+                }`}
+              >
+                <item.icon className={`w-4 h-4 ${activeSection === item.id ? 'text-white' : 'text-gray-400'}`} />
+                {item.label}
+              </button>
+            ))}
+          </nav>
+        </div>
 
-      {/* Snapshot Debug */}
-      <SnapshotDebug channelId={channel.id} />
+        <div className="p-1">
+          <UsageStats />
+        </div>
 
-      {/* AI Context Section */}
-      <Card className="border-indigo-100 shadow-sm">
-        <CardHeader>
-          <div className="flex items-center gap-2">
-            <div className="p-1.5 bg-indigo-100 rounded-md text-indigo-600">
-              <Brain className="w-4 h-4" />
-            </div>
-            <CardTitle>AI Analysis Context</CardTitle>
-          </div>
-          <CardDescription>
-            Tell the AI about your role and what insights you are looking for.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="aiContext">What should the AI focus on?</Label>
-            <div className="relative">
-              <Textarea 
-                id="aiContext" 
-                rows={4}
-                placeholder="Describe your role and goals. E.g. I am a Product Manager. I want to understand what internal tool users are confused about." 
-                value={aiContext} 
-                onChange={e => setAiContext(e.target.value.substring(0, 400))}
-                className="resize-none pr-12"
-              />
-              <div className={`absolute bottom-2 right-2 text-[10px] font-mono ${aiContext.length >= 380 ? 'text-red-500 font-bold' : 'text-gray-400'}`}>
-                {aiContext.length}/400
-              </div>
-            </div>
-          </div>
-          
-          <div className="flex items-center gap-3">
-            <Button 
-              variant="outline" 
-              onClick={handleEnhanceContext} 
-              disabled={enhancing || !aiContext}
-              className="gap-2 border-indigo-200 text-indigo-600 hover:bg-indigo-50 hover:text-indigo-700"
-            >
-              {enhancedSuccess ? (
-                <><Check className="w-4 h-4" /> Enhanced</>
-              ) : (
-                <>{enhancing ? <Loader2 className="w-4 h-4 animate-spin" /> : "✨"} Enhance with AI</>
-              )}
-            </Button>
-            <Button onClick={handleSave} disabled={loading}>
-              {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Save Context
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+        <div className="px-4">
+          <Separator className="mb-6 opacity-50" />
+          <Button 
+            variant="ghost" 
+            onClick={handleDelete}
+            disabled={deleteLoading}
+            className="w-full justify-start gap-3 text-red-500 hover:text-red-600 hover:bg-red-50 rounded-xl font-bold text-xs uppercase tracking-widest px-4"
+          >
+            {deleteLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+            Purge Channel
+          </Button>
+        </div>
+      </aside>
 
-      {/* Digest Notifications */}
-      <Card className="border-indigo-50 shadow-sm">
-        <CardHeader>
-          <div className="flex items-center gap-2">
-            <div className="p-1.5 bg-indigo-50 rounded-md text-indigo-500">
-              <BellRing className="w-4 h-4" />
-            </div>
-            <CardTitle>Digest Notifications</CardTitle>
-          </div>
-          <CardDescription>Get a weekly summary of themes and spikes.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="flex items-center justify-between p-4 border rounded-xl bg-gray-50/50">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-white border rounded-lg text-gray-400"><Mail className="w-4 h-4" /></div>
-              <div>
-                <p className="text-sm font-bold text-gray-900">Email Digest</p>
-                <p className="text-xs text-gray-500">Sent every Monday morning.</p>
-              </div>
-            </div>
-            <Switch checked={true} disabled />
-          </div>
+      {/* Main Form Area */}
+      <div className="flex-1 space-y-8 pb-24">
+        {activeSection === 'general' && (
+          <div className="space-y-8 animate-in slide-in-from-right-4 duration-500">
+            <header>
+              <h2 className="text-2xl font-black text-gray-900 tracking-tight">General Identity</h2>
+              <p className="text-sm font-medium text-gray-400 mt-1">Define how this channel is presented within Pulse.</p>
+            </header>
 
-          <div className="space-y-4 p-4 border rounded-xl bg-white shadow-sm">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-[#4A154B]/10 rounded-lg text-[#4A154B]"><SlackIcon className="w-4 h-4" /></div>
-                <div>
-                  <p className="text-sm font-bold text-gray-900">Slack Digest</p>
-                  <p className="text-xs text-gray-500">Post summary to a team channel.</p>
-                </div>
-              </div>
-              <Switch checked={slackEnabled} onCheckedChange={setSlackEnabled} />
-            </div>
-
-            {slackEnabled && (
-              <div className="pt-4 space-y-4 border-t border-gray-50 animate-in fade-in slide-in-from-top-2">
-                <div className="space-y-2">
-                  <Label className="text-xs">Incoming Webhook URL</Label>
+            <div className="grid gap-6">
+              <div className="bg-white border border-gray-100 rounded-[2rem] p-8 shadow-sm space-y-6">
+                <div className="space-y-3">
+                  <Label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Display Name</Label>
                   <Input 
-                    placeholder="https://hooks.slack.com/services/..." 
-                    value={slackUrl}
-                    onChange={e => setSlackUrl(e.target.value)}
-                    className="font-mono text-xs"
+                    value={name} 
+                    onChange={e => setName(e.target.value)} 
+                    className="rounded-2xl h-14 border-gray-100 bg-gray-50/50 focus:bg-white transition-all font-bold text-lg px-6"
                   />
-                  <p className="text-[10px] text-gray-400">
-                    Create a webhook in your Slack App under "Incoming Webhooks".
-                  </p>
                 </div>
-                <div className="flex gap-2">
-                  <Button variant="outline" size="sm" className="h-8 gap-2 text-xs" onClick={handleTestSlack} disabled={!slackUrl || testingSlack}>
-                    {testingSlack ? <Loader2 className="w-3 h-3 animate-spin" /> : <Send className="w-3 h-3" />}
-                    Test Notification
-                  </Button>
-                  <Button size="sm" className="h-8 text-xs bg-indigo-600" onClick={handleSave} disabled={loading}>Save Settings</Button>
+                <div className="space-y-3">
+                  <Label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Channel Purpose</Label>
+                  <Textarea 
+                    value={description} 
+                    onChange={e => setDescription(e.target.value)} 
+                    className="rounded-[1.5rem] min-h-[120px] border-gray-100 bg-gray-50/50 focus:bg-white transition-all font-medium leading-relaxed px-6 py-4"
+                  />
                 </div>
               </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Channel Information</CardTitle>
-          <CardDescription>Update your channel metadata.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="name">Name</Label>
-            <Input id="name" value={name} onChange={e => setName(e.target.value)} />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="description">Description</Label>
-            <Textarea id="description" value={description} onChange={e => setDescription(e.target.value)} />
-          </div>
-
-          <div className="pt-4 border-t border-gray-100">
-            <Label htmlFor="alertThreshold">Alert Threshold</Label>
-            <p className="text-[11px] text-gray-500 mb-2">Notify me when a theme's volume changes by more than:</p>
-            <div className="flex items-center gap-3 w-32">
-              <Input 
-                id="alertThreshold" 
-                type="number" 
-                min={10} 
-                max={200}
-                value={alertThreshold} 
-                onChange={e => setAlertThreshold(parseInt(e.target.value))} 
-              />
-              <span className="text-sm font-bold text-gray-400">%</span>
+              <div className="bg-white border border-gray-100 rounded-[2rem] p-8 shadow-sm flex items-center justify-between group">
+                <div className="flex items-center gap-4">
+                  <div className="p-3 bg-amber-50 rounded-2xl text-amber-600 group-hover:scale-110 transition-transform">
+                    <ShieldAlert className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-black text-gray-900 uppercase tracking-tight">Anomaly Sensitivity</h4>
+                    <p className="text-xs font-medium text-gray-400">Triggers alerts when theme volume shifts by {alertThreshold}%.</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 bg-gray-50 p-2 rounded-2xl border border-gray-100">
+                  <Input 
+                    type="number" 
+                    value={alertThreshold} 
+                    onChange={e => setAlertThreshold(parseInt(e.target.value))}
+                    className="w-20 h-10 rounded-xl border-none bg-white font-black text-center shadow-sm"
+                  />
+                  <span className="text-xs font-black text-gray-400 pr-2">%</span>
+                </div>
+              </div>
             </div>
           </div>
-        </CardContent>
-        <CardFooter>
-          <Button onClick={handleSave} disabled={loading} className="w-full">
-            {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Save All Changes
-          </Button>
-        </CardFooter>
-      </Card>
+        )}
 
-      <Card className="border-red-200">
-        <CardHeader>
-          <CardTitle className="text-red-600">Danger Zone</CardTitle>
-          <CardDescription>Permanently delete this channel and all its data.</CardDescription>
-        </CardHeader>
-        <CardFooter>
-          <Button variant="destructive" onClick={handleDelete} disabled={deleteLoading}>
-            {deleteLoading ? "Deleting..." : "Delete Channel"}
+        {activeSection === 'ai' && (
+          <div className="space-y-8 animate-in slide-in-from-right-4 duration-500">
+            <header>
+              <div className="flex items-center gap-3">
+                <h2 className="text-2xl font-black text-gray-900 tracking-tight">Intelligence Parameters</h2>
+                <Badge className="bg-indigo-600 text-white border-none text-[9px] font-black uppercase px-2">GPT-4 Enabled</Badge>
+              </div>
+              <p className="text-sm font-medium text-gray-400 mt-1">Fine-tune how the AI interprets and clusters your incoming signals.</p>
+            </header>
+
+            <Card className="border-gray-100 rounded-[2.5rem] shadow-sm overflow-hidden border-none ring-1 ring-gray-100">
+              <CardHeader className="p-8 bg-indigo-50/30 border-b border-indigo-50">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2.5 bg-white rounded-2xl text-indigo-600 shadow-sm">
+                      <Sparkles className="w-5 h-5" />
+                    </div>
+                    <CardTitle className="text-lg font-black text-indigo-900">Semantic Focus</CardTitle>
+                  </div>
+                  <Button 
+                    variant="outline" 
+                    onClick={handleEnhanceContext} 
+                    disabled={enhancing || !aiContext}
+                    className="rounded-xl border-indigo-200 text-indigo-600 hover:bg-white font-black text-[10px] uppercase tracking-widest h-9 px-4"
+                  >
+                    {enhancedSuccess ? <><Check className="w-3.5 h-3.5 mr-2" /> Enhanced</> : <>{enhancing ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-2" /> : "Auto-Refine"}</>}
+                  </Button>
+                </div>
+                <CardDescription className="text-indigo-700/60 font-medium mt-4">
+                  Describe your persona and target insights. The AI uses this context to prioritize themes.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="p-8">
+                <div className="relative">
+                  <Textarea 
+                    rows={6}
+                    placeholder="E.g., I am a Lead Engineer. Focus on technical friction, API errors, and deployment bottlenecks." 
+                    value={aiContext} 
+                    onChange={e => setAiContext(e.target.value.substring(0, 400))}
+                    className="rounded-2xl border-gray-100 bg-gray-50/30 focus:bg-white transition-all font-medium leading-relaxed px-6 py-4 resize-none"
+                  />
+                  <div className={`absolute bottom-4 right-4 text-[9px] font-black tracking-widest ${aiContext.length >= 380 ? 'text-red-500' : 'text-gray-300 uppercase'}`}>
+                    {aiContext.length} / 400
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {activeSection === 'notifications' && (
+          <div className="space-y-8 animate-in slide-in-from-right-4 duration-500">
+            <header>
+              <h2 className="text-2xl font-black text-gray-900 tracking-tight">Notification Channels</h2>
+              <p className="text-sm font-medium text-gray-400 mt-1">Sync insights to your team&apos;s existing workflow.</p>
+            </header>
+
+            <div className="space-y-6">
+              <div className="flex items-center justify-between p-8 border border-gray-100 rounded-[2.5rem] bg-white shadow-sm group hover:border-indigo-100 transition-all">
+                <div className="flex items-center gap-5">
+                  <div className="p-4 bg-indigo-50 rounded-[1.5rem] text-indigo-600 group-hover:scale-110 transition-transform shadow-sm shadow-indigo-50">
+                    <Mail className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-black text-gray-900 uppercase tracking-tight">Email Intelligence Digest</h4>
+                    <p className="text-xs font-medium text-gray-400 mt-0.5">Automated weekly synthesis delivered every Monday.</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="text-[10px] font-black text-indigo-600 uppercase tracking-widest mr-2">Default</span>
+                  <Switch checked={true} disabled className="data-[state=checked]:bg-indigo-600" />
+                </div>
+              </div>
+
+              <div className={`border rounded-[2.5rem] bg-white transition-all overflow-hidden ${slackEnabled ? 'border-indigo-200 shadow-xl shadow-indigo-50' : 'border-gray-100 shadow-sm'}`}>
+                <div className="flex items-center justify-between p-8">
+                  <div className="flex items-center gap-5">
+                    <div className="p-4 bg-[#4A154B]/10 rounded-[1.5rem] text-[#4A154B] shadow-sm shadow-purple-50">
+                      <SlackIcon className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-black text-gray-900 uppercase tracking-tight">Slack Channel Broadcast</h4>
+                      <p className="text-xs font-medium text-gray-400 mt-0.5">Stream summary reports to a shared Slack workspace.</p>
+                    </div>
+                  </div>
+                  <Switch checked={slackEnabled} onCheckedChange={setSlackEnabled} className="data-[state=checked]:bg-[#4A154B]" />
+                </div>
+
+                {slackEnabled && (
+                  <div className="px-8 pb-8 pt-0 space-y-6 animate-in fade-in slide-in-from-top-4 duration-500">
+                    <Separator className="bg-gray-50" />
+                    <div className="space-y-3">
+                      <Label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Webhook Intelligence Endpoint</Label>
+                      <Input 
+                        placeholder="https://hooks.slack.com/services/..." 
+                        value={slackUrl}
+                        onChange={e => setSlackUrl(e.target.value)}
+                        className="rounded-xl h-12 border-gray-100 bg-gray-50/50 focus:bg-white transition-all font-mono text-[11px] px-4"
+                      />
+                    </div>
+                    <div className="flex gap-3 pt-2">
+                      <Button variant="outline" size="sm" className="rounded-xl h-10 px-5 gap-2 border-gray-200 text-xs font-bold" onClick={handleTestSlack} disabled={!slackUrl || testingSlack}>
+                        {testingSlack ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-2" /> : <Send className="w-3.5 h-3.5" />}
+                        Dispatch Test
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeSection === 'advanced' && (
+          <div className="space-y-8 animate-in slide-in-from-right-4 duration-500">
+            <header>
+              <h2 className="text-2xl font-black text-gray-900 tracking-tight">Diagnostic Hub</h2>
+              <p className="text-sm font-medium text-gray-400 mt-1">Verify system integrity and historical data continuity.</p>
+            </header>
+            <SnapshotDebug channelId={channel.id} />
+          </div>
+        )}
+
+        {/* Global Action Bar */}
+        <div className="fixed bottom-10 right-10 flex items-center gap-4 z-50">
+          <Button 
+            onClick={handleSave} 
+            disabled={loading} 
+            className="rounded-2xl h-14 px-10 bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs uppercase tracking-widest shadow-2xl shadow-indigo-200 gap-3 group"
+          >
+            {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Zap className="w-5 h-5 group-hover:fill-white transition-all" />}
+            Commit Parameters
           </Button>
-        </CardFooter>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 }
