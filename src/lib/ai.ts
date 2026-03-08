@@ -25,15 +25,18 @@ async function getCompletion(system: string, user: string, useJson = false) {
   let lastError: any;
   for (const model of MODELS_TO_TRY) {
     try {
+      // Robust message structure: Combine system and user into one prompt for maximum compatibility
+      const fullPrompt = `INSTRUCTIONS: ${system}\n\nINPUT DATA: ${user}`;
+      
       return await client.chat.completions.create({
         model: model,
         messages: [
-          { role: "system", content: system },
-          { role: "user", content: user },
+          { role: "user", content: fullPrompt },
         ],
         response_format: useJson ? { type: "json_object" } : undefined,
       });
     } catch (error: any) {
+      console.warn(`Model ${model} failed: ${error.message}`);
       lastError = error;
       continue; 
     }
@@ -44,42 +47,37 @@ async function getCompletion(system: string, user: string, useJson = false) {
 export async function analyzeThemes(messages: { id: string; content: string }[]): Promise<ThemeResult[]> {
   if (messages.length === 0) return [];
 
-  // Create a mapping: Simple Numeric ID <-> Real Database UUID
   const idMap = new Map<string, string>();
-  const reverseMap = new Map<string, string>();
-  
   const simplifiedMessages = messages.map((m, index) => {
     const simpleId = (index + 1).toString();
     idMap.set(simpleId, m.id);
-    reverseMap.set(m.id, simpleId);
     return { id: simpleId, content: m.content };
   });
 
-  const system = `You are a customer feedback analyst. Group similar messages into 2-5 clear themes.
-Each theme must have: 
+  const systemPrompt = `You are a customer feedback analyst. Group similar messages into 2-5 clear themes.
+Each theme MUST have: 
 - "name": Short title (max 5 words)
 - "summary": 1-2 sentence description
-- "message_ids": An array of the numeric IDs (e.g. ["1", "3"]) from the input that belong to this theme.
+- "message_ids": An array of the numeric IDs (e.g. ["1", "3"]) that belong to this theme.
 - "sentiment": positive, negative, mixed, or neutral.
 
-Respond ONLY with a valid JSON object: { "themes": [...] }`;
+Respond ONLY with valid JSON in this format: { "themes": [...] }`;
 
-  const user = `Messages to analyze:\n${JSON.stringify(simplifiedMessages)}`;
+  const userPrompt = `Analyze these messages:\n${JSON.stringify(simplifiedMessages)}`;
 
   try {
-    const response = await getCompletion(system, user, true);
+    const response = await getCompletion(systemPrompt, userPrompt, true);
     const content = response.choices[0].message.content || "{}";
     const cleanJson = content.replace(/```json\n?|\n?```/g, '').trim();
     const parsed = JSON.parse(cleanJson);
     
     const rawThemes = Array.isArray(parsed) ? parsed : (parsed.themes || []);
 
-    // Map the simplified numeric IDs back to real UUIDs
     const finalThemes = rawThemes.map((theme: any) => ({
       ...theme,
       message_ids: (theme.message_ids || [])
         .map((sid: any) => idMap.get(sid.toString()))
-        .filter((realId: any) => !!realId) // Only keep valid matches
+        .filter((realId: any) => !!realId)
     }));
 
     return finalThemes;
