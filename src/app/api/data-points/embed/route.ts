@@ -4,6 +4,8 @@ import { createSupabaseServerClient, createSupabaseAdminClient } from '@/lib/sup
 import { generateEmbedding } from '@/lib/embeddings';
 import { analyzeSentiment } from '@/lib/ai';
 
+export const dynamic = 'force-dynamic';
+
 export async function POST(request: Request) {
   const authHeader = request.headers.get('Authorization');
   let supabase;
