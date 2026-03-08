@@ -20,12 +20,16 @@ export async function POST(
     supabase = await createSupabaseServerClient();
   }
 
-  // Parse optional messageIds from body
+  // Parse optional messageIds and forceRefresh from body
   let messageIds: string[] | null = null;
+  let forceRefresh = false;
   try {
     const body = await request.json();
     if (body.messageIds && Array.isArray(body.messageIds)) {
       messageIds = body.messageIds;
+    }
+    if (body.forceRefresh === true) {
+      forceRefresh = true;
     }
   } catch (e) {
     // No body or invalid JSON is fine
@@ -45,8 +49,11 @@ export async function POST(
 
   if (messageIds && messageIds.length > 0) {
     query = query.in('id', messageIds);
-  } else {
+  } else if (!forceRefresh) {
     query = query.order('message_timestamp', { ascending: false }).limit(200);
+  } else {
+    // If forceRefresh, we take more data points (up to 1000) to re-evaluate the whole channel
+    query = query.order('message_timestamp', { ascending: false }).limit(1000);
   }
 
   const { data: dataPoints, error: dpError } = await query;
@@ -120,7 +127,7 @@ export async function POST(
         .from('themes')
         .update({
           summary: theme.summary,
-          data_point_count: validMessageIds.length,
+          data_point_count: forceRefresh ? validMessageIds.length : undefined, // Only overwrite count if forcing full refresh
           sentiment_breakdown: breakdown,
           last_updated_at: new Date().toISOString()
         })
@@ -148,6 +155,7 @@ export async function POST(
     processedThemes.push({ id: themeId, name: theme.name, summary: theme.summary });
 
     if (themeId) {
+      // Refresh relations
       await supabase.from('data_point_themes').delete().eq('theme_id', themeId);
       const relations = validMessageIds.map(dpId => ({
         data_point_id: dpId,
@@ -216,6 +224,16 @@ export async function POST(
   }));
 
   if (actualSnapshots.length > 0) {
+    // Delete existing snapshot for today if forceRefresh to avoid incrementing incorrectly if logic changes
+    if (forceRefresh) {
+      await supabase
+        .from('theme_snapshots')
+        .delete()
+        .eq('channel_id', params.id)
+        .eq('snapshot_date', today)
+        .in('theme_id', processedThemeIds);
+    }
+
     await supabase
       .from('theme_snapshots')
       .upsert(actualSnapshots, { onConflict: 'theme_id,snapshot_date' });

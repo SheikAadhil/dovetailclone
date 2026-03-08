@@ -6,6 +6,7 @@ import { ThemeCard } from "./ThemeCard";
 import { MessageList } from "./MessageList";
 import { ChannelSettingsForm } from "./ChannelSettingsForm";
 import { BackfillDialog } from "./BackfillDialog";
+import { NodeImportDialog } from "./NodeImportDialog";
 import { SourcesPanel } from "./SourcesPanel";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -13,9 +14,9 @@ import {
   Brain, RefreshCcw, LayoutPanelLeft, MessageSquare, 
   Settings as SettingsIcon, History, Plus, MoreVertical, 
   FolderOpen, Merge, Clock, TrendingUp, 
-  Filter, BarChart3, ChevronRight, Search, Activity, Layers, Sparkles, X, Check, Loader2
+  Filter, BarChart3, ChevronRight, Search, Activity, Layers, Sparkles, X, Check, Loader2, FileCode, Zap
 } from "lucide-react";
-import { formatDistanceToNow, format, parseISO } from "date-fns";
+import { formatDistanceToNow, format, parseISO, subDays } from "date-fns";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -83,10 +84,11 @@ export function ChannelDetailTabs({ channel }: ChannelDetailTabsProps) {
   const [loadingThemes, setLoadingThemes] = useState(true);
   const [loadingTopics, setLoadingTopics] = useState(true);
   const [analyzing, setAnalyzing] = useState(false);
-  const [, setChannelAlerts] = useState<AnomalyAlert[]>([]);
+  const [channelAlerts, setChannelAlerts] = useState<AnomalyAlert[]>([]);
   
   const [selectedTheme, setSelectedTheme] = useState<Theme | null>(null);
   const [isBackfillOpen, setIsBackfillOpen] = useState(false);
+  const [isNodeImportOpen, setIsNodeImportOpen] = useState(false);
   const [isTopicDialogOpen, setIsTopicOpen] = useState(false);
   const [stats, setStats] = useState({ total_data_points: 0, last_analyzed_at: channel.last_analyzed_at });
 
@@ -164,10 +166,14 @@ export function ChannelDetailTabs({ channel }: ChannelDetailTabsProps) {
     fetchThemes(selectedTopicId, period);
   }, [fetchThemes, selectedTopicId, period]);
 
-  const handleAnalyze = async () => {
+  const handleAnalyze = async (forceRefresh = false) => {
     setAnalyzing(true);
     try {
-      const res = await fetch(`/api/channels/${channel.id}/analyze`, { method: 'POST' });
+      const res = await fetch(`/api/channels/${channel.id}/analyze`, { 
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ forceRefresh })
+      });
       const data = await res.json();
       if (data.error) {
         alert(data.error);
@@ -312,24 +318,38 @@ export function ChannelDetailTabs({ channel }: ChannelDetailTabsProps) {
     return themes.filter(t => visibleThemeIds.includes(t.id));
   }, [themes, visibleThemeIds]);
 
-  // Transform theme trend data for stacked chart
-  const getChartData = () => {
+  // Transform theme trend data for stacked chart - WITH PADDING
+  const chartData = useMemo(() => {
     const dateMap: Record<string, any> = {};
     
+    if (chartThemes.length === 0) return [];
+
+    // 1. Generate all dates in the period to ensure X-axis scale is consistent
+    const days = period === 'all' ? 365 : parseInt(period);
+    
+    for (let i = days - 1; i >= 0; i--) {
+      const dateStr = format(subDays(new Date(), i), "yyyy-MM-dd");
+      dateMap[dateStr] = { date: dateStr };
+      
+      // Initialize each theme with 0 for this date
+      chartThemes.forEach(t => {
+        dateMap[dateStr][t.name] = 0;
+      });
+    }
+
+    // 2. Overlay actual theme snapshots
     chartThemes.forEach(theme => {
       if (!theme.trend_data) return;
       theme.trend_data.forEach(snapshot => {
-        if (!dateMap[snapshot.date]) {
-          dateMap[snapshot.date] = { date: snapshot.date };
+        if (dateMap[snapshot.date]) {
+          dateMap[snapshot.date][theme.name] = snapshot.count;
         }
-        dateMap[snapshot.date][theme.name] = snapshot.count;
       });
     });
 
     return Object.values(dateMap).sort((a, b) => a.date.localeCompare(b.date));
-  };
+  }, [chartThemes, period]);
 
-  const chartData = getChartData();
   const selectedTopic = topics.find(t => t.id === selectedTopicId);
 
   const toggleThemeVisibility = (id: string) => {
@@ -465,14 +485,32 @@ export function ChannelDetailTabs({ channel }: ChannelDetailTabsProps) {
               ))}
             </div>
             <SourcesPanel channelId={channel.id} />
+            <Button variant="outline" size="sm" onClick={() => setIsNodeImportOpen(true)} className="rounded-full border-gray-200 text-[10px] font-black uppercase tracking-widest h-9 px-5 gap-2 bg-white hover:bg-gray-50 transition-all shadow-sm">
+              <FileCode className="w-3.5 h-3.5 text-indigo-600" />
+              Import Nodes
+            </Button>
             <Button variant="outline" size="sm" onClick={() => setIsBackfillOpen(true)} className="rounded-full border-gray-200 text-[10px] font-black uppercase tracking-widest h-9 px-5 gap-2 bg-white hover:bg-gray-50 transition-all shadow-sm">
               <History className="w-3.5 h-3.5 text-indigo-600" />
               Sync History
             </Button>
-            <Button variant="default" size="sm" onClick={handleAnalyze} disabled={analyzing} className="rounded-full bg-indigo-600 hover:bg-indigo-700 shadow-lg shadow-indigo-100 h-9 px-5">
-              {analyzing ? <RefreshCcw className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4 mr-2" />}
-              {analyzing ? "Thinking..." : "Analyze Signal"}
-            </Button>
+            
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="default" size="sm" disabled={analyzing} className="rounded-full bg-indigo-600 hover:bg-indigo-700 shadow-lg shadow-indigo-100 h-9 px-5">
+                  {analyzing ? <RefreshCcw className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4 mr-2" />}
+                  {analyzing ? "Thinking..." : "Analyze Signal"}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="rounded-xl border-gray-100 shadow-2xl p-2 w-56">
+                <DropdownMenuItem onClick={() => handleAnalyze(false)} className="rounded-lg font-bold text-xs p-3">
+                  <Zap className="w-4 h-4 mr-2 text-indigo-600" /> Analyze New Signals
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => handleAnalyze(true)} className="rounded-lg font-bold text-xs p-3">
+                  <RefreshCcw className="w-4 h-4 mr-2 text-indigo-600" /> Force Re-analysis All
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </header>
 
@@ -807,6 +845,13 @@ export function ChannelDetailTabs({ channel }: ChannelDetailTabsProps) {
         channelId={channel.id}
         isOpen={isBackfillOpen}
         onClose={() => setIsBackfillOpen(false)}
+        onSuccess={() => { fetchThemes(); fetchTopics(); }}
+      />
+
+      <NodeImportDialog
+        channelId={channel.id}
+        isOpen={isNodeImportOpen}
+        onClose={() => setIsNodeImportOpen(false)}
         onSuccess={() => { fetchThemes(); fetchTopics(); }}
       />
 
