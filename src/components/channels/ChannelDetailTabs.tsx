@@ -465,6 +465,10 @@ export function ChannelDetailTabs({ channel }: ChannelDetailTabsProps) {
               ))}
             </div>
             <SourcesPanel channelId={channel.id} />
+            <Button variant="outline" size="sm" onClick={() => setIsBackfillOpen(true)} className="rounded-full border-gray-200 text-[10px] font-black uppercase tracking-widest h-9 px-5 gap-2 bg-white hover:bg-gray-50 transition-all shadow-sm">
+              <History className="w-3.5 h-3.5 text-indigo-600" />
+              Sync History
+            </Button>
             <Button variant="default" size="sm" onClick={handleAnalyze} disabled={analyzing} className="rounded-full bg-indigo-600 hover:bg-indigo-700 shadow-lg shadow-indigo-100 h-9 px-5">
               {analyzing ? <RefreshCcw className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4 mr-2" />}
               {analyzing ? "Thinking..." : "Analyze Signal"}
@@ -558,10 +562,6 @@ export function ChannelDetailTabs({ channel }: ChannelDetailTabsProps) {
                           </ScrollArea>
                         </PopoverContent>
                       </Popover>
-
-                      <Button variant="outline" size="sm" onClick={() => setIsBackfillOpen(true)} className="rounded-xl border-gray-100 text-[10px] font-black uppercase tracking-widest h-9 px-4 gap-2">
-                        <History className="w-3.5 h-3.5" /> History Sync
-                      </Button>
                     </div>
                   </div>
 
