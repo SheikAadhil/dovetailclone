@@ -2,17 +2,41 @@ import { Theme } from "@/types";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, MessageSquare, Smile, Frown, Meh } from "lucide-react";
+import { 
+  ArrowRight, MessageSquare, Smile, Frown, Meh, MoreHorizontal, 
+  Pin, PinOff, Pencil, Trash2, Merge, CheckCircle2 
+} from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface ThemeCardProps {
   theme: Theme;
   onView: (theme: Theme) => void;
+  onEdit: (theme: Theme) => void;
+  onDelete: (id: string) => void;
+  onPin: (theme: Theme) => void;
+  onMergeStart: (theme: Theme) => void;
+  onMergeSelect: (targetTheme: Theme) => void;
+  isMergeSource?: boolean;
+  mergeMode?: boolean;
 }
 
-export function ThemeCard({ theme, onView }: ThemeCardProps) {
-  // Determine overall sentiment from breakdown if needed, or use a prop?
-  // Theme interface has sentiment_breakdown.
-  // We can infer dominant sentiment.
+export function ThemeCard({ 
+  theme, 
+  onView, 
+  onEdit, 
+  onDelete, 
+  onPin, 
+  onMergeStart, 
+  onMergeSelect,
+  isMergeSource,
+  mergeMode 
+}: ThemeCardProps) {
   const breakdown = theme.sentiment_breakdown || {};
   const positive = breakdown.positive || 0;
   const negative = breakdown.negative || 0;
@@ -36,22 +60,63 @@ export function ThemeCard({ theme, onView }: ThemeCardProps) {
     sentimentLabel = "Neutral";
   }
 
-  // Calculate percentages for bar chart
-  const total = theme.data_point_count || 1; // avoid divide by zero
+  const total = theme.data_point_count || 1;
   const posPct = (positive / total) * 100;
   const negPct = (negative / total) * 100;
   const neuPct = (neutral / total) * 100;
 
   return (
-    <Card className="flex flex-col h-full hover:shadow-md transition-shadow">
-      <CardHeader className="pb-2">
-        <div className="flex justify-between items-start">
+    <Card className={`flex flex-col h-full transition-all relative ${
+      isMergeSource ? 'border-indigo-500 ring-2 ring-indigo-500/20' : 'hover:shadow-md'
+    }`}>
+      {isMergeSource && (
+        <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-indigo-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full z-10 uppercase tracking-wider shadow-sm">
+          Merging Source
+        </div>
+      )}
+
+      <CardHeader className="pb-2 flex flex-row items-start justify-between space-y-0">
+        <div className="flex-1 min-w-0 pr-2">
+          <div className="flex items-center gap-2 mb-1">
+            {theme.is_pinned && <Pin className="w-3 h-3 text-indigo-600 fill-indigo-600" />}
+            {theme.is_manual && <Badge variant="outline" className="text-[9px] h-4 px-1 uppercase border-orange-200 text-orange-600 bg-orange-50">Manual</Badge>}
+          </div>
           <CardTitle className="text-lg font-bold line-clamp-2">{theme.name}</CardTitle>
         </div>
+
+        {!mergeMode && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" className="h-8 w-8 p-0 flex-shrink-0">
+                <MoreHorizontal className="w-4 h-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuItem onClick={() => onPin(theme)}>
+                {theme.is_pinned ? (
+                  <><PinOff className="w-4 h-4 mr-2" /> Unpin</>
+                ) : (
+                  <><Pin className="w-4 h-4 mr-2" /> Pin to top</>
+                )}
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onEdit(theme)}>
+                <Pencil className="w-4 h-4 mr-2" /> Edit theme
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onMergeStart(theme)}>
+                <Merge className="w-4 h-4 mr-2" /> Merge into...
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => onDelete(theme.id)} className="text-red-600">
+                <Trash2 className="w-4 h-4 mr-2" /> Delete
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
       </CardHeader>
+
       <CardContent className="flex-1 pb-2 space-y-4">
         <p className="text-sm text-gray-500 line-clamp-3">
-          {theme.summary}
+          {theme.summary || theme.description || "No summary available."}
         </p>
 
         <div className="flex flex-wrap gap-2">
@@ -65,18 +130,36 @@ export function ThemeCard({ theme, onView }: ThemeCardProps) {
           </Badge>
         </div>
 
-        {/* Mini bar chart */}
         <div className="h-2 w-full flex rounded-full overflow-hidden bg-gray-100">
           {posPct > 0 && <div style={{ width: `${posPct}%` }} className="bg-green-400" />}
           {neuPct > 0 && <div style={{ width: `${neuPct}%` }} className="bg-gray-300" />}
           {negPct > 0 && <div style={{ width: `${negPct}%` }} className="bg-red-400" />}
         </div>
       </CardContent>
+
       <CardFooter className="pt-2 border-t bg-gray-50/50">
-        <Button variant="ghost" className="w-full justify-between text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 p-0 h-auto font-medium" onClick={() => onView(theme)}>
-          View messages
-          <ArrowRight className="w-4 h-4 ml-2" />
-        </Button>
+        {mergeMode ? (
+          <Button 
+            disabled={isMergeSource}
+            onClick={() => onMergeSelect(theme)}
+            className={`w-full gap-2 rounded-md ${
+              isMergeSource ? 'bg-gray-100 text-gray-400 border-dashed border-2' : 'bg-indigo-600 hover:bg-indigo-700 text-white'
+            }`}
+          >
+            {isMergeSource ? "Source" : (
+              <><CheckCircle2 className="w-4 h-4" /> Merge Here</>
+            )}
+          </Button>
+        ) : (
+          <Button 
+            variant="ghost" 
+            className="w-full justify-between text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 p-0 h-auto font-medium" 
+            onClick={() => onView(theme)}
+          >
+            View messages
+            <ArrowRight className="w-4 h-4 ml-2" />
+          </Button>
+        )}
       </CardFooter>
     </Card>
   );

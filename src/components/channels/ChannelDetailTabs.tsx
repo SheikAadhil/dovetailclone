@@ -13,7 +13,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { 
   Brain, RefreshCcw, LayoutPanelLeft, MessageSquare, 
   Settings as SettingsIcon, AlertCircle, History, Plus, MoreVertical, 
-  FolderOpen, Pencil, Trash2
+  FolderOpen, Pencil, Trash2, X, Merge, CheckCircle2
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -21,6 +21,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface ChannelDetailTabsProps {
   channel: Channel;
@@ -34,11 +35,25 @@ export function ChannelDetailTabs({ channel }: ChannelDetailTabsProps) {
   const [loadingThemes, setLoadingThemes] = useState(true);
   const [loadingTopics, setLoadingTopics] = useState(true);
   const [analyzing, setAnalyzing] = useState(false);
+  
   const [selectedTheme, setSelectedTheme] = useState<Theme | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [isBackfillOpen, setIsBackfillOpen] = useState(false);
   const [isTopicDialogOpen, setIsTopicOpen] = useState(false);
   const [stats, setStats] = useState({ total_data_points: 0, last_analyzed_at: channel.last_analyzed_at });
+
+  // Theme Management State
+  const [isThemeDialogOpen, setIsThemeDialogOpen] = useState(false);
+  const [editingTheme, setEditingTheme] = useState<Theme | null>(null);
+  const [themeName, setThemeName] = useState("");
+  const [themeDesc, setThemeDesc] = useState("");
+  const [themeTopicId, setThemeTopicId] = useState<string>("none");
+  const [savingTheme, setSavingTheme] = useState(false);
+
+  // Merge Mode State
+  const [mergeMode, setMergeMode] = useState(false);
+  const [mergeSource, setMergeSource] = useState<Theme | null>(null);
+  const [merging, setMerging] = useState(false);
 
   // Topic Form State
   const [newTopicName, setNewTopicName] = useState("");
@@ -112,10 +127,7 @@ export function ChannelDetailTabs({ channel }: ChannelDetailTabsProps) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: newTopicName, description: newTopicDesc })
       });
-      if (!res.ok) {
-        const err = await res.text();
-        throw new Error(err);
-      }
+      if (!res.ok) throw new Error(await res.text());
       await fetchTopics();
       setIsTopicOpen(false);
       setNewTopicName("");
@@ -136,6 +148,105 @@ export function ChannelDetailTabs({ channel }: ChannelDetailTabsProps) {
     } catch (e) {
       alert("Delete failed");
     }
+  };
+
+  const handleOpenThemeDialog = (theme?: Theme) => {
+    if (theme) {
+      setEditingTheme(theme);
+      setThemeName(theme.name);
+      setThemeDesc(theme.description || "");
+      setThemeTopicId(theme.topic_id || "none");
+    } else {
+      setEditingTheme(null);
+      setThemeName("");
+      setThemeDesc("");
+      setThemeTopicId(selectedTopicId !== "all" ? selectedTopicId : "none");
+    }
+    setIsThemeDialogOpen(true);
+  };
+
+  const handleSaveTheme = async () => {
+    if (!themeName) return;
+    setSavingTheme(true);
+    try {
+      const url = editingTheme 
+        ? `/api/channels/${channel.id}/themes/${editingTheme.id}`
+        : `/api/channels/${channel.id}/themes`;
+      
+      const res = await fetch(url, {
+        method: editingTheme ? 'PATCH' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: themeName, description: themeDesc, topic_id: themeTopicId })
+      });
+
+      if (!res.ok) throw new Error("Failed to save theme");
+      
+      await fetchThemes();
+      await fetchTopics();
+      setIsThemeDialogOpen(false);
+    } catch (e) {
+      alert("Error saving theme");
+    } finally {
+      setSavingTheme(false);
+    }
+  };
+
+  const handleDeleteTheme = async (themeId: string) => {
+    if (!confirm("Delete this theme? Data points will be unassigned.")) return;
+    try {
+      await fetch(`/api/channels/${channel.id}/themes/${themeId}`, { method: 'DELETE' });
+      fetchThemes();
+      fetchTopics();
+    } catch (e) {
+      alert("Delete failed");
+    }
+  };
+
+  const handlePinTheme = async (theme: Theme) => {
+    try {
+      await fetch(`/api/channels/${channel.id}/themes/${theme.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ is_pinned: !theme.is_pinned })
+      });
+      fetchThemes();
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const startMerge = (source: Theme) => {
+    setMergeSource(source);
+    setMergeMode(true);
+  };
+
+  const handleMergeComplete = async (target: Theme) => {
+    if (!mergeSource) return;
+    if (!confirm(`Merge "${mergeSource.name}" into "${target.name}"? This will delete "${mergeSource.name}".`)) return;
+    
+    setMerging(true);
+    try {
+      const res = await fetch(`/api/channels/${channel.id}/themes/merge`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ source_theme_ids: [mergeSource.id], target_theme_id: target.id })
+      });
+      if (!res.ok) throw new Error("Merge failed");
+      
+      setMergeMode(false);
+      setMergeSource(null);
+      fetchThemes();
+      fetchTopics();
+    } catch (e) {
+      alert("Merge failed");
+    } finally {
+      setMerging(false);
+    }
+  };
+
+  const cancelMerge = () => {
+    setMergeMode(false);
+    setMergeSource(null);
   };
 
   const handleViewTheme = (theme: Theme) => {
@@ -201,7 +312,7 @@ export function ChannelDetailTabs({ channel }: ChannelDetailTabsProps) {
                   size="sm" 
                   className="h-7 w-7 p-0" 
                   onClick={() => setIsTopicOpen(true)}
-                  disabled={topics.length >= 10}
+                  disabled={topics.length >= 10 || mergeMode}
                 >
                   <Plus className="w-4 h-4" />
                 </Button>
@@ -209,12 +320,13 @@ export function ChannelDetailTabs({ channel }: ChannelDetailTabsProps) {
 
               <div className="space-y-1">
                 <button
+                  disabled={mergeMode}
                   onClick={() => setSelectedTopicId("all")}
                   className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors flex items-center justify-between ${
                     selectedTopicId === "all" 
                       ? 'bg-indigo-50 text-indigo-700 font-medium border-l-2 border-indigo-600 rounded-l-none' 
                       : 'text-gray-600 hover:bg-gray-50'
-                  }`}
+                  } ${mergeMode ? 'opacity-50' : ''}`}
                 >
                   All Topics
                 </button>
@@ -225,30 +337,33 @@ export function ChannelDetailTabs({ channel }: ChannelDetailTabsProps) {
                   topics.map(topic => (
                     <div key={topic.id} className="group relative">
                       <button
+                        disabled={mergeMode}
                         onClick={() => setSelectedTopicId(topic.id)}
                         className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors flex items-center justify-between ${
                           selectedTopicId === topic.id 
                             ? 'bg-indigo-50 text-indigo-700 font-medium border-l-2 border-indigo-600 rounded-l-none' 
                             : 'text-gray-600 hover:bg-gray-50'
-                        }`}
+                        } ${mergeMode ? 'opacity-50' : ''}`}
                       >
                         <span className="truncate pr-4">{topic.name}</span>
                         <span className="bg-gray-100 group-hover:bg-white text-gray-500 px-1.5 py-0.5 rounded text-[10px]">
                           {topic.theme_count}
                         </span>
                       </button>
-                      <div className="absolute right-8 top-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" className="h-6 w-6 p-0"><MoreVertical className="w-3.5 h-3.5" /></Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => handleDeleteTopic(topic.id)} className="text-red-600">
-                              <Trash2 className="w-4 h-4 mr-2" /> Delete
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
+                      {!mergeMode && (
+                        <div className="absolute right-8 top-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" className="h-6 w-6 p-0"><MoreVertical className="w-3.5 h-3.5" /></Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => handleDeleteTopic(topic.id)} className="text-red-600">
+                                <Trash2 className="w-4 h-4 mr-2" /> Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                      )}
                     </div>
                   ))
                 )}
@@ -264,15 +379,26 @@ export function ChannelDetailTabs({ channel }: ChannelDetailTabsProps) {
 
             {/* RIGHT PANEL: THEMES */}
             <div className="flex-1 space-y-6">
-              {selectedTopicId !== "all" && selectedTopic && (
-                <div className="bg-gray-50 border rounded-lg p-4">
-                  <div className="flex items-center gap-2 text-gray-900 font-semibold mb-1">
-                    <FolderOpen className="w-4 h-4 text-indigo-600" />
-                    {selectedTopic.name}
-                  </div>
-                  <p className="text-xs text-gray-500">{selectedTopic.description || "No description provided."}</p>
+              <div className="flex items-center justify-between">
+                <div>
+                  {selectedTopicId !== "all" && selectedTopic ? (
+                    <div className="bg-gray-50 border rounded-lg p-4">
+                      <div className="flex items-center gap-2 text-gray-900 font-semibold mb-1">
+                        <FolderOpen className="w-4 h-4 text-indigo-600" />
+                        {selectedTopic.name}
+                      </div>
+                      <p className="text-xs text-gray-500">{selectedTopic.description || "No description provided."}</p>
+                    </div>
+                  ) : (
+                    <h2 className="text-lg font-semibold text-gray-900">All Themes</h2>
+                  )}
                 </div>
-              )}
+                {!mergeMode && (
+                  <Button size="sm" onClick={() => handleOpenThemeDialog()} className="gap-2">
+                    <Plus className="w-4 h-4" /> New Theme
+                  </Button>
+                )}
+              </div>
 
               {loadingThemes ? (
                 <div className="grid gap-6 grid-cols-1 md:grid-cols-2">
@@ -281,7 +407,18 @@ export function ChannelDetailTabs({ channel }: ChannelDetailTabsProps) {
               ) : themes.length > 0 ? (
                 <div className="grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
                   {themes.map((theme) => (
-                    <ThemeCard key={theme.id} theme={theme} onView={handleViewTheme} />
+                    <ThemeCard 
+                      key={theme.id} 
+                      theme={theme} 
+                      onView={handleViewTheme}
+                      onEdit={handleOpenThemeDialog}
+                      onDelete={handleDeleteTheme}
+                      onPin={handlePinTheme}
+                      onMergeStart={startMerge}
+                      onMergeSelect={handleMergeComplete}
+                      mergeMode={mergeMode}
+                      isMergeSource={mergeSource?.id === theme.id}
+                    />
                   ))}
                 </div>
               ) : (
@@ -307,6 +444,22 @@ export function ChannelDetailTabs({ channel }: ChannelDetailTabsProps) {
           <ChannelSettingsForm channel={channel} />
         </TabsContent>
       </Tabs>
+
+      {/* Floating Merge Bar */}
+      {mergeMode && (
+        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 bg-white border border-indigo-100 shadow-xl rounded-full px-6 py-3 flex items-center gap-6 z-50 animate-in fade-in slide-in-from-bottom-4">
+          <div className="flex items-center gap-2 border-r pr-6 border-gray-100">
+            <Merge className="w-5 h-5 text-indigo-600" />
+            <span className="text-sm font-medium text-gray-900 italic">Merging: {mergeSource?.name}</span>
+          </div>
+          <div className="flex items-center gap-2 text-xs text-gray-500 mr-4">
+            Select target theme to merge into
+          </div>
+          <Button size="sm" variant="ghost" className="rounded-full h-8 px-4" onClick={cancelMerge} disabled={merging}>
+            Cancel
+          </Button>
+        </div>
+      )}
 
       <ThemeDrawer 
         theme={selectedTheme} 
@@ -352,6 +505,58 @@ export function ChannelDetailTabs({ channel }: ChannelDetailTabsProps) {
             <Button variant="outline" onClick={() => setIsTopicOpen(false)}>Cancel</Button>
             <Button onClick={handleCreateTopic} disabled={!newTopicName || creatingTopic}>
               {creatingTopic ? "Creating..." : "Create Topic"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Create/Edit Theme Dialog */}
+      <Dialog open={isThemeDialogOpen} onOpenChange={setIsThemeDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{editingTheme ? "Edit Theme" : "Create Manual Theme"}</DialogTitle>
+            <DialogDescription>
+              {editingTheme ? "Update the theme's classification and details." : "Create a custom theme to manually group messages."}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Name</Label>
+              <Input 
+                value={themeName} 
+                onChange={e => setThemeName(e.target.value.substring(0, 60))} 
+                placeholder="e.g. Login Performance"
+              />
+              <p className="text-[10px] text-gray-400 text-right">{themeName.length}/60</p>
+            </div>
+            <div className="space-y-2">
+              <Label>Description / Label</Label>
+              <Textarea 
+                value={themeDesc} 
+                onChange={e => setThemeDesc(e.target.value.substring(0, 200))} 
+                placeholder="Describe what feedback belongs here. Guides AI classification."
+              />
+              <p className="text-[10px] text-gray-400 text-right">{themeDesc.length}/200</p>
+            </div>
+            <div className="space-y-2">
+              <Label>Topic</Label>
+              <Select value={themeTopicId} onValueChange={setThemeTopicId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a topic" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No Topic</SelectItem>
+                  {topics.map(t => (
+                    <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsThemeDialogOpen(false)}>Cancel</Button>
+            <Button onClick={handleSaveTheme} disabled={!themeName || savingTheme}>
+              {savingTheme ? "Saving..." : "Save Theme"}
             </Button>
           </DialogFooter>
         </DialogContent>

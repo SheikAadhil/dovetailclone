@@ -71,3 +71,39 @@ export async function GET(
     last_analyzed_at: channel?.last_analyzed_at
   });
 }
+
+export async function POST(
+  request: Request,
+  { params }: { params: { id: string } }
+) {
+  const { userId } = await auth();
+  if (!userId) return new NextResponse('Unauthorized', { status: 401 });
+
+  const { name, description, topic_id } = await request.json();
+  const supabase = await createSupabaseServerClient();
+
+  const { data: channel } = await supabase
+    .from('channels')
+    .select('workspace_id')
+    .eq('id', params.id)
+    .single();
+
+  const { data: theme, error } = await supabase
+    .from('themes')
+    .insert({
+      channel_id: params.id,
+      workspace_id: channel?.workspace_id,
+      name,
+      description,
+      topic_id: topic_id === 'none' ? null : topic_id,
+      summary: '',
+      is_manual: true,
+      data_point_count: 0
+    })
+    .select()
+    .single();
+
+  if (error) return new NextResponse('Database error', { status: 500 });
+
+  return NextResponse.json(theme);
+}

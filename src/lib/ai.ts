@@ -108,9 +108,10 @@ MESSAGES: ${JSON.stringify(simplifiedMessages)}`;
 }
 
 export async function analyzeSentiment(content: string): Promise<'positive' | 'negative' | 'neutral' | null> {
-  const prompt = `Classify this message sentiment as positive, negative, or neutral. Respond with exactly one word.\nMessage: "${content}"`;
+  const systemPrompt = "Classify the sentiment of the message as exactly one word: positive, negative, or neutral.";
+  const userPrompt = `Message: "${content}"`;
   try {
-    const response = await getCompletion(prompt);
+    const response = await getCompletion(`${systemPrompt}\n\nINPUT: ${userPrompt}`);
     const result = response.choices[0].message.content?.trim().toLowerCase();
     if (result?.includes('positive')) return 'positive';
     if (result?.includes('negative')) return 'negative';
