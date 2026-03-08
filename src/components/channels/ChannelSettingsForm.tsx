@@ -11,6 +11,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Loader2, Trash2, Brain, Check, Info, Mail, Slack as SlackIcon, BellRing, Send } from "lucide-react";
 import { UsageStats } from "./UsageStats";
 import { Switch } from "@/components/ui/switch";
+import { SnapshotDebug } from "./SnapshotDebug";
 
 interface ChannelSettingsFormProps {
   channel: Channel;
@@ -118,6 +119,9 @@ export function ChannelSettingsForm({ channel }: ChannelSettingsFormProps) {
   return (
     <div className="space-y-6 max-w-2xl pb-20">
       <UsageStats />
+
+      {/* Snapshot Debug */}
+      <SnapshotDebug channelId={channel.id} />
 
       {/* AI Context Section */}
       <Card className="border-indigo-100 shadow-sm">
