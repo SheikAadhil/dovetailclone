@@ -5,19 +5,19 @@ import { createSupabaseClient } from "@/lib/supabase";
 import { DataPoint, ChannelField, Theme } from "@/types";
 import { MessageCard } from "./MessageCard";
 import { Input } from "@/components/ui/input";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Loader2, Search, Brain, X, CheckSquare, Filter, Tag } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { 
-  DropdownMenu, 
-  DropdownMenuContent, 
-  DropdownMenuItem, 
-  DropdownMenuLabel, 
-  DropdownMenuSeparator, 
-  DropdownMenuTrigger 
-} from "@/components/ui/dropdown-menu";
-import { cn } from "@/lib/utils";
+  Dialog, 
+  DialogContent, 
+  DialogDescription, 
+  DialogFooter, 
+  DialogHeader, 
+  DialogTitle 
+} from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface MessageListProps {
   channelId: string;
@@ -40,6 +40,7 @@ export function MessageList({ channelId }: MessageListProps) {
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [analyzingBatch, setAnalyzingBatch] = useState(false);
+  const [isTagDialogOpen, setIsTagDialogOpen] = useState(false);
   const [tagging, setTagging] = useState(false);
 
   useEffect(() => {
@@ -135,7 +136,6 @@ export function MessageList({ channelId }: MessageListProps) {
   };
 
   const handleTagWithTheme = async (themeId: string) => {
-    if (selectedIds.size === 0) return;
     setTagging(true);
     try {
       const res = await fetch(`/api/channels/${channelId}/themes/${themeId}/assign`, {
@@ -144,18 +144,12 @@ export function MessageList({ channelId }: MessageListProps) {
         body: JSON.stringify({ messageIds: Array.from(selectedIds) })
       });
       if (res.ok) {
-        alert(`Successfully tagged ${selectedIds.size} messages.`);
+        alert(`Tagged ${selectedIds.size} messages.`);
         setSelectedIds(new Set());
+        setIsTagDialogOpen(false);
         router.refresh();
-      } else {
-        throw new Error("Tagging failed");
       }
-    } catch (e) { 
-      console.error(e);
-      alert("Tagging failed. Please try again."); 
-    } finally { 
-      setTagging(false); 
-    }
+    } catch (e) { alert("Tagging failed"); } finally { setTagging(false); }
   };
 
   const updateMetadataFilter = (column: string, value: string) => {
@@ -168,11 +162,12 @@ export function MessageList({ channelId }: MessageListProps) {
 
   return (
     <div className="space-y-4 relative pb-20">
+      {/* Filter Toolbar */}
       <div className="flex flex-col gap-4 p-4 bg-gray-50 border rounded-xl shadow-sm">
         <div className="flex flex-col sm:flex-row gap-4">
           <div className="relative flex-1">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
-            <Input placeholder="Search message content..." className="pl-9 bg-white" value={search} onChange={(e) => setSearch(e.target.value)} />
+            <Input placeholder="Search messages..." className="pl-9 bg-white" value={search} onChange={(e) => setSearch(e.target.value)} />
           </div>
           <Select value={sentiment} onValueChange={setSentiment}>
             <SelectTrigger className="w-[160px] bg-white border-gray-200">
@@ -221,61 +216,59 @@ export function MessageList({ channelId }: MessageListProps) {
 
       {/* Floating Batch Action Bar */}
       {selectedIds.size > 0 && (
-        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 bg-white border border-indigo-100 shadow-2xl rounded-full px-6 py-3 flex items-center gap-4 z-[100] animate-in fade-in slide-in-from-bottom-4">
+        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 bg-white border border-indigo-100 shadow-2xl rounded-full px-6 py-3 flex items-center gap-4 z-50 animate-in fade-in slide-in-from-bottom-4">
           <div className="flex items-center gap-2 border-r pr-4 border-gray-100">
             <CheckSquare className="w-5 h-5 text-indigo-600" />
             <span className="font-semibold text-sm text-gray-900">{selectedIds.size} selected</span>
           </div>
           
           <div className="flex items-center gap-2">
-            <DropdownMenu>
-              <DropdownMenuTrigger 
-                className={cn(
-                  buttonVariants({ variant: "outline", size: "sm" }),
-                  "rounded-full gap-2 border-indigo-200 text-indigo-600 hover:bg-indigo-50"
-                )}
-                disabled={tagging}
-              >
-                {tagging ? <Loader2 className="w-4 h-4 animate-spin" /> : <Tag className="w-4 h-4" />}
-                Tag with Theme
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56 max-h-64 overflow-auto z-[110]">
-                <DropdownMenuLabel className="text-[10px] font-bold uppercase text-gray-400 px-3 py-2">Select Target Theme</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                {!themes || themes.length === 0 ? (
-                  <div className="p-4 text-xs text-gray-400 italic">No themes found.</div>
-                ) : (
-                  themes.map(t => (
-                    <DropdownMenuItem key={t.id} onClick={() => handleTagWithTheme(t.id)} className="cursor-pointer px-3 py-2 flex flex-col items-start gap-0.5">
-                      <span className="font-medium text-sm text-gray-900">{t.name}</span>
-                      <span className="text-[10px] text-gray-400">{t.data_point_count} messages</span>
-                    </DropdownMenuItem>
-                  ))
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <Button size="sm" variant="outline" className="rounded-full gap-2 border-indigo-200 text-indigo-600" onClick={() => setIsTagDialogOpen(true)}>
+              <Tag className="w-4 h-4" />
+              Tag with Theme
+            </Button>
 
-            <Button 
-              size="sm" 
-              className="rounded-full bg-indigo-600 hover:bg-indigo-700" 
-              onClick={handleAnalyzeSelected} 
-              disabled={analyzingBatch}
-            >
+            <Button size="sm" className="rounded-full bg-indigo-600 hover:bg-indigo-700 text-white" onClick={handleAnalyzeSelected} disabled={analyzingBatch}>
               {analyzingBatch ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Brain className="w-4 h-4 mr-2" />}
               Analyze Selection
             </Button>
             
-            <Button 
-              size="sm" 
-              variant="ghost" 
-              className="rounded-full h-8 w-8 p-0 text-gray-400 hover:text-gray-600" 
-              onClick={clearSelection}
-            >
-              <X className="w-4 h-4" />
-            </Button>
+            <Button size="sm" variant="ghost" className="rounded-full h-8 w-8 p-0 text-gray-400 hover:text-gray-600" onClick={clearSelection}><X className="w-4 h-4" /></Button>
           </div>
         </div>
       )}
+
+      {/* Tag Selection Dialog */}
+      <Dialog open={isTagDialogOpen} onOpenChange={setIsTagDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Tag Messages</DialogTitle>
+            <DialogDescription>Assign {selectedIds.size} selected messages to a theme.</DialogDescription>
+          </DialogHeader>
+          <ScrollArea className="max-h-[300px] mt-4 border rounded-md">
+            <div className="p-2 space-y-1">
+              {!themes || themes.length === 0 ? (
+                <div className="p-4 text-center text-sm text-gray-500">No themes found. Create one in the Themes tab first.</div>
+              ) : (
+                themes.map(t => (
+                  <button
+                    key={t.id}
+                    onClick={() => handleTagWithTheme(t.id)}
+                    disabled={tagging}
+                    className="w-full text-left px-3 py-3 rounded-md hover:bg-indigo-50 transition-colors flex flex-col gap-0.5 border border-transparent hover:border-indigo-100"
+                  >
+                    <span className="font-semibold text-sm text-gray-900">{t.name}</span>
+                    <span className="text-[10px] text-gray-500 uppercase font-bold tracking-wider">{t.data_point_count} messages</span>
+                  </button>
+                ))
+              )}
+            </div>
+          </ScrollArea>
+          <DialogFooter className="sm:justify-start">
+            <Button variant="ghost" onClick={() => setIsTagDialogOpen(false)} disabled={tagging}>Cancel</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
