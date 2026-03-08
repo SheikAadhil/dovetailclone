@@ -23,13 +23,20 @@ export async function POST(
   // 1. Fetch data points
   const { data: dataPoints, error: dpError } = await supabase
     .from('data_points')
-    .select('id, content, sentiment')
+    .select('id, content, sentiment, workspace_id')
     .eq('channel_id', params.id)
     .order('message_timestamp', { ascending: false })
     .limit(200);
 
-  if (dpError || !dataPoints || dataPoints.length < 5) {
-    return NextResponse.json({ error: 'Not enough data (need at least 5 messages)' }, { status: 400 });
+  if (dpError) {
+    return NextResponse.json({ error: 'Database error fetching messages', details: dpError }, { status: 500 });
+  }
+
+  if (!dataPoints || dataPoints.length < 5) {
+    return NextResponse.json({ 
+      error: `Not enough data. Found ${dataPoints?.length || 0} messages, need at least 5.`,
+      found: dataPoints?.length || 0 
+    }, { status: 400 });
   }
 
   // 2. Prepare for AI
@@ -42,7 +49,14 @@ export async function POST(
   const themesResult = await analyzeThemes(messagesForAi);
 
   if (!themesResult || themesResult.length === 0) {
-    return NextResponse.json({ themes: 0 });
+    return NextResponse.json({ 
+      themes: 0, 
+      debug: { 
+        messageCount: dataPoints.length,
+        aiCalled: true,
+        reason: 'AI returned no themes'
+      } 
+    });
   }
 
   // 4. Fetch existing themes to handle upsert manually
