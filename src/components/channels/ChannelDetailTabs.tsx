@@ -25,18 +25,50 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as ChartTooltip, 
-  ResponsiveContainer, Legend 
+  ResponsiveContainer, Legend, Cell
 } from "recharts";
 import { Badge } from "@/components/ui/badge";
+import { format, parseISO } from "date-fns";
 
 interface ChannelDetailTabsProps {
   channel: Channel;
 }
 
 const THEME_COLORS = [
-  "#4f46e5", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", 
+  "#6366f1", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", 
   "#ec4899", "#06b6d4", "#f97316", "#14b8a6", "#3b82f6"
 ];
+
+// Custom Tooltip Component
+const CustomTooltip = ({ active, payload, label }: any) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="bg-white/95 backdrop-blur-md p-4 border border-gray-100 shadow-2xl rounded-2xl min-w-[180px]">
+        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">
+          {label ? format(parseISO(label), "MMMM dd, yyyy") : ""}
+        </p>
+        <div className="space-y-2">
+          {payload.map((entry: any, index: number) => (
+            <div key={index} className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.color }} />
+                <span className="text-xs font-bold text-gray-700">{entry.name}</span>
+              </div>
+              <span className="text-xs font-black text-gray-900">{entry.value}</span>
+            </div>
+          ))}
+          <div className="pt-2 mt-2 border-t border-gray-50 flex items-center justify-between">
+            <span className="text-[10px] font-bold text-gray-400 uppercase">Total Signal</span>
+            <span className="text-xs font-black text-indigo-600">
+              {payload.reduce((sum: number, entry: any) => sum + entry.value, 0)}
+            </span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+  return null;
+};
 
 export function ChannelDetailTabs({ channel }: ChannelDetailTabsProps) {
   const [activeTab, setActiveTab] = useState("themes");
@@ -406,7 +438,7 @@ export function ChannelDetailTabs({ channel }: ChannelDetailTabsProps) {
               </div>
             </div>
 
-            <div className="h-[300px] w-full mt-4 -ml-6">
+            <div className="h-[320px] w-full mt-4 -ml-6">
               {chartData.length >= 2 ? (
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
@@ -417,6 +449,7 @@ export function ChannelDetailTabs({ channel }: ChannelDetailTabsProps) {
                       tickLine={false} 
                       tick={{ fontSize: 10, fill: '#94a3b8', fontWeight: 600 }}
                       dy={10}
+                      tickFormatter={(value) => format(parseISO(value), "MMM dd")}
                     />
                     <YAxis 
                       axisLine={false} 
@@ -424,22 +457,23 @@ export function ChannelDetailTabs({ channel }: ChannelDetailTabsProps) {
                       tick={{ fontSize: 10, fill: '#94a3b8', fontWeight: 600 }}
                     />
                     <ChartTooltip 
+                      content={<CustomTooltip />}
                       cursor={{ fill: '#f8fafc' }}
-                      contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', fontSize: '12px', fontWeight: 'bold' }}
                     />
                     <Legend 
                       verticalAlign="bottom" 
-                      height={36} 
+                      height={48} 
                       iconType="circle"
-                      wrapperStyle={{ fontSize: '10px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.5px', paddingTop: '20px' }}
+                      wrapperStyle={{ fontSize: '10px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.5px', paddingTop: '24px' }}
                     />
-                    {themes.slice(0, 8).map((theme, index) => (
+                    {themes.slice(0, 10).map((theme, index) => (
                       <Bar 
                         key={theme.id} 
                         dataKey={theme.name} 
                         stackId="a" 
                         fill={THEME_COLORS[index % THEME_COLORS.length]} 
-                        radius={index === themes.slice(0, 8).length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]}
+                        radius={index === themes.slice(0, 10).length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]}
+                        barSize={32}
                       />
                     ))}
                   </BarChart>
