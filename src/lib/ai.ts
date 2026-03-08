@@ -21,9 +21,6 @@ export interface ThemeResult {
   sentiment: 'positive' | 'negative' | 'mixed' | 'neutral';
 }
 
-/**
- * Generic chat completion with fallback logic
- */
 async function getCompletion(system: string, user: string, useJson = false) {
   const client = getOpenRouterClient();
   
@@ -32,19 +29,18 @@ async function getCompletion(system: string, user: string, useJson = false) {
   }
 
   try {
-    // Try Primary Model
     return await client.chat.completions.create({
       model: PRIMARY_MODEL,
       messages: [
         { role: "system", content: system },
         { role: "user", content: user },
       ],
+      // Some models via OpenRouter handle JSON mode better than others
       response_format: useJson ? { type: "json_object" } : undefined,
     });
   } catch (error: any) {
     console.warn(`Primary model (${PRIMARY_MODEL}) failed, switching to fallback. Error:`, error.message);
     
-    // Try Fallback Model
     return await client.chat.completions.create({
       model: FALLBACK_MODEL,
       messages: [
@@ -64,9 +60,8 @@ export async function analyzeSentiment(content: string): Promise<'positive' | 'n
     const response = await getCompletion(system, user);
     const result = response.choices[0].message.content?.trim().toLowerCase();
 
-    if (result === 'positive' || result === 'negative' || result === 'neutral') {
-      return result as any;
-    }
+    if (result?.includes('positive')) return 'positive';
+    if (result?.includes('negative')) return 'negative';
     return 'neutral';
   } catch (error) {
     console.error('AI Sentiment Error:', error);
@@ -77,23 +72,33 @@ export async function analyzeSentiment(content: string): Promise<'positive' | 'n
 export async function analyzeThemes(messages: { id: string; content: string }[]): Promise<ThemeResult[]> {
   if (messages.length === 0) return [];
 
-  const system = `You are an expert user feedback analyst. Identify 3-8 recurring themes. 
-Respond ONLY with a JSON object containing a "themes" array.
-Each theme must have: "name" (max 5 words), "summary" (1-2 sentences), "message_ids" (matching provided IDs), and "sentiment" (positive/negative/mixed/neutral).`;
+  const system = `You are a customer feedback analyst. Your goal is to group similar messages into 2-5 clear themes.
+IMPORTANT: You MUST respond with a valid JSON object. 
+Format: { "themes": [ { "name": "...", "summary": "...", "message_ids": ["...", "..."], "sentiment": "..." } ] }`;
 
-  const user = `Analyze these ${messages.length} messages:\n${JSON.stringify(messages)}`;
+  const user = `Analyze these messages and find patterns:\n${JSON.stringify(messages)}`;
 
   try {
     const response = await getCompletion(system, user, true);
     const content = response.choices[0].message.content || "{}";
     
-    // Clean JSON string if model includes markdown markers
-    const cleanJson = content.replace(/```json\n?|\n?```/g, '');
+    // Clean up content (remove markdown if any)
+    const cleanJson = content.replace(/```json\n?|\n?```/g, '').trim();
     const parsed = JSON.parse(cleanJson);
     
-    return parsed.themes || [];
+    // Robustness: Handle cases where model returns array directly instead of { themes: [] }
+    if (Array.isArray(parsed)) {
+      return parsed;
+    }
+    
+    if (parsed.themes && Array.isArray(parsed.themes)) {
+      return parsed.themes;
+    }
+
+    console.warn("AI returned unexpected JSON structure:", parsed);
+    return [];
   } catch (error) {
-    console.error('AI Theme Error:', error);
+    console.error('AI Theme Analysis failed:', error);
     return [];
   }
 }
