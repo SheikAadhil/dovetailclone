@@ -1,7 +1,7 @@
 import { auth } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
 import { createSupabaseServerClient, createSupabaseAdminClient } from '@/lib/supabase-server';
-import { analyzeThemes } from '@/lib/ai';
+import { analyzeThemes, suggestTopics, classifyThemesIntoTopics } from '@/lib/ai';
 
 export async function POST(
   request: Request,
@@ -34,7 +34,7 @@ export async function POST(
   // 1. Fetch data points and channel context
   const { data: channel } = await supabase
     .from('channels')
-    .select('ai_context')
+    .select('ai_context, workspace_id')
     .eq('id', params.id)
     .single();
 
@@ -80,27 +80,28 @@ export async function POST(
     });
   }
 
-  // 4. Fetch existing themes
+  // 4. Fetch existing themes and topics
   const { data: existingThemes } = await supabase
     .from('themes')
     .select('id, name')
     .eq('channel_id', params.id);
 
+  const { data: existingTopics } = await supabase
+    .from('topics')
+    .select('id, name, description')
+    .eq('channel_id', params.id);
+
   const existingThemesMap = new Map((existingThemes || []).map(t => [t.name, t.id]));
+  const processedThemes: { id: string; name: string; summary: string }[] = [];
   const processedThemeIds: string[] = [];
-  const skippedThemes: any[] = [];
 
   // 5. Process themes
   for (const theme of themesResult) {
-    // Robust ID matching: handle potential whitespace/format issues from AI
     const validMessageIds = (theme.message_ids || []).filter(id => 
       dataPoints.some(dp => dp.id.trim() === id.trim())
     );
     
-    if (validMessageIds.length === 0) {
-      skippedThemes.push({ name: theme.name, reason: "No matching message IDs found in database" });
-      continue;
-    }
+    if (validMessageIds.length === 0) continue;
 
     const breakdown: Record<string, number> = { positive: 0, negative: 0, neutral: 0 };
     validMessageIds.forEach(id => {
@@ -144,17 +145,50 @@ export async function POST(
     }
 
     processedThemeIds.push(themeId);
+    processedThemes.push({ id: themeId, name: theme.name, summary: theme.summary });
 
     if (themeId) {
       await supabase.from('data_point_themes').delete().eq('theme_id', themeId);
-      
       const relations = validMessageIds.map(dpId => ({
         data_point_id: dpId,
         theme_id: themeId,
         relevance_score: 1.0
       }));
-      
       await supabase.from('data_point_themes').insert(relations);
+    }
+  }
+
+  // 6. Handle Topics
+  let topicsToClassify = existingTopics || [];
+  if (!existingTopics || existingTopics.length === 0) {
+    const suggested = await suggestTopics(processedThemes);
+    if (suggested && suggested.length > 0) {
+      const { data: newTopics } = await supabase
+        .from('topics')
+        .insert(suggested.map((t, idx) => ({
+          channel_id: params.id,
+          workspace_id: channel?.workspace_id,
+          name: t.name,
+          description: t.description,
+          is_ai_generated: true,
+          display_order: idx,
+          created_by: 'system'
+        })))
+        .select('id, name, description');
+      
+      if (newTopics) topicsToClassify = newTopics;
+    }
+  }
+
+  if (topicsToClassify.length > 0 && processedThemes.length > 0) {
+    const classifications = await classifyThemesIntoTopics(processedThemes, topicsToClassify);
+    for (const item of classifications) {
+      if (item.topic_id) {
+        await supabase
+          .from('themes')
+          .update({ topic_id: item.topic_id })
+          .eq('id', item.theme_id);
+      }
     }
   }
 
@@ -165,8 +199,7 @@ export async function POST(
     .eq('id', params.id);
 
   return NextResponse.json({ 
-    themes: processedThemeIds.length, 
-    skipped: skippedThemes.length,
-    debug: skippedThemes.length > 0 ? { skippedThemes } : undefined
+    themes: processedThemeIds.length,
+    topics: topicsToClassify.length
   });
 }

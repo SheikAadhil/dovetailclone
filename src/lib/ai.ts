@@ -120,6 +120,47 @@ export async function analyzeSentiment(content: string): Promise<'positive' | 'n
   }
 }
 
+export async function suggestTopics(themes: { name: string; summary: string }[]): Promise<{ name: string; description: string }[]> {
+  if (themes.length === 0) return [];
+
+  const systemPrompt = `You generate concise topic categories for user feedback. 
+Identify 3-5 broad, logical categories that group the provided themes. 
+Each topic needs a name (max 30 chars) and a description (max 200 chars).
+Respond ONLY with a valid JSON object: { "topics": [ { "name": "...", "description": "..." } ] }`;
+
+  const userPrompt = `Based on these themes, suggest topics:\n${JSON.stringify(themes)}`;
+
+  try {
+    const response = await getCompletion(`${systemPrompt}\n\nINPUT: ${userPrompt}`);
+    const text = response.choices[0].message.content || "{}";
+    const parsed = extractJson(text);
+    return parsed.topics || [];
+  } catch (error) {
+    console.error('AI Topic Suggestions failed:', error);
+    return [];
+  }
+}
+
+export async function classifyThemesIntoTopics(themes: { id: string; name: string; summary: string }[], topics: { id: string; name: string; description: string | null }[]): Promise<{ theme_id: string; topic_id: string | null }[]> {
+  if (themes.length === 0 || topics.length === 0) return [];
+
+  const systemPrompt = `You are classifying themes into topics. 
+Assign each theme to the most appropriate topic ID from the list. If none fit, use null.
+Respond ONLY with a JSON array: [ { "theme_id": "...", "topic_id": "..." } ]`;
+
+  const userPrompt = `TOPICS:\n${JSON.stringify(topics)}\n\nTHEMES:\n${JSON.stringify(themes)}`;
+
+  try {
+    const response = await getCompletion(`${systemPrompt}\n\nINPUT: ${userPrompt}`);
+    const text = response.choices[0].message.content || "[]";
+    const parsed = extractJson(text);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (error) {
+    console.error('AI Topic Classification failed:', error);
+    return [];
+  }
+}
+
 export interface ThemeResult {
   name: string;
   summary: string;

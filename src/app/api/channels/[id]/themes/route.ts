@@ -7,48 +7,48 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   const { userId } = await auth();
-  if (!userId) {
-    return new NextResponse('Unauthorized', { status: 401 });
-  }
+  if (!userId) return new NextResponse('Unauthorized', { status: 401 });
+
+  const { searchParams } = new URL(request.url);
+  const topicId = searchParams.get('topicId');
+  const period = searchParams.get('period') || '30'; // Default 30 days
 
   const supabase = await createSupabaseServerClient();
 
-  // 1. Get channel stats (total points, last_analyzed_at)
-  const { data: channel, error: chError } = await supabase
+  // 1. Get channel stats
+  const { data: channel } = await supabase
     .from('channels')
     .select('last_analyzed_at')
     .eq('id', params.id)
     .single();
-
-  if (chError || !channel) {
-    return new NextResponse('Channel not found', { status: 404 });
-  }
 
   const { count: totalDataPoints } = await supabase
     .from('data_points')
     .select('*', { count: 'exact', head: true })
     .eq('channel_id', params.id);
 
-  // 2. Get themes with data points
-  const { data: themesRaw, error: thError } = await supabase
+  // 2. Build Themes Query
+  let query = supabase
     .from('themes')
     .select(`
-      id, name, summary, data_point_count, sentiment_breakdown, is_pinned, created_at, last_updated_at,
+      id, name, summary, data_point_count, sentiment_breakdown, is_pinned, created_at, last_updated_at, topic_id,
       data_point_themes (
         data_points (
           id, content, sender_name, message_timestamp, sentiment
         )
       )
     `)
-    .eq('channel_id', params.id)
-    .order('data_point_count', { ascending: false });
+    .eq('channel_id', params.id);
 
-  if (thError) {
-    console.error('Error fetching themes:', thError);
-    return new NextResponse('Database error', { status: 500 });
+  if (topicId && topicId !== 'all') {
+    query = query.eq('topic_id', topicId);
   }
 
-  // 3. Transform data structure
+  const { data: themesRaw, error: thError } = await query.order('is_pinned', { ascending: false }).order('data_point_count', { ascending: false });
+
+  if (thError) return new NextResponse('Database error', { status: 500 });
+
+  // 3. Transform
   const themes = (themesRaw || []).map((t: any) => ({
     id: t.id,
     name: t.name,
@@ -58,6 +58,7 @@ export async function GET(
     is_pinned: t.is_pinned,
     created_at: t.created_at,
     last_updated_at: t.last_updated_at,
+    topic_id: t.topic_id,
     data_points: t.data_point_themes
       .map((dpt: any) => dpt.data_points)
       .filter((dp: any) => dp !== null)
@@ -67,6 +68,6 @@ export async function GET(
   return NextResponse.json({
     themes,
     total_data_points: totalDataPoints || 0,
-    last_analyzed_at: channel.last_analyzed_at
+    last_analyzed_at: channel?.last_analyzed_at
   });
 }
