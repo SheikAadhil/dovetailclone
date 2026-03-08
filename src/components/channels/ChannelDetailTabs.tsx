@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Channel, Theme, Topic } from "@/types";
+import { Channel, Theme, Topic, AnomalyAlert } from "@/types";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ThemeCard } from "./ThemeCard";
 import { ThemeDrawer } from "./ThemeDrawer";
@@ -14,10 +14,10 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { 
   Brain, RefreshCcw, LayoutPanelLeft, MessageSquare, 
   Settings as SettingsIcon, AlertCircle, History, Plus, MoreVertical, 
-  FolderOpen, Pencil, Trash2, X, Merge, CheckCircle2, Clock
+  FolderOpen, Trash2, Merge, CheckCircle2, Clock, AlertTriangle
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -33,11 +33,12 @@ export function ChannelDetailTabs({ channel }: ChannelDetailTabsProps) {
   const [themes, setThemes] = useState<Theme[]>([]);
   const [topics, setTopics] = useState<Topic[]>([]);
   const [selectedTopicId, setSelectedTopicId] = useState<string>("all");
-  const [period, setPeriod] = useState<string>("30"); // "7", "30", "90", "all"
+  const [period, setPeriod] = useState<string>("30");
   
   const [loadingThemes, setLoadingThemes] = useState(true);
   const [loadingTopics, setLoadingTopics] = useState(true);
   const [analyzing, setAnalyzing] = useState(false);
+  const [channelAlerts, setChannelAlerts] = useState<AnomalyAlert[]>([]);
   
   const [selectedTheme, setSelectedTheme] = useState<Theme | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
@@ -62,6 +63,16 @@ export function ChannelDetailTabs({ channel }: ChannelDetailTabsProps) {
   const [newTopicName, setNewTopicName] = useState("");
   const [newTopicDesc, setNewTopicDesc] = useState("");
   const [creatingTopic, setCreatingTopic] = useState(false);
+
+  const fetchChannelAlerts = async () => {
+    try {
+      const res = await fetch('/api/alerts');
+      const data = await res.json();
+      setChannelAlerts(data.filter((a: any) => a.channel_id === channel.id));
+    } catch (e) {
+      console.error(e);
+    }
+  };
 
   const fetchTopics = async () => {
     setLoadingTopics(true);
@@ -97,6 +108,7 @@ export function ChannelDetailTabs({ channel }: ChannelDetailTabsProps) {
   useEffect(() => {
     fetchTopics();
     fetchThemes();
+    fetchChannelAlerts();
   }, [channel.id]);
 
   useEffect(() => {
@@ -113,6 +125,7 @@ export function ChannelDetailTabs({ channel }: ChannelDetailTabsProps) {
       } else {
         await fetchTopics();
         await fetchThemes();
+        await fetchChannelAlerts();
       }
     } catch (e) {
       alert('Analysis failed');
@@ -304,6 +317,33 @@ export function ChannelDetailTabs({ channel }: ChannelDetailTabsProps) {
 
         <TabsContent value="themes" className="mt-6">
           <div className="flex flex-col gap-6">
+            {/* Anomaly Banner */}
+            {channelAlerts.length > 0 && (
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 flex items-start gap-3 shadow-sm animate-in fade-in slide-in-from-top-2">
+                <div className="p-2 bg-amber-100 rounded-full text-amber-600 flex-shrink-0">
+                  <AlertTriangle className="w-4 h-4" />
+                </div>
+                <div className="flex-1 pt-1">
+                  <h4 className="text-sm font-bold text-amber-900 mb-1">Theme volume shift detected</h4>
+                  <div className="space-y-1">
+                    {channelAlerts.map(alert => (
+                      <p key={alert.id} className="text-xs text-amber-800 leading-snug">
+                        Theme <span className="font-bold underline cursor-pointer" onClick={() => handleViewTheme(themes.find(t => t.id === alert.theme_id)!)}>{alert.theme_name}</span> is 
+                        {alert.alert_type === 'spike' ? ' up ' : ' down '} 
+                        <span className="font-bold">{Math.round(alert.percent_change)}%</span> compared to last week.
+                      </p>
+                    ))}
+                  </div>
+                </div>
+                <Button variant="ghost" size="sm" className="text-amber-700 hover:bg-amber-100" onClick={async () => {
+                  await fetch('/api/alerts', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ action: 'mark_all_read' }) });
+                  setChannelAlerts([]);
+                }}>
+                  Dismiss
+                </Button>
+              </div>
+            )}
+
             {/* Time Period Filter */}
             <div className="flex items-center gap-2 bg-gray-100/50 p-1 rounded-lg w-fit">
               <Clock className="w-3.5 h-3.5 text-gray-400 ml-2 mr-1" />

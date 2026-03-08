@@ -20,6 +20,7 @@ export function ChannelSettingsForm({ channel }: ChannelSettingsFormProps) {
   const [name, setName] = useState(channel.name);
   const [description, setDescription] = useState(channel.description || "");
   const [aiContext, setAiContext] = useState(channel.ai_context || "");
+  const [alertThreshold, setAlertThreshold] = useState(channel.alert_threshold_percent || 50);
   const [loading, setLoading] = useState(false);
   const [enhancing, setEnhancing] = useState(false);
   const [enhancedSuccess, setEnhancedSuccess] = useState(false);
@@ -31,7 +32,12 @@ export function ChannelSettingsForm({ channel }: ChannelSettingsFormProps) {
       const res = await fetch(`/api/channels/${channel.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, description, ai_context: aiContext })
+        body: JSON.stringify({ 
+          name, 
+          description, 
+          ai_context: aiContext,
+          alert_threshold_percent: alertThreshold
+        })
       });
       if (!res.ok) throw new Error('Failed to update');
       router.refresh();
@@ -157,6 +163,22 @@ export function ChannelSettingsForm({ channel }: ChannelSettingsFormProps) {
           <div className="space-y-2">
             <Label htmlFor="description">Description</Label>
             <Textarea id="description" value={description} onChange={e => setDescription(e.target.value)} />
+          </div>
+
+          <div className="pt-4 border-t border-gray-100">
+            <Label htmlFor="alertThreshold">Alert Threshold</Label>
+            <p className="text-[11px] text-gray-500 mb-2">Notify me when a theme's volume changes by more than:</p>
+            <div className="flex items-center gap-3 w-32">
+              <Input 
+                id="alertThreshold" 
+                type="number" 
+                min={10} 
+                max={200}
+                value={alertThreshold} 
+                onChange={e => setAlertThreshold(parseInt(e.target.value))} 
+              />
+              <span className="text-sm font-bold text-gray-400">%</span>
+            </div>
           </div>
         </CardContent>
         <CardFooter>

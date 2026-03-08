@@ -2,6 +2,8 @@ import { UserButton } from "@clerk/nextjs";
 import Link from "next/link";
 import { MessageSquare, Settings, LayoutGrid } from "lucide-react";
 
+import { NotificationBell } from "@/components/channels/NotificationBell";
+
 export default function DashboardLayout({
   children,
 }: {
@@ -29,7 +31,11 @@ export default function DashboardLayout({
           {/* Add more nav items here */}
         </nav>
 
-        <div className="p-4 border-t border-gray-100 mt-auto">
+        <div className="p-4 border-t border-gray-100 mt-auto flex flex-col gap-1">
+          <div className="flex items-center justify-between px-3 mb-2">
+            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-1">Alerts</span>
+            <NotificationBell />
+          </div>
           <div className="flex items-center gap-3 px-3 py-2 text-sm font-medium text-gray-500 hover:text-gray-700 cursor-pointer">
             <Settings className="w-4 h-4" />
             Settings
