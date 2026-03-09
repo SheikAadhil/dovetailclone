@@ -326,7 +326,7 @@ export function MessageList({ channelId }: MessageListProps) {
               </button>
             </div>
             <div className="flex-1 overflow-y-auto p-6">
-              <div className="prose prose-sm max-w-none prose-headings:font-black prose-headings:tracking-tight prose-h1:text-2xl prose-h2:text-xl prose-h3:text-lg prose-p:text-gray-600 prose-p:font-medium prose-p:leading-relaxed prose-li:text-gray-600 prose-code:text-indigo-600 prose-code:bg-indigo-50 prose-code:px-1 prose-code:rounded prose-code:before:content-none prose-code:after:content-none prose-blockquote:border-l-4 prose-blockquote:border-indigo-200 prose-blockquote:bg-indigo-50 prose-blockquote:p-3 prose-blockquote:rounded-r-lg prose-strong:text-gray-900 prose-ul:list-disc prose-ol:list-decimal">
+              <div className="prose prose-sm max-w-none prose-headings:font-black prose-headings:tracking-tight prose-h1:text-2xl prose-h2:text-xl prose-h3:text-lg prose-p:text-gray-600 prose-p:font-medium prose-p:leading-relaxed prose-p:whitespace-pre-wrap prose-li:text-gray-600 prose-code:text-indigo-600 prose-code:bg-indigo-50 prose-code:px-1 prose-code:rounded prose-code:before:content-none prose-code:after:content-none prose-blockquote:border-l-4 prose-blockquote:border-indigo-200 prose-blockquote:bg-indigo-50 prose-blockquote:p-3 prose-blockquote:rounded-r-lg prose-strong:text-gray-900 prose-ul:list-disc prose-ol:list-decimal">
                 <ReactMarkdown remarkPlugins={[remarkGfm]}>
                   {expandedMessage.content}
                 </ReactMarkdown>
