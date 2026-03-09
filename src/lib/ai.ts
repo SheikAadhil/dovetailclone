@@ -78,16 +78,33 @@ export async function analyzeThemes(messages: { id: string; content: string }[],
     return { id: simpleId, content: m.content };
   });
 
-  const contextPart = aiContext ? `\nCONTEXT ABOUT THIS ANALYSIS:\n${aiContext}\n\nUse this context to determine what themes are most relevant. Focus on what matters to this role and ignore noise that does not serve these goals.\n` : '';
+  const contextPart = aiContext ? `\nUSER-PROVIDED CONTEXT:\n${aiContext}\n` : '';
 
-  const prompt = `You are a customer feedback analyst and researcher. ${contextPart}
-TASK: Group these messages into 2-8 themes.
-IF A MESSAGE CONTAINS EXPLICIT THEMES, EXTRACT THEM DIRECTLY.
-FOR LARGE OBSERVATION NODES: Analyze the entire text and derive as many distinct themes as necessary to cover the data.
+  const prompt = `You are an expert Team Analyst applying the "Reflexive Thematic Analysis" framework (Braun & Clarke, 2022).
+Your goal is to develop, analyze, and interpret patterns across this dataset of team signals.
 
-FORMAT: You MUST respond ONLY with a JSON object. No other text.
-JSON SCHEMA: { "themes": [ { "name": "Title", "summary": "Summary", "message_ids": ["1"], "sentiment": "mixed" } ] }
-MESSAGES: ${JSON.stringify(simplifiedMessages)}`;
+${contextPart}
+
+### THEMATIC ANALYSIS ENGINE CORE PRINCIPLES:
+1. THEMES ARE DEVELOPED, NOT DISCOVERED: You must actively engage with the data to develop themes through interpretation.
+2. CENTRAL ORGANIZING CONCEPT: Every theme must capture shared meaning united by a central concept. It is NOT just a "bucket" for a topic.
+   - WRONG (Topic Summary): "Communication issues: meetings, slack, emails."
+   - RIGHT (Theme): "The Paradox of Open Communication: Stated openness norms clash with power dynamics that suppress dissenting voices."
+3. BEYOND SURFACE LEVEL: Use both Semantic (explicit) and Latent (implicit/underlying) coding to identify patterns.
+4. QUALITY OVER QUANTITY: Develop 3-8 high-quality, well-defined themes rather than many thin ones.
+
+### YOUR PROCESS:
+1. FAMILIARIZATION: Review all signals to understand the overall team story.
+2. CODING: Mentally identify meaningful segments and apply labels. Look for "Invisible Labor", "Voice Not Valued", "Role Ambiguity", etc.
+3. THEME DEVELOPMENT: Group codes into candidate themes with shared meaning.
+4. REFINEMENT: Ensure themes are internally coherent and distinctive. Check if they tell a convincing story.
+
+### FORMAT: 
+Respond ONLY with a JSON object. No other text.
+JSON SCHEMA: { "themes": [ { "name": "Theme Title", "summary": "2-3 sentence definition explaining the central organizing concept and its impact on the team.", "message_ids": ["1", "2"], "sentiment": "mixed" } ] }
+
+### DATASET (MESSAGES): 
+${JSON.stringify(simplifiedMessages)}`;
 
   try {
     const response = await getCompletion(prompt);
@@ -127,12 +144,13 @@ export async function analyzeSentiment(content: string): Promise<'positive' | 'n
 export async function suggestTopics(themes: { name: string; summary: string }[]): Promise<{ name: string; description: string }[]> {
   if (themes.length === 0) return [];
 
-  const systemPrompt = `You generate concise topic categories for user feedback. 
-Identify 3-5 broad, logical categories that group the provided themes. 
-Each topic needs a name (max 30 chars) and a description (max 200 chars).
-Respond ONLY with a valid JSON object: { "topics": [ { "name": "...", "description": "..." } ] }`;
+  const systemPrompt = `You are a Senior Team Researcher. Based on a set of developed themes, your task is to identify 3-5 broad, logical Topic Categories that provide a coherent structure for the analysis.
+Each topic should represent a distinct facet of team dynamics or organizational health.
 
-  const userPrompt = `Based on these themes, suggest topics:\n${JSON.stringify(themes)}`;
+FORMAT: Respond ONLY with a valid JSON object.
+JSON SCHEMA: { "topics": [ { "name": "Topic Name", "description": "Max 200 chars explaining the scope of this category." } ] }`;
+
+  const userPrompt = `Based on these developed themes, suggest high-level Topics:\n${JSON.stringify(themes)}`;
 
   try {
     const response = await getCompletion(`${systemPrompt}\n\nINPUT: ${userPrompt}`);
