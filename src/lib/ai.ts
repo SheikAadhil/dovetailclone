@@ -11,10 +11,10 @@ const getOpenRouterClient = () => {
   });
 };
 
-// Simplified list focusing on the most robust free models
+// Optimized list: Gemini 2.0 Flash is much more reliable than Llama free models on OpenRouter
 const MODELS_TO_TRY = [
-  "meta-llama/llama-3.3-70b-instruct:free",
   "google/gemini-2.0-flash-001",
+  "meta-llama/llama-3.3-70b-instruct:free",
   "mistralai/mistral-7b-instruct:free",
   "meta-llama/llama-3.2-3b-instruct:free",
   "google/gemma-3-27b-it:free"
