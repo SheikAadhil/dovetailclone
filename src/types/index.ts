@@ -77,6 +77,7 @@ export interface Theme {
   data_points?: DataPoint[];
   // Feature 2
   topic_id: string | null;
+  topic_name?: string;
   // Feature 3
   description: string | null;
   is_manual: boolean;

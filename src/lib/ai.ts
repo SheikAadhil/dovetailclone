@@ -68,7 +68,7 @@ function extractJson(text: string) {
   }
 }
 
-export async function analyzeThemes(messages: { id: string; content: string }[], aiContext?: string | null): Promise<ThemeResult[]> {
+export async function analyzeThemesLayer1(messages: { id: string; content: string }[], aiContext?: string | null): Promise<ThemeResult[]> {
   if (messages.length === 0) return [];
 
   const idMap = new Map<string, string>();
@@ -80,28 +80,24 @@ export async function analyzeThemes(messages: { id: string; content: string }[],
 
   const contextPart = aiContext ? `\nUSER-PROVIDED CONTEXT:\n${aiContext}\n` : '';
 
-  const prompt = `You are a Dual-Layer Analyst: acting as both a Senior Product Strategist and a Qualitative Researcher (Reflexive Thematic Analysis). 
-Your goal is to extract patterns that are both immediately actionable and deeply interpretive.
+  const prompt = `You are a Senior Product Strategist and UX Researcher. 
+Your goal is to extract immediately actionable Product Insights and UX Friction points from these signals.
 
 ${contextPart}
 
-### ANALYSIS PRINCIPLES:
-1. DUAL-LAYER INSIGHTS: For every theme, you must provide both a Surface/Product Layer and a Deep/Latent Layer.
-2. IDENTIFY MULTIPLE THEMES: Identify 3-8 distinct themes. Do not consolidate unrelated insights. Even a few signals can contain multiple distinct insights.
-3. INTERPRETIVE DEPTH: Use Latent Analysis to identify underlying meanings, assumptions, and organizational dynamics (e.g., "Invisible Labor", "Voice Not Valued", "The Paradox of Speed").
-
-### YOUR DUAL-LAYER PROCESS:
-- LAYER 1 (SURFACE): What is explicitly stated? What product friction or user needs are immediate? How do we fix this now?
-- LAYER 2 (DEEP): What are the underlying patterns? What does this say about team health, latent assumptions, or the broader customer relationship? 
+### ANALYSIS PRINCIPLES (LAYER 1 - PRODUCT INSIGHTS):
+1. ACTIONABILITY: Every theme must be something a product team can act on (Feature requests, bugs, UI friction, workflow gaps).
+2. MULTIPLE THEMES: Identify 3-8 distinct themes. 
+3. SURFACE PATTERNS: Focus on what is explicitly stated and common pain points.
 
 ### FORMAT: 
 Respond ONLY with a JSON object. No other text.
 JSON SCHEMA: { 
   "themes": [ 
     { 
-      "name": "Coherent Theme Title", 
-      "summary": "Product-Focused Insight: 1-2 sentences on actionable friction and immediate recommendations.", 
-      "deep_analysis": "Reflexive/Latent Analysis: 1-2 paragraphs exploring the underlying meaning, conceptual significance, and systemic patterns.",
+      "name": "Product Theme Title", 
+      "summary": "1-2 sentence definition of the core friction.", 
+      "deep_analysis": "Product Recommendations: 1-2 paragraphs on specific actionable steps to improve the experience.",
       "message_ids": ["1", "2"], 
       "sentiment": "mixed" 
     } 
@@ -111,6 +107,52 @@ JSON SCHEMA: {
 ### DATASET (MESSAGES): 
 ${JSON.stringify(simplifiedMessages)}`;
 
+  return await performAnalysis(prompt, idMap);
+}
+
+export async function analyzeThemesLayer2(messages: { id: string; content: string }[], aiContext?: string | null): Promise<ThemeResult[]> {
+  if (messages.length === 0) return [];
+
+  const idMap = new Map<string, string>();
+  const simplifiedMessages = messages.map((m, index) => {
+    const simpleId = (index + 1).toString();
+    idMap.set(simpleId, m.id);
+    return { id: simpleId, content: m.content };
+  });
+
+  const contextPart = aiContext ? `\nUSER-PROVIDED CONTEXT:\n${aiContext}\n` : '';
+
+  const prompt = `You are an expert Qualitative Researcher specializing in Reflexive Thematic Analysis (Braun & Clarke).
+Your goal is to extract Deep, Latent, and Interpretive patterns from these signals.
+
+${contextPart}
+
+### ANALYSIS PRINCIPLES (LAYER 2 - DEEP ANALYSIS):
+1. INTERPRETIVE DEPTH: Go beyond the surface. Identify underlying assumptions, organizational dynamics, and systemic issues (e.g. "Invisible Labor", "The Silence Paradox").
+2. DEVELOPED THEMES: Themes must represent a pattern of shared meaning united by a central organizing concept.
+3. REFLEXIVITY: Actively interpret the data. What is being said *implicitly*?
+
+### FORMAT: 
+Respond ONLY with a JSON object. No other text.
+JSON SCHEMA: { 
+  "themes": [ 
+    { 
+      "name": "Deep Theme Title", 
+      "summary": "Central Organizing Concept: 1-2 sentences on the underlying interpretive pattern.", 
+      "deep_analysis": "Latent Analysis: 1-2 paragraphs exploring conceptual significance, assumptions, and systemic dynamics.",
+      "message_ids": ["1", "2"], 
+      "sentiment": "mixed" 
+    } 
+  ] 
+}
+
+### DATASET (MESSAGES): 
+${JSON.stringify(simplifiedMessages)}`;
+
+  return await performAnalysis(prompt, idMap);
+}
+
+async function performAnalysis(prompt: string, idMap: Map<string, string>): Promise<ThemeResult[]> {
   try {
     const response = await getCompletion(prompt);
     const text = response.choices[0].message.content || "{}";
@@ -120,6 +162,7 @@ ${JSON.stringify(simplifiedMessages)}`;
 
     const finalThemes = rawThemes.map((theme: any) => ({
       ...theme,
+      deep_analysis: theme.deep_analysis || theme.analysis || "", 
       message_ids: (theme.message_ids || [])
         .map((sid: any) => idMap.get(sid.toString()))
         .filter((realId: any) => !!realId)

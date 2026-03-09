@@ -14,7 +14,7 @@ import {
   Brain, RefreshCcw, LayoutPanelLeft, MessageSquare, 
   Settings as SettingsIcon, History, Plus, MoreVertical, 
   FolderOpen, Merge, Clock, TrendingUp, 
-  Filter, BarChart3, ChevronRight, Search, Activity, Layers, Sparkles, X, Check, Loader2, FileCode, Zap
+  Filter, BarChart3, ChevronRight, Search, Activity, Layers, Sparkles, X, Check, Loader2, FileCode, Zap, Lightbulb
 } from "lucide-react";
 import { formatDistanceToNow, format, parseISO, subDays } from "date-fns";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -31,6 +31,7 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface ChannelDetailTabsProps {
   channel: Channel;
@@ -77,6 +78,7 @@ export function ChannelDetailTabs({ channel }: ChannelDetailTabsProps) {
   const [topics, setTopics] = useState<Topic[]>([]);
   const [selectedTopicId, setSelectedTopicId] = useState<string>("all");
   const [period, setPeriod] = useState<string>("30");
+  const [analysisLayer, setAnalysisLayer] = useState<"product" | "deep">("product");
   
   // Chart Selection State
   const [visibleThemeIds, setVisibleThemeIds] = useState<string[]>([]);
@@ -313,10 +315,26 @@ export function ChannelDetailTabs({ channel }: ChannelDetailTabsProps) {
     setSelectedTheme(theme);
   };
 
+  const filteredThemes = useMemo(() => {
+    if (selectedTopicId !== "all") {
+      return themes.filter(t => t.topic_id === selectedTopicId);
+    }
+    
+    // System filtering logic
+    const productTopic = topics.find(t => t.name.includes("Product Insights"));
+    const deepTopic = topics.find(t => t.name.includes("Deep Analysis"));
+    
+    if (analysisLayer === "product") {
+      return themes.filter(t => t.topic_id === productTopic?.id || !t.topic_id);
+    } else {
+      return themes.filter(t => t.topic_id === deepTopic?.id);
+    }
+  }, [themes, selectedTopicId, analysisLayer, topics]);
+
   // Filtered chart themes based on user selection
   const chartThemes = useMemo(() => {
-    return themes.filter(t => visibleThemeIds.includes(t.id));
-  }, [themes, visibleThemeIds]);
+    return filteredThemes.filter(t => visibleThemeIds.includes(t.id));
+  }, [filteredThemes, visibleThemeIds]);
 
   // Transform theme trend data for stacked chart - WITH PADDING
   const chartData = useMemo(() => {
@@ -685,10 +703,10 @@ export function ChannelDetailTabs({ channel }: ChannelDetailTabsProps) {
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
                   <div>
                     <h2 className="text-2xl font-black text-gray-900 tracking-tight">
-                      {selectedTopicId === "all" ? "Theme Library" : selectedTopic?.name}
+                      {selectedTopicId === "all" ? "Analysis Library" : selectedTopic?.name}
                     </h2>
                     <p className="text-sm font-medium text-gray-400 mt-1">
-                      {selectedTopicId === "all" ? "A central repository of identified semantic patterns." : selectedTopic?.description}
+                      {selectedTopicId === "all" ? "Explore insights across different levels of research depth." : selectedTopic?.description}
                     </p>
                   </div>
                   <div className="flex items-center gap-3">
@@ -702,13 +720,28 @@ export function ChannelDetailTabs({ channel }: ChannelDetailTabsProps) {
                   </div>
                 </div>
 
+                {selectedTopicId === "all" && (
+                  <Tabs value={analysisLayer} onValueChange={(v: any) => setAnalysisLayer(v)} className="w-full">
+                    <TabsList className="grid w-full max-w-md grid-cols-2 p-1 bg-gray-100 rounded-2xl h-12">
+                      <TabsTrigger value="product" className="rounded-xl font-black text-[11px] uppercase tracking-widest gap-2 data-[state=active]:bg-white data-[state=active]:text-indigo-600 data-[state=active]:shadow-sm">
+                        <Zap className="w-3.5 h-3.5" />
+                        Product Insights
+                      </TabsTrigger>
+                      <TabsTrigger value="deep" className="rounded-xl font-black text-[11px] uppercase tracking-widest gap-2 data-[state=active]:bg-white data-[state=active]:text-amber-600 data-[state=active]:shadow-sm">
+                        <Lightbulb className="w-3.5 h-3.5" />
+                        Deep Analysis
+                      </TabsTrigger>
+                    </TabsList>
+                  </Tabs>
+                )}
+
                 {loadingThemes ? (
                   <div className="grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                     {[1, 2, 3, 4, 5, 6, 7, 8].map(i => <Skeleton key={i} className="h-64 w-full rounded-[2rem]" />)}
                   </div>
-                ) : themes.length > 0 ? (
+                ) : filteredThemes.length > 0 ? (
                   <div className="grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 pb-12">
-                    {themes.map((theme) => (
+                    {filteredThemes.map((theme) => (
                       <ThemeCard 
                         key={theme.id} 
                         theme={theme} 
@@ -753,69 +786,7 @@ export function ChannelDetailTabs({ channel }: ChannelDetailTabsProps) {
       {/* 3. INSPECTOR PANEL (Right Sidebar) */}
       <aside className={`w-[450px] border-l border-gray-100 bg-white transition-all duration-500 ease-in-out flex flex-col z-30 shrink-0 relative overflow-hidden ${selectedTheme ? 'mr-0 shadow-2xl' : '-mr-[450px]'}`}>
         {selectedTheme && (
-          <>
-            <div className="p-8 border-b border-gray-50 bg-gray-50/30">
-              <div className="flex items-center justify-between mb-6">
-                <button onClick={() => setSelectedTheme(null)} className="p-2 hover:bg-white rounded-xl text-gray-400 transition-colors shadow-none hover:shadow-sm">
-                  <X className="w-5 h-5" />
-                </button>
-                <div className="flex items-center gap-2">
-                  <Badge className="bg-emerald-50 text-emerald-600 border-none font-black text-[9px] uppercase px-2 py-0.5">Primary Signal</Badge>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" className="h-8 w-8 p-0"><MoreVertical className="w-4 h-4" /></Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="rounded-xl border-gray-100">
-                      <DropdownMenuItem onClick={() => handleOpenThemeDialog(selectedTheme)} className="font-bold text-xs p-3">Edit theme Details</DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem onClick={() => handleDeleteTheme(selectedTheme.id)} className="text-red-600 font-bold text-xs p-3">Purge theme</DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-              </div>
-
-              <h3 className="text-2xl font-black text-gray-900 tracking-tight leading-tight mb-3">{selectedTheme.name}</h3>
-              <p className="text-sm font-medium text-gray-500 leading-relaxed mb-6">{selectedTheme.summary}</p>
-              
-              <div className="flex items-center gap-4">
-                <div className="flex flex-col">
-                  <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Total Volume</span>
-                  <span className="text-lg font-black text-gray-900">{selectedTheme.data_point_count}</span>
-                </div>
-                <Separator orientation="vertical" className="h-8" />
-                <div className="flex flex-col">
-                  <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Signal Status</span>
-                  <span className="text-lg font-black text-emerald-600">Active</span>
-                </div>
-              </div>
-            </div>
-
-            <ScrollArea className="flex-1 bg-white">
-              <div className="p-8">
-                <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-6 flex items-center gap-2">
-                  <MessageSquare className="w-3.5 h-3.5" />
-                  Recent Occurrences
-                </h4>
-                <div className="space-y-4">
-                  {selectedTheme.data_points && selectedTheme.data_points.length > 0 ? (
-                    selectedTheme.data_points.map((msg) => (
-                      <div key={msg.id} className="p-5 rounded-[1.5rem] border border-gray-50 bg-gray-50/30 hover:bg-gray-50 transition-colors group/msg">
-                        <div className="flex items-center justify-between mb-3">
-                          <span className="text-[10px] font-black text-gray-900 uppercase tracking-widest group-hover/msg:text-indigo-600 transition-colors">{msg.sender_name || 'Anonymous Signal'}</span>
-                          <span className="text-[9px] font-bold text-gray-400">{format(new Date(msg.message_timestamp), 'MMM dd, HH:mm')}</span>
-                        </div>
-                        <p className="text-xs font-medium text-gray-600 leading-relaxed line-clamp-4 group-hover/msg:line-clamp-none transition-all">{msg.content}</p>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="text-center py-12 bg-gray-50/50 rounded-3xl border border-dashed border-gray-100">
-                      <p className="text-xs font-bold text-gray-400 italic px-6">Detailed message records are currently being indexed for this theme.</p>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </ScrollArea>
-          </>
+          <ThemeDrawer theme={selectedTheme} isOpen={!!selectedTheme} onClose={() => setSelectedTheme(null)} />
         )}
       </aside>
 

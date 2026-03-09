@@ -30,6 +30,9 @@ export async function GET(
     .from('themes')
     .select(`
       id, name, summary, data_point_count, sentiment_breakdown, is_pinned, created_at, last_updated_at, topic_id, description, is_manual,
+      topics (
+        name
+      ),
       data_point_themes (
         data_points (
           id, content, sender_name, message_timestamp, sentiment
@@ -106,6 +109,7 @@ export async function GET(
       created_at: t.created_at,
       last_updated_at: t.last_updated_at,
       topic_id: t.topic_id,
+      topic_name: t.topics?.name,
       trend_data: trendData, // Return all data for the requested period
       trend_direction: direction,
       trend_percent_change: percentChange,

@@ -1,7 +1,7 @@
 import { auth } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
 import { createSupabaseServerClient, createSupabaseAdminClient } from '@/lib/supabase-server';
-import { analyzeThemes, suggestTopics, classifyThemesIntoTopics } from '@/lib/ai';
+import { analyzeThemesLayer1, analyzeThemesLayer2, ThemeResult } from '@/lib/ai';
 
 export async function POST(
   request: Request,
@@ -52,7 +52,6 @@ export async function POST(
   } else if (!forceRefresh) {
     query = query.order('message_timestamp', { ascending: false }).limit(200);
   } else {
-    // If forceRefresh, we take more data points (up to 1000) to re-evaluate the whole channel
     query = query.order('message_timestamp', { ascending: false }).limit(1000);
   }
 
@@ -66,160 +65,135 @@ export async function POST(
     return NextResponse.json({ error: 'No signals found to analyze' }, { status: 400 });
   }
 
-  // 2. Prepare for AI
-  // SPECIAL CASE: If it's a single data point (likely a large Markdown Node), 
-  // we might want to split it or treat it as a high-density source.
-  const isSingleNode = dataPoints.length === 1 && (dataPoints[0].source === 'node' || dataPoints[0].source === 'markdown');
-  
   const messagesForAi = dataPoints.map(dp => ({
     id: dp.id,
     content: dp.content
   }));
 
-  // 3. Call AI with optional context
-  // Pass hint if it's a single high-density node
-  const themesResult = await analyzeThemes(
-    messagesForAi, 
-    isSingleNode 
-      ? `${channel?.ai_context || ''}\nNOTE: This is a single high-density observation node. Extract all distinct themes and insights from this specific text.` 
-      : channel?.ai_context
-  );
+  // 2. STAGE 1: PRODUCT LEVEL ANALYSIS
+  const layer1Themes = await analyzeThemesLayer1(messagesForAi, channel?.ai_context);
+  
+  // 3. STAGE 2: DEEP/LATENT ANALYSIS
+  const layer2Themes = await analyzeThemesLayer2(messagesForAi, channel?.ai_context);
 
-  if (!themesResult || themesResult.length === 0) {
-    return NextResponse.json({ 
-      themes: 0, 
-      debug: { 
-        messageCount: dataPoints.length, 
-        aiReason: "AI returned empty themes list" 
-      } 
-    });
-  }
+  // 4. Ensure System Topics exist for categorization
+  const LAYER_TOPICS = [
+    { name: 'Product Insights (Layer 1)', description: 'Immediate actionable feedback and product improvements.' },
+    { name: 'Deep Analysis (Layer 2)', description: 'Latent patterns, systemic dynamics, and reflexive research insights.' }
+  ];
 
-  // 4. Fetch existing themes and topics
-  const { data: existingThemes } = await supabase
-    .from('themes')
-    .select('id, name')
-    .eq('channel_id', params.id);
-
-  const { data: existingTopics } = await supabase
-    .from('topics')
-    .select('id, name, description')
-    .eq('channel_id', params.id);
-
-  const existingThemesMap = new Map((existingThemes || []).map(t => [t.name, t.id]));
-  const processedThemes: { id: string; name: string; summary: string }[] = [];
   const processedThemeIds: string[] = [];
 
-  // 5. Process themes
-  for (const theme of themesResult) {
-    const validMessageIds = (theme.message_ids || []).filter(id => 
-      dataPoints.some(dp => dp.id.trim() === id.trim())
-    );
+  const processLayer = async (themesResult: ThemeResult[], topicName: string) => {
+    // Get or create the topic for this layer
+    let { data: topic } = await supabase
+      .from('topics')
+      .select('id')
+      .eq('channel_id', params.id)
+      .eq('name', topicName)
+      .maybeSingle();
     
-    if (validMessageIds.length === 0) continue;
-
-    const breakdown: Record<string, number> = { positive: 0, negative: 0, neutral: 0 };
-    validMessageIds.forEach(id => {
-      const dp = dataPoints.find(d => d.id.trim() === id.trim());
-      if (dp?.sentiment) {
-        breakdown[dp.sentiment] = (breakdown[dp.sentiment] || 0) + 1;
-      } else {
-        breakdown['neutral'] = (breakdown['neutral'] || 0) + 1;
-      }
-    });
-
-    let themeId = existingThemesMap.get(theme.name);
-
-    if (themeId) {
-      await supabase
-        .from('themes')
-        .update({
-          summary: theme.summary,
-          description: theme.deep_analysis,
-          data_point_count: forceRefresh ? validMessageIds.length : undefined,
-          sentiment_breakdown: breakdown,
-          last_updated_at: new Date().toISOString()
-        })
-        .eq('id', themeId);
-    } else {
-      const { data: newTheme, error: insertError } = await supabase
-        .from('themes')
+    if (!topic) {
+      const { data: newTopic } = await supabase
+        .from('topics')
         .insert({
           channel_id: params.id,
-          workspace_id: dataPoints[0].workspace_id,
-          name: theme.name,
-          summary: theme.summary,
-          description: theme.deep_analysis,
-          data_point_count: validMessageIds.length,
-          sentiment_breakdown: breakdown,
-          is_pinned: false
+          workspace_id: channel?.workspace_id,
+          name: topicName,
+          description: LAYER_TOPICS.find(t => t.name === topicName)?.description,
+          is_ai_generated: true,
+          created_by: 'system'
         })
         .select('id')
         .single();
+      topic = newTopic;
+    }
+
+    if (!topic) return;
+
+    for (const theme of themesResult) {
+      const validMessageIds = (theme.message_ids || []).filter(id => 
+        dataPoints.some(dp => dp.id.trim() === id.trim())
+      );
       
-      if (insertError || !newTheme) continue;
-      themeId = newTheme.id;
-    }
+      if (validMessageIds.length === 0) continue;
 
-    processedThemeIds.push(themeId);
-    processedThemes.push({ id: themeId, name: theme.name, summary: theme.summary });
+      const breakdown: Record<string, number> = { positive: 0, negative: 0, neutral: 0 };
+      validMessageIds.forEach(id => {
+        const dp = dataPoints.find(d => d.id.trim() === id.trim());
+        if (dp?.sentiment) {
+          breakdown[dp.sentiment] = (breakdown[dp.sentiment] || 0) + 1;
+        } else {
+          breakdown['neutral'] = (breakdown['neutral'] || 0) + 1;
+        }
+      });
 
-    if (themeId) {
-      // Refresh relations
-      await supabase.from('data_point_themes').delete().eq('theme_id', themeId);
-      const relations = validMessageIds.map(dpId => ({
-        data_point_id: dpId,
-        theme_id: themeId,
-        relevance_score: 1.0
-      }));
-      await supabase.from('data_point_themes').insert(relations);
-    }
-  }
+      // Check if theme exists in THIS layer
+      const { data: existing } = await supabase
+        .from('themes')
+        .select('id')
+        .eq('channel_id', params.id)
+        .eq('name', theme.name)
+        .eq('topic_id', topic.id)
+        .maybeSingle();
 
-  // 6. Handle Topics
-  let topicsToClassify = existingTopics || [];
-  if (!existingTopics || existingTopics.length === 0) {
-    const suggested = await suggestTopics(processedThemes);
-    if (suggested && suggested.length > 0) {
-      const { data: newTopics } = await supabase
-        .from('topics')
-        .insert(suggested.map((t, idx) => ({
-          channel_id: params.id,
-          workspace_id: channel?.workspace_id,
-          name: t.name,
-          description: t.description,
-          is_ai_generated: true,
-          display_order: idx,
-          created_by: 'system'
-        })))
-        .select('id, name, description');
-      
-      if (newTopics) topicsToClassify = newTopics;
-    }
-  }
+      let themeId = existing?.id;
 
-  if (topicsToClassify.length > 0 && processedThemes.length > 0) {
-    const classifications = await classifyThemesIntoTopics(processedThemes, topicsToClassify);
-    for (const item of classifications) {
-      if (item.topic_id) {
+      if (themeId) {
         await supabase
           .from('themes')
-          .update({ topic_id: item.topic_id })
-          .eq('id', item.theme_id);
+          .update({
+            summary: theme.summary,
+            description: theme.deep_analysis,
+            sentiment_breakdown: breakdown,
+            last_updated_at: new Date().toISOString()
+          })
+          .eq('id', themeId);
+      } else {
+        const { data: newTheme } = await supabase
+          .from('themes')
+          .insert({
+            channel_id: params.id,
+            workspace_id: dataPoints[0].workspace_id,
+            name: theme.name,
+            summary: theme.summary,
+            description: theme.deep_analysis,
+            data_point_count: validMessageIds.length,
+            sentiment_breakdown: breakdown,
+            topic_id: topic.id,
+            is_pinned: false
+          })
+          .select('id')
+          .single();
+        
+        themeId = newTheme?.id;
+      }
+
+      if (themeId) {
+        processedThemeIds.push(themeId);
+        // Refresh relations
+        await supabase.from('data_point_themes').delete().eq('theme_id', themeId);
+        const relations = validMessageIds.map(dpId => ({
+          data_point_id: dpId,
+          theme_id: themeId,
+          relevance_score: 1.0
+        }));
+        await supabase.from('data_point_themes').insert(relations);
       }
     }
-  }
+  };
 
-  // 7. Update channel timestamp
+  await processLayer(layer1Themes, 'Product Insights (Layer 1)');
+  await processLayer(layer2Themes, 'Deep Analysis (Layer 2)');
+
+  // 5. Update channel timestamp
   await supabase
     .from('channels')
     .update({ last_analyzed_at: new Date().toISOString() })
     .eq('id', params.id);
 
-  // 8. Create theme snapshots for trend tracking
+  // 6. Create theme snapshots
   const today = new Date().toISOString().split('T')[0];
-
-  // Fetch actual theme data for snapshots to ensure accuracy
   const { data: allThemes } = await supabase
     .from('themes')
     .select('id, data_point_count, sentiment_breakdown')
@@ -234,16 +208,6 @@ export async function POST(
   }));
 
   if (actualSnapshots.length > 0) {
-    // Delete existing snapshot for today if forceRefresh to avoid incrementing incorrectly if logic changes
-    if (forceRefresh) {
-      await supabase
-        .from('theme_snapshots')
-        .delete()
-        .eq('channel_id', params.id)
-        .eq('snapshot_date', today)
-        .in('theme_id', processedThemeIds);
-    }
-
     await supabase
       .from('theme_snapshots')
       .upsert(actualSnapshots, { onConflict: 'theme_id,snapshot_date' });
@@ -251,6 +215,6 @@ export async function POST(
 
   return NextResponse.json({
     themes: processedThemeIds.length,
-    topics: topicsToClassify.length
+    layers: 2
   });
 }
