@@ -117,7 +117,7 @@ export function MessageList({ channelId }: MessageListProps) {
   };
 
   const handleAnalyzeSelected = async () => {
-    if (selectedIds.size < 2) { alert("Please select at least 2 messages."); return; }
+    if (selectedIds.size < 1) { alert("Please select at least 1 message."); return; }
     setAnalyzingBatch(true);
     try {
       const res = await fetch(`/api/channels/${channelId}/analyze`, {
