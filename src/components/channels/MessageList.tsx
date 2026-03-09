@@ -8,6 +8,8 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Loader2, Search, Brain, X, CheckSquare, Filter, Tag, XCircle, FileCode } from "lucide-react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { useRouter } from "next/navigation";
 import { 
   Dialog, 
@@ -324,10 +326,10 @@ export function MessageList({ channelId }: MessageListProps) {
               </button>
             </div>
             <div className="flex-1 overflow-y-auto p-6">
-              <div className="prose prose-sm max-w-none">
-                <p className="text-sm text-gray-600 font-medium leading-relaxed whitespace-pre-wrap break-words">
+              <div className="prose prose-sm max-w-none prose-headings:font-black prose-headings:tracking-tight prose-h1:text-2xl prose-h2:text-xl prose-h3:text-lg prose-p:text-gray-600 prose-p:font-medium prose-p:leading-relaxed prose-li:text-gray-600 prose-code:text-indigo-600 prose-code:bg-indigo-50 prose-code:px-1 prose-code:rounded prose-code:before:content-none prose-code:after:content-none prose-blockquote:border-l-4 prose-blockquote:border-indigo-200 prose-blockquote:bg-indigo-50 prose-blockquote:p-3 prose-blockquote:rounded-r-lg prose-strong:text-gray-900 prose-ul:list-disc prose-ol:list-decimal">
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>
                   {expandedMessage.content}
-                </p>
+                </ReactMarkdown>
               </div>
             </div>
           </div>
