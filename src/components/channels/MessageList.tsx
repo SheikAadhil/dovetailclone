@@ -306,7 +306,7 @@ export function MessageList({ channelId }: MessageListProps) {
         <div className="fixed inset-0 z-50 flex justify-end">
           <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={() => setExpandedMessage(null)} />
           <div className="relative w-full max-w-xl bg-white shadow-2xl h-full flex flex-col animate-in slide-in-from-right duration-300">
-            <div className="flex items-center justify-between p-6 border-b border-gray-100">
+            <div className="flex items-center justify-between p-6 border-b border-gray-100 shrink-0">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center text-amber-700">
                   <FileCode className="w-5 h-5" />
@@ -323,13 +323,13 @@ export function MessageList({ channelId }: MessageListProps) {
                 <XCircle className="w-6 h-6 text-gray-400" />
               </button>
             </div>
-            <ScrollArea className="flex-1 p-6">
+            <div className="flex-1 overflow-y-auto p-6">
               <div className="prose prose-sm max-w-none">
                 <p className="text-sm text-gray-600 font-medium leading-relaxed whitespace-pre-wrap break-words">
                   {expandedMessage.content}
                 </p>
               </div>
-            </ScrollArea>
+            </div>
           </div>
         </div>
       )}
