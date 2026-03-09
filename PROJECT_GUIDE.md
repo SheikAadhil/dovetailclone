@@ -20,11 +20,22 @@ Pulse Dovetail Clone is a feedback analysis platform that aggregates qualitative
 ## 2. Data Signals & Ingestion
 The project treats every incoming piece of feedback as a **Signal** (stored as `data_points`).
 
-### A. Slack Messages
+### A. Slack Messages (Real-time & Manual)
 - **Mechanism:** Slack Events API (`/api/slack/events`).
 - **Processing:** Listens for `message` events in authorized channels.
 - **Metadata:** Captures sender identity, timestamp, and channel source.
 - **Automation:** Automatically triggers vector embedding generation for semantic search.
+
+#### How to Enable Automatic Ingestion (Real-time):
+To have messages appear in your signals automatically as they are sent in Slack, follow these steps:
+1. **App Configuration:** Go to your [Slack App Dashboard](https://api.slack.com/apps).
+2. **Event Subscriptions:** 
+   - Enable "Event Subscriptions".
+   - Set the **Request URL** to: `https://<your-deployed-domain>.vercel.app/api/slack/events`.
+   - Under "Subscribe to events on behalf of users", add `message.channels`.
+3. **Bot Scopes:** Ensure your bot has the `channels:history` and `groups:history` scopes.
+4. **Invite Bot:** In Slack, invite your Pulse Bot to the channel you want to monitor (e.g., `/invite @PulseBot`).
+5. **Auto-Capture:** Once invited, every new message will be captured as a **Signal** in real-time.
 
 ### B. CSV Imports
 - **Mechanism:** Multipart form-data upload (`/api/channels/[id]/csv-import`).
