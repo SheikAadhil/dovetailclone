@@ -23,8 +23,8 @@ export function ThemeDrawer({ theme, isOpen, onClose }: ThemeDrawerProps) {
 
   return (
     <Sheet open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <SheetContent className="w-[480px] sm:w-[540px] p-0 flex flex-col h-full overflow-hidden">
-        <ScrollArea className="flex-1 w-full h-full">
+      <SheetContent className="w-[480px] sm:w-[540px] p-0 flex flex-col h-full">
+        <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-200">
           <div className="flex flex-col min-h-full">
             <SheetHeader className="p-6 border-b bg-gray-50/50">
               <SheetTitle className="text-xl font-bold">{theme.name}</SheetTitle>
@@ -98,7 +98,7 @@ export function ThemeDrawer({ theme, isOpen, onClose }: ThemeDrawerProps) {
               </div>
             </div>
           </div>
-        </ScrollArea>
+        </div>
       </SheetContent>
     </Sheet>
   );
