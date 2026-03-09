@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { Channel, Theme, Topic, AnomalyAlert } from "@/types";
 import { ThemeCard } from "./ThemeCard";
+import { ThemeDrawer } from "./ThemeDrawer";
 import { MessageList } from "./MessageList";
 import { ChannelSettingsForm } from "./ChannelSettingsForm";
 import { BackfillDialog } from "./BackfillDialog";
