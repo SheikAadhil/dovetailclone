@@ -101,7 +101,17 @@ ${contextPart}
 
 ### FORMAT: 
 Respond ONLY with a JSON object. No other text.
-JSON SCHEMA: { "themes": [ { "name": "Theme Title", "summary": "2-3 sentence definition explaining the central organizing concept and its impact on the team.", "message_ids": ["1", "2"], "sentiment": "mixed" } ] }
+JSON SCHEMA: { 
+  "themes": [ 
+    { 
+      "name": "Theme Title", 
+      "summary": "2-3 sentence definition explaining the central organizing concept.", 
+      "analysis": "1-2 paragraphs of analytic narrative explaining the theme's significance, underlying patterns (latent meanings), and specific connections to team dynamics.",
+      "message_ids": ["1", "2"], 
+      "sentiment": "mixed" 
+    } 
+  ] 
+}
 
 ### DATASET (MESSAGES): 
 ${JSON.stringify(simplifiedMessages)}`;
@@ -186,6 +196,7 @@ Respond ONLY with a JSON array: [ { "theme_id": "...", "topic_id": "..." } ]`;
 export interface ThemeResult {
   name: string;
   summary: string;
+  analysis: string;
   message_ids: string[];
   sentiment: 'positive' | 'negative' | 'mixed' | 'neutral';
 }
