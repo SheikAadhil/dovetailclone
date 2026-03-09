@@ -80,29 +80,28 @@ export async function analyzeThemes(messages: { id: string; content: string }[],
 
   const contextPart = aiContext ? `\nUSER-PROVIDED CONTEXT:\n${aiContext}\n` : '';
 
-  const prompt = `You are a Senior Product Researcher and UX Strategist. Your goal is to extract high-impact, actionable themes from team and customer signals to improve product and customer experience.
+  const prompt = `You are a Dual-Layer Analyst: acting as both a Senior Product Strategist and a Qualitative Researcher (Reflexive Thematic Analysis). 
+Your goal is to extract patterns that are both immediately actionable and deeply interpretive.
 
 ${contextPart}
 
 ### ANALYSIS PRINCIPLES:
-1. IDENTIFY MULTIPLE THEMES: Do not consolidate everything into a single theme. Even a few messages can contain 2-4 distinct insights. Aim for 3-8 themes for larger datasets.
-2. ACTIONABILITY OVER THEORY: Every theme must enable the user to make decisions. Avoid academic or abstract descriptions.
-3. CENTRAL ORGANIZING CONCEPT: Every theme must capture a shared meaning united by a clear product or experience insight.
-4. BEYOND THE SURFACE: Use Latent Analysis to identify underlying friction, unmet needs, or behavioral patterns.
+1. DUAL-LAYER INSIGHTS: For every theme, you must provide both a Surface/Product Layer and a Deep/Latent Layer.
+2. IDENTIFY MULTIPLE THEMES: Identify 3-8 distinct themes. Do not consolidate unrelated insights. Even a few signals can contain multiple distinct insights.
+3. INTERPRETIVE DEPTH: Use Latent Analysis to identify underlying meanings, assumptions, and organizational dynamics (e.g., "Invisible Labor", "Voice Not Valued", "The Paradox of Speed").
 
-### YOUR PROCESS:
-1. FAMILIARIZATION: Review all signals to identify distinct patterns.
-2. PRODUCT CODING: Identify signals related to "UI Friction", "Feature Requests", "Performance Issues", "Customer Resentment", "Workflow Gaps", etc.
-3. THEME SYNTHESIS: Group these insights into themes that tell a clear story about how to improve the product or experience.
+### YOUR DUAL-LAYER PROCESS:
+- LAYER 1 (SURFACE): What is explicitly stated? What product friction or user needs are immediate? How do we fix this now?
+- LAYER 2 (DEEP): What are the underlying patterns? What does this say about team health, latent assumptions, or the broader customer relationship? 
 
 ### FORMAT: 
 Respond ONLY with a JSON object. No other text.
 JSON SCHEMA: { 
   "themes": [ 
     { 
-      "name": "Actionable Theme Title", 
-      "summary": "1-2 sentence definition of the core insight.", 
-      "analysis": "Product Insights & Recommendations: 1-2 paragraphs explaining the impact on users and specific actionable steps to improve the experience.",
+      "name": "Coherent Theme Title", 
+      "summary": "Product-Focused Insight: 1-2 sentences on actionable friction and immediate recommendations.", 
+      "deep_analysis": "Reflexive/Latent Analysis: 1-2 paragraphs exploring the underlying meaning, conceptual significance, and systemic patterns.",
       "message_ids": ["1", "2"], 
       "sentiment": "mixed" 
     } 
@@ -192,7 +191,7 @@ Respond ONLY with a JSON array: [ { "theme_id": "...", "topic_id": "..." } ]`;
 export interface ThemeResult {
   name: string;
   summary: string;
-  analysis: string;
+  deep_analysis: string;
   message_ids: string[];
   sentiment: 'positive' | 'negative' | 'mixed' | 'neutral';
 }

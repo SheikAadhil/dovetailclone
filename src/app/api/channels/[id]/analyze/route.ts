@@ -135,8 +135,8 @@ export async function POST(
         .from('themes')
         .update({
           summary: theme.summary,
-          description: theme.analysis,
-          data_point_count: forceRefresh ? validMessageIds.length : undefined, // Only overwrite count if forcing full refresh
+          description: theme.deep_analysis,
+          data_point_count: forceRefresh ? validMessageIds.length : undefined,
           sentiment_breakdown: breakdown,
           last_updated_at: new Date().toISOString()
         })
@@ -149,7 +149,7 @@ export async function POST(
           workspace_id: dataPoints[0].workspace_id,
           name: theme.name,
           summary: theme.summary,
-          description: theme.analysis,
+          description: theme.deep_analysis,
           data_point_count: validMessageIds.length,
           sentiment_breakdown: breakdown,
           is_pinned: false
