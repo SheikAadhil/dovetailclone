@@ -7,7 +7,7 @@ import { MessageCard } from "./MessageCard";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, Search, Brain, X, CheckSquare, Filter, Tag } from "lucide-react";
+import { Loader2, Search, Brain, X, CheckSquare, Filter, Tag, XCircle, FileCode } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { 
   Dialog, 
@@ -42,6 +42,7 @@ export function MessageList({ channelId }: MessageListProps) {
   const [analyzingBatch, setAnalyzingBatch] = useState(false);
   const [isTagDialogOpen, setIsTagDialogOpen] = useState(false);
   const [tagging, setTagging] = useState(false);
+  const [expandedMessage, setExpandedMessage] = useState<DataPoint | null>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -117,7 +118,14 @@ export function MessageList({ channelId }: MessageListProps) {
   };
 
   const handleAnalyzeSelected = async () => {
-    if (selectedIds.size < 1) { alert("Please select at least 1 message."); return; }
+    const selectedMessages = messages.filter(m => selectedIds.has(m.id));
+    const hasOnlyObservationNodes = selectedMessages.every(m => m.source === 'node' || m.source === 'markdown');
+    
+    if (hasOnlyObservationNodes) {
+      if (selectedIds.size < 1) { alert("Please select at least 1 observation node."); return; }
+    } else {
+      if (selectedIds.size < 2) { alert("Please select at least 2 signals."); return; }
+    }
     setAnalyzingBatch(true);
     try {
       const res = await fetch(`/api/channels/${channelId}/analyze`, {
@@ -229,6 +237,7 @@ export function MessageList({ channelId }: MessageListProps) {
             selected={selectedIds.has(msg.id)} 
             onSelect={handleToggleSelect} 
             onAnalyze={handleAnalyzeSingle}
+            onExpand={setExpandedMessage}
           />
         ))}
         {loading && <div className="flex justify-center py-10"><Loader2 className="w-6 h-6 animate-spin text-indigo-600" /></div>}
@@ -291,6 +300,39 @@ export function MessageList({ channelId }: MessageListProps) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Side Panel for Full Observation */}
+      {expandedMessage && (
+        <div className="fixed inset-0 z-50 flex justify-end">
+          <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={() => setExpandedMessage(null)} />
+          <div className="relative w-full max-w-xl bg-white shadow-2xl h-full flex flex-col animate-in slide-in-from-right duration-300">
+            <div className="flex items-center justify-between p-6 border-b border-gray-100">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center text-amber-700">
+                  <FileCode className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-black text-gray-900">Full Observation</h3>
+                  <p className="text-xs text-gray-500 font-medium">{expandedMessage.sender_name || 'Observation Node'}</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setExpandedMessage(null)}
+                className="p-2 hover:bg-gray-100 rounded-xl transition-colors"
+              >
+                <XCircle className="w-6 h-6 text-gray-400" />
+              </button>
+            </div>
+            <ScrollArea className="flex-1 p-6">
+              <div className="prose prose-sm max-w-none">
+                <p className="text-sm text-gray-600 font-medium leading-relaxed whitespace-pre-wrap break-words">
+                  {expandedMessage.content}
+                </p>
+              </div>
+            </ScrollArea>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

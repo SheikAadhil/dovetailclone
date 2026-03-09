@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { formatDistanceToNow } from "date-fns";
 import { 
   Smile, Frown, Meh, Slack, FileText, FileCode, Database, 
-  ChevronDown, ChevronUp, Brain, Loader2
+  ChevronDown, Brain, Loader2
 } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -16,10 +16,10 @@ interface MessageCardProps {
   selected?: boolean;
   onSelect?: (id: string, checked: boolean) => void;
   onAnalyze?: (id: string) => Promise<void>;
+  onExpand?: (message: DataPoint) => void;
 }
 
-export function MessageCard({ message, themes, onClick, selected, onSelect, onAnalyze }: MessageCardProps) {
-  const [expanded, setSetExpanded] = useState(false);
+export function MessageCard({ message, themes, onClick, selected, onSelect, onAnalyze, onExpand }: MessageCardProps) {
   const [analyzing, setAnalyzing] = useState(false);
 
   const isLongContent = message.content.length > 300 || message.content.split('\n').length > 4;
@@ -114,15 +114,15 @@ export function MessageCard({ message, themes, onClick, selected, onSelect, onAn
           </div>
           
           <div className="relative">
-            <p className={`text-sm text-gray-600 font-medium leading-relaxed whitespace-pre-wrap break-words ${!expanded && isLongContent ? 'line-clamp-4' : ''}`}>
+            <p className={`text-sm text-gray-600 font-medium leading-relaxed whitespace-pre-wrap break-words ${isLongContent ? 'line-clamp-4' : ''}`}>
               {message.content}
             </p>
             {isLongContent && (
               <button 
-                onClick={(e) => { e.stopPropagation(); setSetExpanded(!expanded); }}
+                onClick={(e) => { e.stopPropagation(); onExpand?.(message); }}
                 className="flex items-center gap-1.5 mt-2 text-[10px] font-black text-indigo-600 uppercase tracking-[0.1em] hover:text-indigo-700 transition-colors"
               >
-                {expanded ? <><ChevronUp className="w-3.5 h-3.5" /> Collapse Details</> : <><ChevronDown className="w-3.5 h-3.5" /> Show Full Observation</>}
+                <ChevronDown className="w-3.5 h-3.5" /> Show Full Observation
               </button>
             )}
           </div>
