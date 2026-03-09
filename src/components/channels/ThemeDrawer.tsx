@@ -29,6 +29,15 @@ export function ThemeDrawer({ theme, isOpen, onClose }: ThemeDrawerProps) {
           <SheetDescription className="mt-2 text-gray-500">
             {theme.summary}
           </SheetDescription>
+
+          {theme.description && (
+            <div className="mt-4 p-4 bg-indigo-50/50 rounded-2xl border border-indigo-100">
+              <h4 className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-2">Analytic Narrative</h4>
+              <p className="text-sm text-indigo-900 leading-relaxed font-medium">
+                {theme.description}
+              </p>
+            </div>
+          )}
           
           <div className="flex items-center gap-4 mt-4">
             <Badge variant="outline" className="bg-white">
