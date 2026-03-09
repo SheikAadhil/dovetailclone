@@ -113,14 +113,14 @@ export function MessageCard({ message, themes, onClick, selected, onSelect, onAn
             </div>
           </div>
           
-          <div className="relative">
+          <div className="relative" onClick={(e) => e.stopPropagation()}>
             <p className={`text-sm text-gray-600 font-medium leading-relaxed whitespace-pre-wrap break-words ${isLongContent ? 'line-clamp-4' : ''}`}>
               {message.content}
             </p>
             {isLongContent && (
               <button 
-                onClick={(e) => { e.stopPropagation(); onExpand?.(message); }}
-                className="flex items-center gap-1.5 mt-2 text-[10px] font-black text-indigo-600 uppercase tracking-[0.1em] hover:text-indigo-700 transition-colors"
+                onClick={(e) => { e.stopPropagation(); e.preventDefault(); onExpand?.(message); }}
+                className="flex items-center gap-1.5 mt-2 text-[10px] font-black text-indigo-600 uppercase tracking-[0.1em] hover:text-indigo-700 transition-colors z-20 relative"
               >
                 <ChevronDown className="w-3.5 h-3.5" /> Show Full Observation
               </button>
