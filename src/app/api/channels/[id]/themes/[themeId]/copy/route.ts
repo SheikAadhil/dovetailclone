@@ -16,18 +16,14 @@ export async function POST(
   // First get the theme to check ownership
   const { data: theme, error: fetchError } = await supabase
     .from("themes")
-    .select("*, channels(workspace_id, workspaces(owner_id))")
+    .select("*, channels!inner(workspace_id, workspaces!inner(owner_id))")
     .eq("id", params.themeId)
+    .eq("channels.workspaces.owner_id", userId)
     .single();
 
   if (fetchError || !theme) {
-    return new NextResponse("Theme not found", { status: 404 });
-  }
-
-  // Check workspace ownership
-  const workspaceId = theme.channels?.workspaces?.owner_id;
-  if (workspaceId !== userId) {
-    return new NextResponse("Unauthorized", { status: 401 });
+    console.error("Theme fetch error:", fetchError);
+    return new NextResponse("Theme not found or unauthorized", { status: 404 });
   }
 
   // Create a new theme as a copy
@@ -48,7 +44,7 @@ export async function POST(
 
   if (createError) {
     console.error("Error copying theme:", createError);
-    return new NextResponse("Error copying theme", { status: 500 });
+    return new NextResponse("Error copying theme: " + createError.message, { status: 500 });
   }
 
   // Copy all data point associations

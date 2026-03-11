@@ -267,17 +267,20 @@ export function ChannelDetailTabs({ channel }: ChannelDetailTabsProps) {
 
   const handleCopyTheme = async (theme: Theme) => {
     try {
+      console.log("Copying theme:", theme.id, "from channel:", channel.id);
       const res = await fetch(`/api/channels/${channel.id}/themes/${theme.id}/copy`, {
         method: 'POST'
       });
+      const data = await res.json();
+      console.log("Copy response:", res.status, data);
       if (res.ok) {
         alert("Theme copied successfully!");
         fetchThemes();
       } else {
-        const data = await res.json();
-        alert(data.message || "Copy failed");
+        alert(data.message || data.error || "Copy failed");
       }
     } catch (e) {
+      console.error("Copy error:", e);
       alert("Copy failed");
     }
   };
