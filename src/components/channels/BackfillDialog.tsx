@@ -48,7 +48,7 @@ export function BackfillDialog({ channelId, isOpen, onClose, onSuccess }: Backfi
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="rounded-[2.5rem] p-0 border-none shadow-2xl w-[95vw] max-w-2xl max-h-[90vh] flex flex-col overflow-hidden">
+      <DialogContent className="rounded-[2.5rem] p-0 border-none shadow-2xl w-[90vw] max-w-4xl max-h-[90vh] flex flex-col overflow-hidden">
         <div className="p-6 sm:p-10 pb-0">
           <DialogHeader className="mb-6">
             <div className="w-12 h-12 bg-indigo-50 rounded-2xl flex items-center justify-center text-indigo-600 mb-4 shadow-sm">
@@ -92,7 +92,7 @@ export function BackfillDialog({ channelId, isOpen, onClose, onSuccess }: Backfi
           </div>
         </ScrollArea>
 
-        <div className="p-6 sm:p-10 pt-4 border-t border-gray-50 bg-gray-50/30 shrink-0">
+        <div className="p-6 sm:p-10 pt-4 pb-10 border-t border-gray-50 bg-gray-50/30 shrink-0">
           <div className="flex flex-col sm:flex-row gap-3 sm:justify-start">
             <Button variant="outline" onClick={onClose} disabled={loading} className="rounded-2xl h-12 sm:h-14 px-8 font-black text-xs uppercase tracking-widest border-gray-200 bg-white w-full sm:w-auto">
               Cancel
