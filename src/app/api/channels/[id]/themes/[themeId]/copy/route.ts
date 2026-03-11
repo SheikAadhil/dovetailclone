@@ -26,7 +26,7 @@ export async function POST(
     return new NextResponse("Theme not found or unauthorized", { status: 404 });
   }
 
-  // Create a new theme as a copy
+  // Create a new theme as a copy (include data_point_count from original)
   const { data: newTheme, error: createError } = await supabase
     .from("themes")
     .insert({
@@ -35,9 +35,10 @@ export async function POST(
       name: `${theme.name} (Copy)`,
       summary: theme.summary,
       description: theme.description,
-      is_manual: theme.is_manual || true, // Preserve original or default to true if AI-generated
+      is_manual: theme.is_manual || true,
       is_pinned: false,
       sentiment_breakdown: theme.sentiment_breakdown,
+      data_point_count: theme.data_point_count || 0,
     })
     .select()
     .single();
@@ -67,13 +68,14 @@ export async function POST(
     if (insertAssocError) {
       console.error("Error copying associations:", insertAssocError);
     }
-
-    // Update the new theme's data_point_count
-    await supabase
-      .from("themes")
-      .update({ data_point_count: associations.length })
-      .eq("id", newTheme.id);
   }
 
-  return NextResponse.json(newTheme);
+  // Re-fetch the theme to get updated data_point_count
+  const { data: updatedTheme } = await supabase
+    .from("themes")
+    .select("*")
+    .eq("id", newTheme.id)
+    .single();
+
+  return NextResponse.json(updatedTheme || newTheme);
 }
