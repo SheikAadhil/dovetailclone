@@ -2,6 +2,18 @@ import { NextResponse } from 'next/server';
 import { verifySlackSignature, getUserDisplayName } from '@/lib/slack';
 import { createSupabaseAdminClient } from '@/lib/supabase-server';
 
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url);
+  const challenge = searchParams.get('challenge');
+  
+  if (challenge) {
+    console.log('[Slack Events] URL verification GET request');
+    return NextResponse.json({ challenge });
+  }
+  
+  return new NextResponse('Method not allowed', { status: 405 });
+}
+
 export async function POST(request: Request) {
   const rawBody = await request.text();
   const timestamp = request.headers.get('x-slack-request-timestamp');
@@ -12,7 +24,10 @@ export async function POST(request: Request) {
     return new NextResponse('Configuration error', { status: 500 });
   }
   
-  if (!timestamp || !signature) return new NextResponse('Missing Slack headers', { status: 400 });
+  if (!timestamp || !signature) {
+    console.log('[Slack Events] Missing Slack headers. Timestamp:', timestamp, 'Signature:', signature ? 'present' : 'missing');
+    return new NextResponse('Missing Slack headers', { status: 400 });
+  }
 
   const isValid = verifySlackSignature(process.env.SLACK_SIGNING_SECRET, rawBody, timestamp, signature);
   if (!isValid) {
