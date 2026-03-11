@@ -14,6 +14,8 @@ This is a **Pulse Dovetail Clone** - a feedback analysis platform that aggregate
 - **AI/LLM:** OpenRouter via `src/lib/ai.ts` (multi-model fallback: Gemini 2.0 Flash, Llama 3.3 70B, Mistral 7B)
 - **Styling:** Tailwind CSS + Shadcn UI components
 - **Visualization:** Recharts
+- **Email:** Resend (weekly digest)
+- **CSV Parsing:** Papaparse
 
 ## Common Commands
 
@@ -23,7 +25,24 @@ npm run dev           # Start development server at http://localhost:3000
 npm run build         # Build for production
 npm run start         # Start production server
 npm run lint          # Run ESLint
+
+# Database (Supabase)
+npx supabase start    # Start local Supabase instance
+npx supabase db reset # Reset local database
 ```
+
+## Environment Variables
+
+Required environment variables in `.env.local`:
+
+- **Authentication:** `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`
+- **Database:** `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`
+- **Slack:** `SLACK_CLIENT_ID`, `SLACK_CLIENT_SECRET`, `SLACK_SIGNING_SECRET`
+- **AI:** `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `OPENROUTER_API_KEY`
+- **Email:** `RESEND_API_KEY`, `RESEND_FROM_EMAIL`
+- **App:** `NEXT_PUBLIC_APP_URL`, `CRON_SECRET`
+
+Copy `.env.local.example` to `.env.local` and fill in values.
 
 ## Architecture
 
@@ -40,29 +59,61 @@ npm run lint          # Run ESLint
 
 ### Key API Routes (`src/app/api/`)
 
+**Channel Management:**
 - `/api/channels` - Channel CRUD
+- `/api/channels/[id]` - Single channel operations
 - `/api/channels/[id]/analyze` - AI theme extraction
 - `/api/channels/[id]/csv-import` - CSV upload with column mapping
 - `/api/channels/[id]/md-import` - Markdown/observation node import
+- `/api/channels/[id]/backfill` - Historical Slack message sync
+
+**Themes & Topics:**
 - `/api/channels/[id]/themes` - Theme CRUD
+- `/api/channels/[id]/themes/[themeId]` - Theme operations
+- `/api/channels/[id]/themes/[themeId]/assign` - Assign signals to theme
+- `/api/channels/[id]/themes/[themeId]/copy` - Copy theme content to clipboard
+- `/api/channels/[id]/themes/merge` - Merge multiple themes
+- `/api/channels/[id]/topics` - Topic CRUD
+- `/api/channels/[id]/enhance-context` - Update AI context
+
+**Data & Sources:**
 - `/api/channels/[id]/sources` - Source management
+- `/api/channels/[id]/fields` - Custom field definitions
+- `/api/data-points/[id]` - Individual data point CRUD
+- `/api/data-points/embed` - Generate embeddings
+
+**Snapshots & Alerts:**
 - `/api/channels/[id]/snapshots` - Trend snapshots
+- `/api/channels/[id]/snapshots/create` - Create snapshot
+- `/api/channels/[id]/snapshots/generate-history` - Generate historical data
+- `/api/alerts` - Anomaly detection alerts
+
+**Integrations:**
 - `/api/slack/events` - Slack Events API for real-time ingestion
 - `/api/slack/callback` - OAuth callback
-- `/api/alerts` - Anomaly detection alerts
-- `/api/email` - Email digest sending
-- `/api/workspace` - Workspace operations
+- `/api/slack/channels` - List Slack channels
+- `/api/email/digest` - Weekly digest email
+
+**Workspace:**
+- `/api/workspace/usage` - Usage statistics
 
 ### Core Libraries (`src/lib/`)
 
-- `ai.ts` - LLM theme extraction, sentiment analysis, topic categorization with multi-model fallback
+- `ai.ts` - LLM theme extraction, sentiment analysis, topic categorization with multi-model fallback via OpenRouter
 - `supabase.ts` / `supabase-server.ts` - Database client
 - `embeddings.ts` - Vector embedding generation for semantic search
 - `slack.ts` - Slack API helpers
+- `utils.ts` - Shared utility functions (cn, formatting)
 
 ### Authentication Flow
 
 The app uses Clerk for auth. The middleware (`src/middleware.ts`) protects all `/channels` routes. Public routes include the landing page and API endpoints.
+
+## UI Components
+
+UI components are in `src/components/ui/` (Shadcn) and feature-specific components in `src/components/channels/`:
+- **Shadcn components:** button, card, dialog, dropdown-menu, input, select, tabs, etc.
+- **Channel components:** MessageCard, ThemeCard, ChannelCard, CSVImportDialog, ThemeDrawer, SourcesPanel
 
 ## Data Ingestion
 
@@ -80,5 +131,7 @@ The app uses Clerk for auth. The middleware (`src/middleware.ts`) protects all `
 ## Database
 
 Supabase migrations in `supabase/migrations/`:
-- `001_initial_schema.sql` - Core tables
-- `002_channel_enhancements.sql` - Additional features (fields, sources, alerts, etc.)
+- `001_initial_schema.sql` - Core tables (workspaces, channels, data_points, themes, topics)
+- `002_channel_enhancements.sql` - Additional features (sources, alerts, fields, snapshots)
+
+Run local Supabase with: `npx supabase start`

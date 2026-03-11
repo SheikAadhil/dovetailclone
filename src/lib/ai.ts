@@ -80,98 +80,128 @@ export async function analyzeThemesLayer1(messages: { id: string; content: strin
 
   const contextPart = aiContext ? `\nUSER-PROVIDED CONTEXT:\n${aiContext}\n` : '';
 
-  const prompt = `You are a strict thematic synthesis engine for product signals.
+  const prompt = `You are a strict product-insight synthesis engine.
 
-Your goal is to derive product-insight themes from mixed-source signals without losing coverage, collapsing important distinctions, or hiding unassigned evidence.
+Your job is to analyze a set of user signals and produce a complete, auditable theme report.
+
+Your highest priority is coverage accuracy, not elegant storytelling.
+
+CORE FAILURE TO AVOID
+
+Do not produce a clean-looking summary by silently dropping signals.
+
+If a signal does not fit a major theme, it must still appear as either:
+- an isolated issue
+- a positive strength
+- an unrepresented signal that needs review
 
 ${contextPart}
 
-### PRIORITY ORDER
+### WORKFLOW
 
-1. Full coverage
-2. Clean top-level clustering
-3. Clear evidence traceability
-4. Strategic interpretation
-5. Good writing
+STEP 1: BUILD A SIGNAL LEDGER FIRST
+Before writing any themes, create a hidden ledger with one row per signal.
 
-### NON-NEGOTIABLE RULES
+Each signal must be assigned to exactly one of these buckets:
+1. Top-level theme
+2. Isolated issue
+3. Positive strength
+4. Unrepresented / needs review
 
-1. Every signal must be handled explicitly
-- Start by creating a hidden assignment table with every signal ID.
-- Each signal must end in exactly one of these buckets:
-  a) a top-level theme
-  b) isolated issue
-  c) positive strength
+Rules:
+- Every signal must appear in the ledger.
+- No signal may appear twice in top-level themes.
 - No signal may disappear.
-- No signal may be counted twice across top-level themes.
+- If unsure, place it in "Unrepresented / needs review" rather than forcing a weak theme fit.
 
-2. Do not over-compress
-- Do not reduce the taxonomy so much that important patterns vanish.
-- If simplifying the theme set causes distinct issues to disappear, keep more themes.
-- Coverage is more important than elegance.
-
-3. Preserve these issue types when present
-Do not accidentally bury these inside broad buckets:
-- collaboration / export friction
-- privacy / data governance
-- permissions / access control
-- AI trust / traceability
-- theme quality / grouping accuracy
-- analyst control features like rename / merge / split
-- pricing for experimentation
-- cross-source deduplication
-- positive strengths
-- automation vs manual control tensions
-
-4. Broad themes need justification
-- Do not use one broad theme like "usability and workflow issues" unless the grouped signals truly share the same product problem and same likely solution.
-- A bug, an onboarding issue, a mobile UI problem, and terminology confusion should not be merged just because they all create friction.
-
-5. Positive signals must survive
-- If the dataset contains strengths, capture them explicitly.
-- Do not produce a pain-only analysis.
-- Positive signals can be listed under a separate "Strengths" section when they do not justify a larger theme.
-
-6. Isolated issues must be visible
-- If a signal does not belong in a broad theme, place it in "Isolated issues" instead of forcing it into the wrong bucket.
-- Never hide isolated issues by omitting them.
-
-7. Recommendations must match scope
-- Give recommendations only at the level supported by evidence.
-- One signal = narrow recommendation.
-- Multiple related signals = broader recommendation.
-- Do not suggest major platform redesigns from weak evidence.
-
-8. Latent themes come after top-level themes
-- Deep analysis must synthesize the top-level themes.
-- It must not act as a dumping ground for missing issues.
-- If a concept is important enough to appear in deep analysis but missing from top-level themes, fix the top-level themes first.
-
-9. Plain naming only
-- Use short, product-usable names.
-- Avoid dramatic or academic labels.
-- Prefer "Export traceability issues" over "The burden of validation."
-
-10. Hard validation before output
-Silently check:
-- total input signals = total signals represented in top-level themes + isolated issues + strengths
+STEP 2: VALIDATE THE LEDGER
+Silently validate:
+- total input signals = total ledger rows
+- total input signals = top-level theme signals + isolated issues + strengths + unrepresented
 - duplicated signals = 0
-- unrepresented signals = 0
+- missing signals = 0
 
-If not true, revise before answering.
+If validation fails, revise before writing any prose.
+
+STEP 3: DERIVE TOP-LEVEL THEMES
+Create top-level themes only from signals that clearly belong together.
+
+Top-level themes must be:
+- distinct
+- product-actionable
+- understandable in a roadmap review
+- supported by direct evidence
+
+Do not over-compress the taxonomy.
+If keeping fewer themes causes important issues to vanish, use more themes.
+
+STEP 4: PRESERVE IMPORTANT DISTINCTIONS
+Do not collapse these unless the evidence strongly supports it:
+- theme quality vs traceability
+- privacy/governance vs permissions/access
+- integration/import friction vs export/sharing friction
+- actionability vs workflow confusion
+- role-based needs vs automation/manual-control tension
+- cross-source deduplication vs general integration
+- onboarding vs ongoing usability
+- pricing for experimentation vs other complaints
+- positive strengths vs pain points
+- analyst-control features (rename/merge/split) vs generic AI quality issues
+
+STEP 5: HANDLE SINGLETONS CORRECTLY
+If a pattern has only one signal:
+- do not automatically inflate it into a major theme
+- place it in "Isolated issues" if it is real but weakly represented
+- keep it visible
+- recommend monitoring or targeted fixes
+
+STEP 6: DO NOT HIDE STRENGTHS
+If the dataset contains positive signals, include them in a "Strengths" section.
+Do not produce a pain-only report.
+
+STEP 7: LATENT THEMES ONLY AFTER COVERAGE IS COMPLETE
+Deep themes must synthesize the top-level themes.
+They must not be used to rescue signals that were omitted from the top-level layer.
+If a deep theme contains an issue missing from top-level themes, fix the top-level themes first.
+
+STEP 8: NAME THEMES PLAINLY
+Use simple names.
+Good:
+- Export traceability issues
+- Low trust in AI-generated themes
+- Regional filtering limitations
+
+Bad:
+- The burden of validation
+- systemic opacity of informational abstraction
+
+STEP 9: RECOMMENDATIONS MUST MATCH EVIDENCE
+For each top-level theme, give:
+- one clear product implication
+- one proportional recommendation
+- recommendation type:
+  - UX fix
+  - IA/content fix
+  - model/AI improvement
+  - integration/platform fix
+  - trust/governance fix
+  - pricing/packaging fix
+
+Do not recommend a broad platform redesign from one weak signal.
 
 ### OUTPUT FORMAT
 
 Respond with JSON:
 
 {
-  "coverage_check": {
+  "coverage_report": {
     "total_signals": 0,
     "signals_in_top_level_themes": 0,
-    "signals_in_strengths": 0,
     "signals_in_isolated_issues": 0,
-    "unrepresented_signals": "none" or ["id1"],
-    "duplicate_signals": "none" or ["id1"]
+    "signals_in_strengths": 0,
+    "signals_in_unrepresented": 0,
+    "missing_signals": "none" or ["id1"],
+    "duplicated_signals": "none" or ["id1"]
   },
   "top_level_themes": [
     {
@@ -179,26 +209,36 @@ Respond with JSON:
       "definition": "1-2 sentence definition",
       "signal_ids": ["1", "2"],
       "message_count": 0,
-      "why_together": "why these signals belong in one theme",
+      "why_together": "why these signals belong together",
       "evidence": ["excerpt 1", "excerpt 2"],
       "user_need": "what users need",
       "product_implication": "what this means for product",
       "recommendation": "specific recommendation",
-      "confidence": "High"
+      "recommendation_type": "UX fix" | "IA/content fix" | "model/AI improvement" | "integration/platform fix" | "trust/governance fix" | "pricing/packaging fix",
+      "confidence": "High" | "Medium" | "Low"
     }
   ],
   "strengths": [
     {
+      "name": "Strength name",
       "signal_ids": ["1"],
-      "what_users_value": "what users value",
-      "why_it_matters": "strategic importance"
+      "why_it_matters": "strategic importance",
+      "how_to_preserve": "how to maintain or expand this strength"
     }
   ],
   "isolated_issues": [
     {
+      "name": "Issue name",
       "signal_ids": ["1"],
-      "why_not_grouped": "why it doesn't fit broader themes",
+      "why_not_elevated": "why it was not elevated into a broader theme",
       "what_to_monitor": "monitoring guidance"
+    }
+  ],
+  "unrepresented_needs_review": [
+    {
+      "signal_id": "1",
+      "signal_content": "the actual signal content",
+      "reason": "why it could not be confidently grouped"
     }
   ],
   "latent_tensions": [
@@ -206,11 +246,27 @@ Respond with JSON:
       "name": "Tension name",
       "connected_themes": ["theme1", "theme2"],
       "deeper_pattern": "what deeper pattern it explains",
-      "strategic_importance": "why it matters",
-      "confidence": "Medium"
+      "strategic_importance": "why it matters strategically",
+      "confidence": "High" | "Medium" | "Low"
     }
   ]
 }
+
+### FINAL QUALITY GATE
+Before finalizing, silently answer:
+- Did I account for every signal?
+- Did I avoid double-counting?
+- Did I preserve important distinctions?
+- Did I keep strengths visible?
+- Did I avoid using deep themes to hide top-level omissions?
+- Did I avoid turning weak evidence into big narratives?
+
+If any answer is "no," revise before output.
+
+FINAL INSTRUCTION
+Optimize for complete, decision-grade synthesis.
+Do not optimize for fewer themes.
+A slightly longer but fully auditable report is better than a neat but incomplete one.
 
 ### DATASET (MESSAGES):
 ${JSON.stringify(simplifiedMessages)}`;
@@ -266,7 +322,7 @@ async function performAnalysis(prompt: string, idMap: Map<string, string>): Prom
     const text = response.choices[0].message.content || "{}";
     const parsed = extractJson(text);
 
-    // Handle new format with top_level_themes
+    // Handle new format with coverage_report and top_level_themes
     if (parsed.top_level_themes && Array.isArray(parsed.top_level_themes)) {
       const finalThemes = parsed.top_level_themes.map((theme: any) => ({
         name: theme.name,
@@ -282,13 +338,15 @@ async function performAnalysis(prompt: string, idMap: Map<string, string>): Prom
         user_need: theme.user_need,
         product_implication: theme.product_implication,
         recommendation: theme.recommendation,
+        recommendation_type: theme.recommendation_type,
         confidence: theme.confidence,
-        // Coverage check
-        coverage_check: parsed.coverage_check,
-        // Additional fields
+        // Coverage report
+        coverage_report: parsed.coverage_report || parsed.coverage_check,
+        // Additional sections
         latent_tensions: parsed.latent_tensions,
         strengths: parsed.strengths,
-        isolated_issues: parsed.isolated_issues
+        isolated_issues: parsed.isolated_issues,
+        unrepresented_needs_review: parsed.unrepresented_needs_review
       }));
       return finalThemes;
     }
@@ -373,7 +431,17 @@ export interface ThemeResult {
   deep_analysis: string;
   message_ids: string[];
   sentiment: 'positive' | 'negative' | 'mixed' | 'neutral';
-  // Coverage check
+  // Coverage report (new format)
+  coverage_report?: {
+    total_signals: number;
+    signals_in_top_level_themes: number;
+    signals_in_isolated_issues: number;
+    signals_in_strengths: number;
+    signals_in_unrepresented: number;
+    missing_signals: string | string[];
+    duplicated_signals: string | string[];
+  };
+  // Legacy coverage check
   coverage_check?: {
     total_signals: number;
     signals_in_top_level_themes: number;
@@ -389,6 +457,7 @@ export interface ThemeResult {
   user_need?: string;
   product_implication?: string;
   recommendation?: string;
+  recommendation_type?: 'UX fix' | 'IA/content fix' | 'model/AI improvement' | 'integration/platform fix' | 'trust/governance fix' | 'pricing/packaging fix';
   confidence?: 'High' | 'Medium' | 'Low';
   // Additional sections
   latent_tensions?: Array<{
@@ -400,6 +469,7 @@ export interface ThemeResult {
     confidence: 'High' | 'Medium' | 'Low';
   }>;
   strengths?: Array<{
+    name?: string;
     signal_ids?: string[];
     description?: string;
     what_users_value?: string;
@@ -408,11 +478,18 @@ export interface ThemeResult {
     how_to_preserve?: string;
   }>;
   isolated_issues?: Array<{
+    name?: string;
     signal_ids?: string[];
     issue?: string;
     why_not_grouped?: string;
+    why_not_elevated?: string;
     what_to_monitor?: string;
     reason_not_elevated?: string;
     signal_id?: string;
+  }>;
+  unrepresented_needs_review?: Array<{
+    signal_id: string;
+    signal_content: string;
+    reason: string;
   }>;
 }
