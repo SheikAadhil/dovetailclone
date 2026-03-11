@@ -265,6 +265,23 @@ export function ChannelDetailTabs({ channel }: ChannelDetailTabsProps) {
     }
   };
 
+  const handleCopyTheme = async (theme: Theme) => {
+    try {
+      const res = await fetch(`/api/channels/${channel.id}/themes/${theme.id}/copy`, {
+        method: 'POST'
+      });
+      if (res.ok) {
+        alert("Theme copied successfully!");
+        fetchThemes();
+      } else {
+        const data = await res.json();
+        alert(data.message || "Copy failed");
+      }
+    } catch (e) {
+      alert("Copy failed");
+    }
+  };
+
   const handlePinTheme = async (theme: Theme) => {
     try {
       await fetch(`/api/channels/${channel.id}/themes/${theme.id}`, {
@@ -683,15 +700,16 @@ export function ChannelDetailTabs({ channel }: ChannelDetailTabsProps) {
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {themes.slice(0, 3).map(theme => (
-                      <ThemeCard 
-                        key={theme.id} 
-                        theme={theme} 
+                      <ThemeCard
+                        key={theme.id}
+                        theme={theme}
                         onView={handleViewTheme}
                         onEdit={handleOpenThemeDialog}
                         onDelete={handleDeleteTheme}
                         onPin={handlePinTheme}
                         onMergeStart={startMerge}
                         onMergeSelect={handleMergeComplete}
+                        onCopy={handleCopyTheme}
                       />
                     ))}
                   </div>
@@ -743,15 +761,16 @@ export function ChannelDetailTabs({ channel }: ChannelDetailTabsProps) {
                 ) : filteredThemes.length > 0 ? (
                   <div className="grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 pb-12">
                     {filteredThemes.map((theme) => (
-                      <ThemeCard 
-                        key={theme.id} 
-                        theme={theme} 
+                      <ThemeCard
+                        key={theme.id}
+                        theme={theme}
                         onView={handleViewTheme}
                         onEdit={handleOpenThemeDialog}
                         onDelete={handleDeleteTheme}
                         onPin={handlePinTheme}
                         onMergeStart={startMerge}
                         onMergeSelect={handleMergeComplete}
+                        onCopy={handleCopyTheme}
                         mergeMode={mergeMode}
                         isMergeSource={mergeSource?.id === theme.id}
                       />
