@@ -35,7 +35,7 @@ export async function POST(
       name: `${theme.name} (Copy)`,
       summary: theme.summary,
       description: theme.description,
-      is_manual: true,
+      is_manual: theme.is_manual || true, // Preserve original or default to true if AI-generated
       is_pinned: false,
       sentiment_breakdown: theme.sentiment_breakdown,
     })
