@@ -80,107 +80,152 @@ export async function analyzeThemesLayer1(messages: { id: string; content: strin
 
   const contextPart = aiContext ? `\nUSER-PROVIDED CONTEXT:\n${aiContext}\n` : '';
 
-  const prompt = `You are a Senior Product Strategist and UX Researcher.
-Your goal is to extract immediately actionable Product Insights and UX Friction points from these signals.
+  const prompt = `You are a strict product-insight synthesis engine.
+
+Your task is to analyze a set of user signals and produce decision-grade themes.
+
+Your top priority is auditability, not eloquence.
 
 ${contextPart}
 
-### RIGOROUS ANALYSIS REQUIREMENTS (MANDATORY):
+### OPERATING RULES
 
-1. COVERAGE DISCIPLINE (MANDATORY):
-- You MUST count EVERY signal exactly once in the top-level theme layer
-- Do NOT drop any signal
-- Do NOT double-count signals across top-level themes
-- If a signal relates to multiple ideas, assign it to ONE primary theme and optionally list secondary tags separately
+1. Assignment first, writing second
+- Before writing any theme narrative, create a hidden assignment table mapping every signal ID to exactly one top-level theme.
+- Do not write themes until this assignment table is complete.
+- If any signal is unassigned or assigned to more than one top-level theme, stop and fix it before continuing.
 
-2. OUTPUT FORMAT (MANDATORY):
-You MUST include a dataset accounting section in your response:
+2. Hard accounting rule
+- Every input signal must be assigned exactly once at the top-level.
+- No dropped signals.
+- No duplicated signals.
+- No theme can claim a message count unless the count exactly matches the assigned signal IDs.
 
-[JSON STRUCTURE EXAMPLE]
-## A. Dataset Accounting
-- Total signals: [EXACT COUNT]
-- Assigned to top-level themes: [MUST EQUAL TOTAL]
-- Unassigned: none (or list any that couldn't be assigned)
-- Duplicates: none (or list any duplicates)
-[/JSON STRUCTURE EXAMPLE]
+3. Fail-safe validation
+Before finalizing, silently validate:
+- total input signals = total unique assigned signals
+- duplicate assigned signals = 0
+- unassigned signals = 0
+If validation fails, revise the clustering instead of generating prose.
 
-3. THEME OUTPUT FORMAT (MANDATORY):
-For each theme, include:
-- Name (plain, product-usable - avoid theatrical labels)
-- Definition (1 sentence)
-- Signal IDs (list all message IDs assigned)
-- Why this is one theme (central organizing concept)
-- Representative evidence (2-3 signal excerpts)
-- User need
-- Product implication
-- Recommendation (labeled as: UX fix, IA/content fix, model/AI improvement, integration/platform fix, trust/governance fix, or pricing/packaging consideration)
-- Confidence: High / Medium / Low
+4. Two layers only
+Produce only:
+- Top-level product themes
+- Latent tensions
 
-4. TWO-LAYER STRUCTURE (MANDATORY):
-- TOP-LEVEL THEMES: For prioritization and roadmap decisions
-- LATENT TENSIONS: Cross-cutting dynamics that synthesize across multiple themes (NOT just renamed themes)
+Do not create extra layers.
+Do not mix top-level themes with latent tensions.
 
-5. NON-OVERLAPPING THEMES (MANDATORY):
-- Each theme must be DISTINCT
-- Do NOT have overlapping themes like "trust vs accuracy vs transparency" saying the same thing
-- If themes could be merged without losing decision value, MERGE them
+5. Top-level theme standard
+Top-level themes must be:
+- mutually distinct
+- product-actionable
+- understandable in a roadmap review
+- based on directly observable evidence in the signals
 
-6. INCLUDE POSITIVE SIGNALS (MANDATORY):
-- Do NOT output only pain points
-- If signals include strengths, wins, or sticky behaviors, capture them as "Strengths / Pull Factors"
+6. Latent tension standard
+Latent tensions must:
+- synthesize across multiple top-level themes
+- explain a deeper strategic pattern
+- not simply rename a top-level theme
+- reference top-level themes, not raw signals only
 
-7. EVIDENCE-BASED (MANDATORY):
-- Every theme claim must be grounded in signal evidence
-- If evidence is weak, state "Confidence: Low"
+7. Naming rules
+Use plain, functional names.
+Avoid dramatic, academic, or consultant-style labels.
+Bad: "The Performative Facade of AI-Driven Insight"
+Good: "Low trust in AI-generated themes"
 
-### ANALYSIS PRINCIPLES (LAYER 1 - PRODUCT INSIGHTS):
-1. ACTIONABILITY: Every theme must be something a product team can act on (Feature requests, bugs, UI friction, workflow gaps).
-2. MULTIPLE THEMES: Identify 3-8 distinct themes.
-3. SURFACE PATTERNS: Focus on what is explicitly stated and common pain points.
+8. Preserve key distinctions
+Do not collapse these unless the evidence is extremely strong:
+- theme quality/control vs traceability/trust
+- import/ingestion friction vs sharing/export friction
+- privacy/governance vs permissions/access
+- actionability vs workflow confusion
+- role-based needs vs automation-vs-control tension
+- cross-source deduplication vs source integration
+- onboarding vs ongoing usability
+- pricing for experimentation vs general pricing complaints
+- segmentation/filtering needs vs broad granularity issues
 
-### FORMAT:
-Respond with a JSON object containing:
-1. "dataset_accounting": { total_signals, assigned_to_themes, unassigned, duplicates }
-2. "top_level_themes": [ { name, definition, signal_ids, why_this_theme, evidence, user_need, product_implication, recommendation, confidence } ]
-3. "latent_tensions": [ { name, deeper_pattern, connected_themes, strategic_importance, confidence } ]
-4. "strengths": [ { description, evidence } ]
-5. "missed_areas": [ { issue, signal_id } ]
+9. Singleton rule
+- If a pattern appears in only one signal, treat it as an isolated issue unless there is strong justification to elevate it.
+- Do not inflate singleton issues into major themes.
+- You may keep important singleton issues, but label them clearly as isolated or emerging.
 
-JSON SCHEMA:
+10. Positive signal rule
+- Capture positive signals explicitly.
+- Do not produce a pain-only report.
+- If users value something, list it under a Strengths section or as a positive theme when justified.
+
+11. Recommendation rule
+Every recommendation must be:
+- directly tied to the evidence
+- proportional to the evidence
+- concrete, not vague
+
+Label each recommendation as one of:
+- UX fix
+- IA/content fix
+- model/AI improvement
+- integration/platform fix
+- trust/governance fix
+- pricing/packaging fix
+
+12. No narrative inflation
+- Do not use abstract language to make weak evidence sound profound.
+- Do not infer hidden motives unless clearly supported.
+- If the evidence is mixed or weak, say so plainly.
+
+### OUTPUT FORMAT
+
+Respond with a JSON object:
+
 {
   "dataset_accounting": {
     "total_signals": 0,
-    "assigned_to_themes": 0,
-    "unassigned": "none",
-    "duplicates": "none"
+    "total_top_level_themes": 0,
+    "total_assigned_signals": 0,
+    "unassigned_signals": "none" or ["id1", "id2"],
+    "duplicate_assigned_signals": "none" or ["id1", "id2"]
   },
   "top_level_themes": [
     {
-      "name": "Theme Title",
+      "name": "Plain theme name",
       "definition": "1-sentence definition",
       "signal_ids": ["1", "2"],
-      "why_this_theme": "central organizing concept",
+      "message_count": 2,
+      "why_together": "central organizing concept",
       "evidence": ["signal excerpt 1", "signal excerpt 2"],
       "user_need": "what users need",
       "product_implication": "what this means for product",
-      "recommendation": "UX fix",
+      "recommendation": "specific recommendation",
+      "recommendation_type": "UX fix",
       "confidence": "High"
+    }
+  ],
+  "strengths": [
+    {
+      "description": "what users value",
+      "evidence": "signal excerpt",
+      "how_to_preserve": "how to maintain this strength"
     }
   ],
   "latent_tensions": [
     {
-      "name": "Tension Name",
-      "deeper_pattern": "what it explains",
+      "name": "Tension name",
+      "deeper_pattern": "what deeper pattern it explains",
       "connected_themes": ["theme1", "theme2"],
-      "strategic_importance": "why it matters",
+      "strategic_meaning": "why it matters strategically",
       "confidence": "Medium"
     }
   ],
-  "strengths": [
-    { "description": "what users value", "evidence": "signal excerpt" }
-  ],
-  "missed_areas": [
-    { "issue": "singleton or weak area", "signal_id": "id" }
+  "isolated_issues": [
+    {
+      "issue": "issue description",
+      "signal_id": "id",
+      "reason_not_elevated": "why treated as isolated"
+    }
   ]
 }
 
@@ -242,16 +287,24 @@ async function performAnalysis(prompt: string, idMap: Map<string, string>): Prom
     if (parsed.top_level_themes && Array.isArray(parsed.top_level_themes)) {
       const finalThemes = parsed.top_level_themes.map((theme: any) => ({
         name: theme.name,
-        summary: theme.definition || theme.summary,
-        deep_analysis: theme.product_implication || theme.recommendation || theme.why_this_theme || "",
+        summary: theme.definition || theme.summary || "",
+        deep_analysis: theme.product_implication || theme.recommendation || "",
         message_ids: (theme.signal_ids || theme.message_ids || [])
           .map((sid: any) => idMap.get(sid.toString()))
           .filter((realId: any) => !!realId),
         sentiment: theme.sentiment || 'neutral',
+        message_count: theme.message_count,
+        why_together: theme.why_together,
+        evidence: theme.evidence,
+        user_need: theme.user_need,
+        product_implication: theme.product_implication,
+        recommendation: theme.recommendation,
+        recommendation_type: theme.recommendation_type,
+        confidence: theme.confidence,
         dataset_accounting: parsed.dataset_accounting,
         latent_tensions: parsed.latent_tensions,
         strengths: parsed.strengths,
-        missed_areas: parsed.missed_areas
+        isolated_issues: parsed.isolated_issues
       }));
       return finalThemes;
     }
@@ -339,23 +392,34 @@ export interface ThemeResult {
   // New rigorous analysis fields
   dataset_accounting?: {
     total_signals: number;
-    assigned_to_themes: number;
-    unassigned: string | string[];
-    duplicates: string | string[];
+    total_top_level_themes: number;
+    total_assigned_signals: number;
+    unassigned_signals: string | string[];
+    duplicate_assigned_signals: string | string[];
   };
   latent_tensions?: Array<{
     name: string;
     deeper_pattern: string;
     connected_themes: string[];
-    strategic_importance: string;
+    strategic_meaning: string;
     confidence: 'High' | 'Medium' | 'Low';
   }>;
   strengths?: Array<{
     description: string;
     evidence: string;
+    how_to_preserve?: string;
   }>;
-  missed_areas?: Array<{
+  isolated_issues?: Array<{
     issue: string;
     signal_id: string;
+    reason_not_elevated: string;
   }>;
+  // Theme-specific fields
+  message_count?: number;
+  why_together?: string;
+  evidence?: string[];
+  user_need?: string;
+  product_implication?: string;
+  recommendation?: string;
+  recommendation_type?: string;
 }
