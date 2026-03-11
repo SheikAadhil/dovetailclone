@@ -651,4 +651,155 @@ When deductive coding is appropriate, consider these frameworks:
 
 ---
 
+## 10. Rigorous Analysis Framework (Coverage & Quality Standards)
+
+This section defines the mandatory quality standards for theme extraction to ensure high precision, full traceability, and zero narrative inflation.
+
+### 10.1 Coverage Discipline (MANDATORY)
+
+**Every signal must be accounted for exactly once at the top-level theme layer.**
+
+- Count every input signal exactly once in the top-level theme layer.
+- Do NOT drop any signal.
+- Do NOT double-count signals across top-level themes.
+- If a signal relates to multiple ideas, assign it to ONE primary theme and optionally list secondary tags separately.
+- **Coverage check is REQUIRED** at the end of each analysis showing:
+  - Total input signals
+  - Total signals assigned to top-level themes
+  - Any unassigned signals (list or "none")
+  - Any duplicated signals (list or "none")
+  - **The total assigned at the top-level MUST equal the total number of input signals**
+
+### 10.2 Two-Layer Structure (MANDATORY)
+
+Produce exactly two layers:
+
+1. **Top-level product themes** - For prioritization and roadmap decisions
+2. **Latent tensions or cross-cutting dynamics** - For interpretation and strategy
+
+- Do NOT mix these layers.
+- A latent theme must synthesize across multiple top-level themes; it must NOT simply rename one top-level theme.
+
+### 10.3 Non-Overlapping Themes (MANDATORY)
+
+- Each top-level theme must be DISTINCT and NON-OVERLAPPING.
+- Avoid theme overlap such as:
+  - "trust vs accuracy vs transparency" all saying the same thing
+  - "sharing vs permissions vs export" split without strong reason
+  - "integration vs cross-source fusion" mixed together
+- If two themes could be merged without losing decision value, MERGE them.
+
+### 10.4 Plain Naming Conventions (MANDATORY)
+
+- Use simple, product-usable names.
+- Do NOT use theatrical or consultant-style labels.
+- **Bad**: "The Performative Facade of AI-Driven Insight"
+- **Good**: "Low trust in AI-generated themes"
+- Theme names should be understandable in a roadmap review.
+
+### 10.5 Evidence Requirements (MANDATORY)
+
+Every theme output must include:
+- Theme name
+- 1-sentence definition
+- Signal IDs assigned to it
+- Why those signals belong together
+- Representative quotes or paraphrases
+- Product implication
+- **Do NOT make claims not grounded in signals**
+- **If evidence is weak, state it is weak**
+
+### 10.6 Important Distinctions to Preserve
+
+Keep these distinctions visible when present in the data:
+- Actionability vs. workflow confusion
+- Trust/traceability vs. theme quality
+- Ingestion/import friction vs. sharing/export friction
+- Privacy/security concerns vs. permissions/access issues
+- Role-based needs vs. automation-vs-control tension
+- Cross-source deduplication/fusion vs. basic integration/import
+- Onboarding vs. ongoing usability
+- Pricing for experimentation vs. general pricing complaints
+
+### 10.7 Include Positive Signals (MANDATORY)
+
+- Do NOT output only pain points.
+- If input includes strengths, wins, or sticky behaviors, capture them in a "Strengths / pull factors" section or assign to a positive theme.
+- Positive evidence is strategically important.
+
+### 10.8 Role Sensitivity (MANDATORY)
+
+- Identify when different user groups want different things.
+- Distinguish managers, researchers, sales, customer success, and individual contributors if signals support it.
+- Do NOT flatten conflicting needs into one generic theme.
+
+### 10.9 Actionability Standard (MANDATORY)
+
+Recommendations must be specific and proportional to evidence. Label each recommendation as:
+- UX fix
+- IA/content fix
+- Model/AI improvement
+- Integration/platform fix
+- Trust/governance fix
+- Pricing/packaging consideration
+
+### 10.10 Mandatory Output Format
+
+For each analysis run, output in this exact structure:
+
+**A. Dataset Accounting**
+- Total signals: X
+- Assigned to top-level themes: X
+- Unassigned: list or "none"
+- Duplicates: list or "none"
+
+**B. Top-level themes**
+For each theme:
+- Name
+- Definition
+- Signal IDs
+- Why this is one theme
+- Representative evidence
+- User need
+- Product implication
+- Recommendation
+- Confidence: High / Medium / Low
+
+**C. Latent tensions**
+For each tension:
+- Name
+- What deeper pattern it explains
+- Which top-level themes it connects
+- Why it matters strategically
+- Confidence: High / Medium / Low
+
+**D. Strengths**
+- List positive signals separately
+- Explain what users already value
+
+**E. Missed or weak areas**
+- Call out singleton issues
+- Identify themes too weak to generalize
+- State where more data is needed
+
+### 10.11 Quality Checks (MANDATORY)
+
+Before finalizing any analysis, silently verify:
+- [ ] Did I account for every signal exactly once at the top level?
+- [ ] Did I separate top-level themes from latent tensions?
+- [ ] Did I avoid fancy wording that hides weak evidence?
+- [ ] Did I preserve important distinctions instead of collapsing everything?
+- [ ] Did I include positive signals?
+- [ ] Are recommendations tied directly to evidence?
+
+### 10.12 Hard Constraints
+
+- Do NOT use inflated language
+- Do NOT invent user motives not present in the data
+- Do NOT create more themes than evidence supports
+- Prefer FEWER, CLEARER themes over many overlapping ones
+- If a theme has only ONE signal, treat it as an isolated issue unless there is strong justification
+
+---
+
 *This document is adapted from established thematic analysis methodology and should be used as a guiding framework. The AI should apply these principles flexibly, adapting to the specific characteristics of each signal set while maintaining quality standards.*

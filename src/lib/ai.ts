@@ -80,31 +80,110 @@ export async function analyzeThemesLayer1(messages: { id: string; content: strin
 
   const contextPart = aiContext ? `\nUSER-PROVIDED CONTEXT:\n${aiContext}\n` : '';
 
-  const prompt = `You are a Senior Product Strategist and UX Researcher. 
+  const prompt = `You are a Senior Product Strategist and UX Researcher.
 Your goal is to extract immediately actionable Product Insights and UX Friction points from these signals.
 
 ${contextPart}
 
+### RIGOROUS ANALYSIS REQUIREMENTS (MANDATORY):
+
+1. COVERAGE DISCIPLINE (MANDATORY):
+- You MUST count EVERY signal exactly once in the top-level theme layer
+- Do NOT drop any signal
+- Do NOT double-count signals across top-level themes
+- If a signal relates to multiple ideas, assign it to ONE primary theme and optionally list secondary tags separately
+
+2. OUTPUT FORMAT (MANDATORY):
+You MUST include a dataset accounting section in your response:
+```
+## A. Dataset Accounting
+- Total signals: [EXACT COUNT]
+- Assigned to top-level themes: [MUST EQUAL TOTAL]
+- Unassigned: none (or list any that couldn't be assigned)
+- Duplicates: none (or list any duplicates)
+```
+
+3. THEME OUTPUT FORMAT (MANDATORY):
+For each theme, include:
+- Name (plain, product-usable - avoid theatrical labels)
+- Definition (1 sentence)
+- Signal IDs (list all message IDs assigned)
+- Why this is one theme (central organizing concept)
+- Representative evidence (2-3 signal excerpts)
+- User need
+- Product implication
+- Recommendation (labeled as: UX fix, IA/content fix, model/AI improvement, integration/platform fix, trust/governance fix, or pricing/packaging consideration)
+- Confidence: High / Medium / Low
+
+4. TWO-LAYER STRUCTURE (MANDATORY):
+- TOP-LEVEL THEMES: For prioritization and roadmap decisions
+- LATENT TENSIONS: Cross-cutting dynamics that synthesize across multiple themes (NOT just renamed themes)
+
+5. NON-OVERLAPPING THEMES (MANDATORY):
+- Each theme must be DISTINCT
+- Do NOT have overlapping themes like "trust vs accuracy vs transparency" saying the same thing
+- If themes could be merged without losing decision value, MERGE them
+
+6. INCLUDE POSITIVE SIGNALS (MANDATORY):
+- Do NOT output only pain points
+- If signals include strengths, wins, or sticky behaviors, capture them as "Strengths / Pull Factors"
+
+7. EVIDENCE-BASED (MANDATORY):
+- Every theme claim must be grounded in signal evidence
+- If evidence is weak, state "Confidence: Low"
+
 ### ANALYSIS PRINCIPLES (LAYER 1 - PRODUCT INSIGHTS):
 1. ACTIONABILITY: Every theme must be something a product team can act on (Feature requests, bugs, UI friction, workflow gaps).
-2. MULTIPLE THEMES: Identify 3-8 distinct themes. 
+2. MULTIPLE THEMES: Identify 3-8 distinct themes.
 3. SURFACE PATTERNS: Focus on what is explicitly stated and common pain points.
 
-### FORMAT: 
-Respond ONLY with a JSON object. No other text.
-JSON SCHEMA: { 
-  "themes": [ 
-    { 
-      "name": "Product Theme Title", 
-      "summary": "1-2 sentence definition of the core friction.", 
-      "deep_analysis": "Product Recommendations: 1-2 paragraphs on specific actionable steps to improve the experience.",
-      "message_ids": ["1", "2"], 
-      "sentiment": "mixed" 
-    } 
-  ] 
+### FORMAT:
+Respond with a JSON object containing:
+1. "dataset_accounting": { total_signals, assigned_to_themes, unassigned, duplicates }
+2. "top_level_themes": [ { name, definition, signal_ids, why_this_theme, evidence, user_need, product_implication, recommendation, confidence } ]
+3. "latent_tensions": [ { name, deeper_pattern, connected_themes, strategic_importance, confidence } ]
+4. "strengths": [ { description, evidence } ]
+5. "missed_areas": [ { issue, signal_id } ]
+
+JSON SCHEMA:
+{
+  "dataset_accounting": {
+    "total_signals": 0,
+    "assigned_to_themes": 0,
+    "unassigned": "none",
+    "duplicates": "none"
+  },
+  "top_level_themes": [
+    {
+      "name": "Theme Title",
+      "definition": "1-sentence definition",
+      "signal_ids": ["1", "2"],
+      "why_this_theme": "central organizing concept",
+      "evidence": ["signal excerpt 1", "signal excerpt 2"],
+      "user_need": "what users need",
+      "product_implication": "what this means for product",
+      "recommendation": "UX fix",
+      "confidence": "High"
+    }
+  ],
+  "latent_tensions": [
+    {
+      "name": "Tension Name",
+      "deeper_pattern": "what it explains",
+      "connected_themes": ["theme1", "theme2"],
+      "strategic_importance": "why it matters",
+      "confidence": "Medium"
+    }
+  ],
+  "strengths": [
+    { "description": "what users value", "evidence": "signal excerpt" }
+  ],
+  "missed_areas": [
+    { "issue": "singleton or weak area", "signal_id": "id" }
+  ]
 }
 
-### DATASET (MESSAGES): 
+### DATASET (MESSAGES):
 ${JSON.stringify(simplifiedMessages)}`;
 
   return await performAnalysis(prompt, idMap);
@@ -157,12 +236,31 @@ async function performAnalysis(prompt: string, idMap: Map<string, string>): Prom
     const response = await getCompletion(prompt);
     const text = response.choices[0].message.content || "{}";
     const parsed = extractJson(text);
-    
+
+    // Handle new rigorous format with dataset_accounting and top_level_themes
+    if (parsed.top_level_themes && Array.isArray(parsed.top_level_themes)) {
+      const finalThemes = parsed.top_level_themes.map((theme: any) => ({
+        name: theme.name,
+        summary: theme.definition || theme.summary,
+        deep_analysis: theme.product_implication || theme.recommendation || theme.why_this_theme || "",
+        message_ids: (theme.signal_ids || theme.message_ids || [])
+          .map((sid: any) => idMap.get(sid.toString()))
+          .filter((realId: any) => !!realId),
+        sentiment: theme.sentiment || 'neutral',
+        dataset_accounting: parsed.dataset_accounting,
+        latent_tensions: parsed.latent_tensions,
+        strengths: parsed.strengths,
+        missed_areas: parsed.missed_areas
+      }));
+      return finalThemes;
+    }
+
+    // Legacy format handling
     const rawThemes = Array.isArray(parsed) ? parsed : (parsed.themes || []);
 
     const finalThemes = rawThemes.map((theme: any) => ({
       ...theme,
-      deep_analysis: theme.deep_analysis || theme.analysis || "", 
+      deep_analysis: theme.deep_analysis || theme.analysis || "",
       message_ids: (theme.message_ids || [])
         .map((sid: any) => idMap.get(sid.toString()))
         .filter((realId: any) => !!realId)
@@ -237,4 +335,26 @@ export interface ThemeResult {
   deep_analysis: string;
   message_ids: string[];
   sentiment: 'positive' | 'negative' | 'mixed' | 'neutral';
+  // New rigorous analysis fields
+  dataset_accounting?: {
+    total_signals: number;
+    assigned_to_themes: number;
+    unassigned: string | string[];
+    duplicates: string | string[];
+  };
+  latent_tensions?: Array<{
+    name: string;
+    deeper_pattern: string;
+    connected_themes: string[];
+    strategic_importance: string;
+    confidence: 'High' | 'Medium' | 'Low';
+  }>;
+  strengths?: Array<{
+    description: string;
+    evidence: string;
+  }>;
+  missed_areas?: Array<{
+    issue: string;
+    signal_id: string;
+  }>;
 }
