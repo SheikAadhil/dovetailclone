@@ -138,6 +138,11 @@ export async function POST(request: Request) {
         .single();
 
       if (insertError) {
+        // Handle duplicate key error gracefully - another request may have inserted
+        if (insertError.code === '23505') {
+          console.log('[Slack Events] Data point already exists (concurrent insert), skipping');
+          continue;
+        }
         console.error('[Slack Events] Error inserting data point:', insertError);
         continue;
       }
