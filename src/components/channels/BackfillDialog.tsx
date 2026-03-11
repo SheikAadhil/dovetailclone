@@ -48,7 +48,10 @@ export function BackfillDialog({ channelId, isOpen, onClose, onSuccess }: Backfi
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="rounded-[2.5rem] p-0 border-none shadow-2xl w-[98vw] max-w-6xl max-h-[85vh] flex flex-col overflow-hidden">
+      <DialogContent 
+        className="rounded-[2.5rem] p-0 border-none shadow-2xl !w-[95vw] !max-w-5xl !max-h-[90vh] flex flex-col overflow-hidden data-[slot=dialog-content]:!max-w-none data-[slot=dialog-content]:!max-h-[90vh]"
+        style={{ width: '95vw', maxWidth: '800px', maxHeight: '90vh' }}
+      >
         <div className="p-6 sm:p-10 pb-0">
           <DialogHeader className="mb-6">
             <div className="w-12 h-12 bg-indigo-50 rounded-2xl flex items-center justify-center text-indigo-600 mb-4 shadow-sm">
@@ -61,8 +64,8 @@ export function BackfillDialog({ channelId, isOpen, onClose, onSuccess }: Backfi
           </DialogHeader>
         </div>
 
-        <ScrollArea className="flex-1 min-h-0 px-6 sm:px-10">
-          <div className="py-2 space-y-6">
+        <ScrollArea className="flex-1 min-h-0 px-6 sm:px-10 overflow-auto">
+          <div className="py-2 space-y-6 pb-4">
             <div className="flex items-center gap-2 mb-2">
               <Calendar className="w-4 h-4 text-indigo-600" />
               <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Select Depth Scope</span>
