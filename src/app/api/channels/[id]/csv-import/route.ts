@@ -118,6 +118,11 @@ export async function POST(
 
   // Batch insert in chunks of 100
   const chunkSize = 100;
+  const vercelUrl = process.env.VERCEL_URL;
+  const appUrl = vercelUrl
+    ? `https://${vercelUrl}`
+    : (process.env.NEXT_PUBLIC_APP_URL || 'https://dovetailclone.vercel.app');
+
   for (let i = 0; i < dataPoints.length; i += chunkSize) {
     const chunk = dataPoints.slice(i, i + chunkSize);
     const { data: inserted } = await adminSupabase
@@ -128,7 +133,6 @@ export async function POST(
     // Trigger embeddings for each inserted row
     if (inserted) {
       inserted.forEach(dp => {
-        const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
         fetch(`${appUrl}/api/data-points/embed`, {
           method: 'POST',
           headers: {

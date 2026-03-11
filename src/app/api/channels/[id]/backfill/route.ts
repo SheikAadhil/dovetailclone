@@ -115,8 +115,11 @@ export async function POST(
     } while (cursor);
 
     // 6. Trigger embedding for new rows
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
-    
+    const vercelUrl = process.env.VERCEL_URL;
+    const appUrl = vercelUrl
+      ? `https://${vercelUrl}`
+      : (process.env.NEXT_PUBLIC_APP_URL || 'https://dovetailclone.vercel.app');
+
     newIds.forEach(id => {
       fetch(`${appUrl}/api/data-points/embed`, {
         method: 'POST',

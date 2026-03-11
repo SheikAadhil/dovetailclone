@@ -47,6 +47,11 @@ export async function POST(
   let importedCount = 0;
   const errors = [];
 
+  const vercelUrl = process.env.VERCEL_URL;
+  const appUrl = vercelUrl
+    ? `https://${vercelUrl}`
+    : (process.env.NEXT_PUBLIC_APP_URL || 'https://dovetailclone.vercel.app');
+
   // 2. Process each file
   for (const file of files) {
     try {
@@ -85,7 +90,6 @@ export async function POST(
 
       // Trigger embeddings
       if (inserted) {
-        const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
         fetch(`${appUrl}/api/data-points/embed`, {
           method: 'POST',
           headers: {

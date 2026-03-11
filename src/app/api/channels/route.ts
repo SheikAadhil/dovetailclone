@@ -83,7 +83,10 @@ export async function POST(request: Request) {
 
   // Trigger backfill if requested and channel connected
   if (backfillDays && slack_channel_id && slack_team_id) {
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+    const vercelUrl = process.env.VERCEL_URL;
+    const appUrl = vercelUrl
+      ? `https://${vercelUrl}`
+      : (process.env.NEXT_PUBLIC_APP_URL || 'https://dovetailclone.vercel.app');
     // Fire and forget
     fetch(`${appUrl}/api/channels/${channel.id}/backfill`, {
       method: 'POST',

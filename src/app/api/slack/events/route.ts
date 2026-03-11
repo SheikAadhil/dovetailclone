@@ -135,7 +135,11 @@ export async function POST(request: Request) {
         await supabase.rpc('increment_source_count', { source_uuid: src.id });
 
         // Trigger embed processing (fire and forget, don't fail if it errors)
-        const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://dovetailclone.vercel.app';
+        // Use VERCEL_URL if available, otherwise fall back to NEXT_PUBLIC_APP_URL
+        const vercelUrl = process.env.VERCEL_URL;
+        const appUrl = vercelUrl
+          ? `https://${vercelUrl}`
+          : (process.env.NEXT_PUBLIC_APP_URL || 'https://dovetailclone.vercel.app');
         fetch(`${appUrl}/api/data-points/embed`, {
           method: 'POST',
           headers: {

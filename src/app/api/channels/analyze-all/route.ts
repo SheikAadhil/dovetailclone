@@ -24,7 +24,10 @@ export async function GET(request: Request) {
 
   if (!channels) return NextResponse.json({ analyzed: 0 });
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+  const vercelUrl = process.env.VERCEL_URL;
+  const appUrl = vercelUrl
+    ? `https://${vercelUrl}`
+    : (process.env.NEXT_PUBLIC_APP_URL || 'https://dovetailclone.vercel.app');
   let analyzedCount = 0;
   let alertsCount = 0;
 
