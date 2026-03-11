@@ -7,33 +7,76 @@ export async function POST(request: Request) {
   const timestamp = request.headers.get('x-slack-request-timestamp');
   const signature = request.headers.get('x-slack-signature');
   
+  if (!process.env.SLACK_SIGNING_SECRET) {
+    console.error('[Slack Events] CRITICAL: SLACK_SIGNING_SECRET is not defined in environment variables');
+    return new NextResponse('Configuration error', { status: 500 });
+  }
+  
   if (!timestamp || !signature) return new NextResponse('Missing Slack headers', { status: 400 });
 
-  const isValid = verifySlackSignature(process.env.SLACK_SIGNING_SECRET!, rawBody, timestamp, signature);
-  if (!isValid) return new NextResponse('Invalid signature', { status: 401 });
+  const isValid = verifySlackSignature(process.env.SLACK_SIGNING_SECRET, rawBody, timestamp, signature);
+  if (!isValid) {
+    console.error('[Slack Events] Invalid signature detected. Check SLACK_SIGNING_SECRET.');
+    return new NextResponse('Invalid signature', { status: 401 });
+  }
 
   const body = JSON.parse(rawBody);
-  if (body.type === 'url_verification') return NextResponse.json({ challenge: body.challenge });
+  if (body.type === 'url_verification') {
+    console.log('[Slack Events] URL verification challenge received');
+    return NextResponse.json({ challenge: body.challenge });
+  }
+
+  console.log('[Slack Events] Event received:', body.type, body.event?.type, body.event?.subtype);
 
   if (body.event) {
     const event = body.event;
-    if (event.type !== 'message' || event.subtype || event.bot_id) {
+    
+    // Ignore bot messages and non-message events
+    if (event.type !== 'message') {
+      console.log('[Slack Events] Ignoring non-message event:', event.type);
+      return new NextResponse('Ok', { status: 200 });
+    }
+
+    if (event.bot_id) {
+      console.log('[Slack Events] Ignoring bot message:', event.bot_id);
+      return new NextResponse('Ok', { status: 200 });
+    }
+
+    // We allow some subtypes like file_share if they have text, but ignore message_deleted etc.
+    if (event.subtype && !['file_share', 'thread_broadcast'].includes(event.subtype)) {
+      console.log('[Slack Events] Ignoring message subtype:', event.subtype);
       return new NextResponse('Ok', { status: 200 });
     }
 
     const { text, user, ts, channel } = event;
+    console.log('[Slack Events] Processing message from channel:', channel, 'user:', user);
+
     const supabase = createSupabaseAdminClient();
     
     // Find ALL sources matching this slack_channel_id
     const { data: sources, error } = await supabase
       .from('channel_sources')
-      .select('id, channel_id, workspace_id, slack_team_id, source_label')
-      .eq('slack_channel_id', channel)
-      .eq('is_active', true);
+      .select('id, channel_id, workspace_id, slack_team_id, source_label, is_active')
+      .eq('slack_channel_id', channel);
 
-    if (error || !sources || sources.length === 0) return new NextResponse('Ok', { status: 200 });
+    if (error) {
+      console.error('[Slack Events] Database error finding sources:', error);
+      return new NextResponse('Error', { status: 500 });
+    }
+
+    if (!sources || sources.length === 0) {
+      console.log('[Slack Events] No active sources found for slack_channel_id:', channel);
+      return new NextResponse('Ok', { status: 200 });
+    }
+
+    console.log(`[Slack Events] Found ${sources.length} potential sources for channel ${channel}`);
 
     for (const src of sources) {
+      if (!src.is_active) {
+        console.log(`[Slack Events] Source ${src.id} is inactive, skipping.`);
+        continue;
+      }
+
       const { data: connection } = await supabase
         .from('slack_connections')
         .select('bot_token')
@@ -46,6 +89,8 @@ export async function POST(request: Request) {
         if (name) senderName = name;
       }
 
+      console.log(`[Slack Events] Inserting data point for channel_id: ${src.channel_id}, source: ${src.source_label}`);
+
       const { data: inserted, error: insertError } = await supabase
         .from('data_points')
         .insert({
@@ -55,7 +100,7 @@ export async function POST(request: Request) {
           source_id: src.id,
           source_label: src.source_label,
           external_id: ts,
-          content: text,
+          content: text || '',
           sender_name: senderName,
           sender_slack_id: user,
           slack_channel_id: channel,
@@ -64,7 +109,13 @@ export async function POST(request: Request) {
         .select('id')
         .single();
         
-      if (!insertError && inserted) {
+      if (insertError) {
+        console.error('[Slack Events] Error inserting data point:', insertError);
+        continue;
+      }
+
+      if (inserted) {
+        console.log('[Slack Events] Data point inserted successfully:', inserted.id);
         // Increment source count
         await supabase.rpc('increment_source_count', { source_uuid: src.id });
 
@@ -76,7 +127,7 @@ export async function POST(request: Request) {
             'Authorization': `Bearer ${process.env.CRON_SECRET}`
           },
           body: JSON.stringify({ dataPointId: inserted.id })
-        }).catch(err => console.error('Error triggering embed:', err));
+        }).catch(err => console.error('[Slack Events] Error triggering embed:', err));
       }
     }
   }
