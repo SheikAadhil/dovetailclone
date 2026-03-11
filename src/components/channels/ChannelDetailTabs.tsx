@@ -265,26 +265,6 @@ export function ChannelDetailTabs({ channel }: ChannelDetailTabsProps) {
     }
   };
 
-  const handleCopyTheme = async (theme: Theme) => {
-    try {
-      console.log("Copying theme:", theme.id, "from channel:", channel.id);
-      const res = await fetch(`/api/channels/${channel.id}/themes/${theme.id}/copy`, {
-        method: 'POST'
-      });
-      const data = await res.json();
-      console.log("Copy response:", res.status, data);
-      if (res.ok) {
-        alert("Theme copied successfully!");
-        fetchThemes();
-      } else {
-        alert(data.message || data.error || "Copy failed");
-      }
-    } catch (e) {
-      console.error("Copy error:", e);
-      alert("Copy failed");
-    }
-  };
-
   const handlePinTheme = async (theme: Theme) => {
     try {
       await fetch(`/api/channels/${channel.id}/themes/${theme.id}`, {
@@ -712,7 +692,6 @@ export function ChannelDetailTabs({ channel }: ChannelDetailTabsProps) {
                         onPin={handlePinTheme}
                         onMergeStart={startMerge}
                         onMergeSelect={handleMergeComplete}
-                        onCopy={handleCopyTheme}
                       />
                     ))}
                   </div>

@@ -23,7 +23,6 @@ interface ThemeCardProps {
   onPin: (theme: Theme) => void;
   onMergeStart: (theme: Theme) => void;
   onMergeSelect: (targetTheme: Theme) => void;
-  onCopy?: (theme: Theme) => void;
   isMergeSource?: boolean;
   mergeMode?: boolean;
 }
@@ -36,7 +35,6 @@ export function ThemeCard({
   onPin,
   onMergeStart,
   onMergeSelect,
-  onCopy,
   isMergeSource,
   mergeMode
 }: ThemeCardProps) {
@@ -104,11 +102,13 @@ export function ThemeCard({
               <DropdownMenuItem onClick={() => onPin(theme)} className="rounded-xl font-bold text-sm">
                 {theme.is_pinned ? <><PinOff className="w-4 h-4 mr-3 text-gray-400" /> Unpin</> : <><Pin className="w-4 h-4 mr-3 text-gray-400" /> Pin Theme</>}
               </DropdownMenuItem>
-              {onCopy && (
-                <DropdownMenuItem onClick={() => onCopy(theme)} className="rounded-xl font-bold text-sm">
-                  <Copy className="w-4 h-4 mr-3 text-gray-400" /> Copy Theme
-                </DropdownMenuItem>
-              )}
+              <DropdownMenuItem onClick={() => {
+                const textToCopy = `Theme: ${theme.name}\n\nSummary: ${theme.summary || theme.description || 'No summary'}`;
+                navigator.clipboard.writeText(textToCopy);
+                alert('Copied to clipboard!');
+              }} className="rounded-xl font-bold text-sm">
+                  <Copy className="w-4 h-4 mr-3 text-gray-400" /> Copy to Clipboard
+              </DropdownMenuItem>
               <DropdownMenuItem onClick={() => onEdit(theme)} className="rounded-xl font-bold text-sm">
                 <Pencil className="w-4 h-4 mr-3 text-gray-400" /> Edit Details
               </DropdownMenuItem>
