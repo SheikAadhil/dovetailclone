@@ -45,31 +45,31 @@ export default async function ChannelsPage() {
   }));
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold tracking-tight">Channels</h1>
+        <h1 className="text-2xl font-bold tracking-tight">Channels</h1>
         <Link href="/channels/new">
-          <Button>
-            <Plus className="mr-2 h-4 w-4" /> New Channel
+          <Button size="sm">
+            <Plus className="mr-1.5 h-3.5 w-3.5" /> New Channel
           </Button>
         </Link>
       </div>
 
       {channels.length === 0 ? (
-        <div className="flex flex-col items-center justify-center h-96 border-2 border-dashed rounded-lg bg-gray-50 text-center">
-          <div className="w-16 h-16 bg-gray-200 rounded-full flex items-center justify-center mb-4">
-            <Plus className="w-8 h-8 text-gray-500" />
+        <div className="flex flex-col items-center justify-center h-64 border-2 border-dashed rounded-lg bg-gray-50 text-center p-6">
+          <div className="w-12 h-12 bg-gray-200 rounded-full flex items-center justify-center mb-3">
+            <Plus className="w-6 h-6 text-gray-500" />
           </div>
-          <h2 className="text-xl font-semibold text-gray-900">No channels yet</h2>
-          <p className="text-gray-500 mt-2 max-w-sm">
-            Create your first channel to start monitoring Slack messages and extracting insights.
+          <h2 className="text-lg font-semibold text-gray-900">No channels yet</h2>
+          <p className="text-gray-500 text-sm mt-1 max-w-xs">
+            Create your first channel to start monitoring Slack messages.
           </p>
-          <Link href="/channels/new" className="mt-6">
-            <Button>Create your first channel</Button>
+          <Link href="/channels/new" className="mt-4">
+            <Button size="sm">Create your first channel</Button>
           </Link>
         </div>
       ) : (
-        <div className="grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
           {channels.map((channel: any) => (
             <ChannelCard key={channel.id} channel={channel} />
           ))}

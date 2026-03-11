@@ -63,30 +63,30 @@ export function ThemeCard({
   const neuPct = (neutral / total) * 100;
 
   return (
-    <Card className={`group flex flex-col h-full transition-all duration-300 border-gray-100 rounded-[2rem] overflow-hidden relative shadow-sm hover:shadow-xl hover:shadow-indigo-500/5 hover:-translate-y-1 ${
+    <Card className={`group flex flex-col h-full transition-all duration-200 border-gray-100 rounded-xl overflow-hidden relative shadow-sm hover:shadow-md ${
       isMergeSource ? 'ring-2 ring-indigo-500 ring-offset-2' : ''
     }`}>
       {isMergeSource && (
-        <div className="absolute top-4 left-4 bg-indigo-600 text-white text-[10px] font-black px-3 py-1 rounded-full z-10 uppercase tracking-[0.2em] shadow-lg shadow-indigo-200">
+        <div className="absolute top-3 left-3 bg-indigo-600 text-white text-[9px] font-semibold px-2 py-0.5 rounded-full z-10 uppercase tracking-wider shadow-md">
           Source
         </div>
       )}
 
-      <CardHeader className="pb-3 pt-6 px-6 flex flex-row items-start justify-between space-y-0">
+      <CardHeader className="pb-2 pt-4 px-4 flex flex-row items-start justify-between space-y-0">
         <div className="flex-1 min-w-0 pr-2">
-          <div className="flex items-center gap-2 mb-2">
+          <div className="flex items-center gap-1.5 mb-1.5">
             {theme.is_pinned && (
-              <div className="p-1.5 bg-indigo-50 rounded-xl">
-                <Pin className="w-3.5 h-3.5 text-indigo-600 fill-indigo-600" />
+              <div className="p-1 bg-indigo-50 rounded-md">
+                <Pin className="w-3 h-3 text-indigo-600 fill-indigo-600" />
               </div>
             )}
             {theme.is_manual && (
-              <Badge variant="outline" className="text-[10px] font-black h-5 px-2 uppercase border-orange-100 text-orange-600 bg-orange-50 rounded-lg">
+              <Badge variant="outline" className="text-[9px] font-medium h-5 px-1.5 uppercase border-orange-100 text-orange-600 bg-orange-50 rounded-md">
                 Manual
               </Badge>
             )}
           </div>
-          <CardTitle className="text-xl font-black text-gray-900 line-clamp-2 tracking-tight leading-tight group-hover:text-indigo-600 transition-colors">
+          <CardTitle className="text-base font-semibold text-gray-900 line-clamp-2 leading-snug group-hover:text-indigo-600 transition-colors">
             {theme.name}
           </CardTitle>
         </div>
@@ -94,16 +94,15 @@ export function ThemeCard({
         {!mergeMode && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="h-9 w-9 p-0 rounded-xl hover:bg-gray-100 text-gray-400">
-                <MoreHorizontal className="w-5 h-5" />
+              <Button variant="ghost" className="h-8 w-8 p-0 rounded-lg hover:bg-gray-100 text-gray-400">
+                <MoreHorizontal className="w-4 h-4" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-52 rounded-2xl border-gray-100 shadow-2xl p-2">
-              <DropdownMenuItem onClick={() => onPin(theme)} className="rounded-xl font-bold text-sm">
-                {theme.is_pinned ? <><PinOff className="w-4 h-4 mr-3 text-gray-400" /> Unpin</> : <><Pin className="w-4 h-4 mr-3 text-gray-400" /> Pin Theme</>}
+            <DropdownMenuContent align="end" className="w-44 rounded-xl border-gray-100 shadow-lg p-1.5">
+              <DropdownMenuItem onClick={() => onPin(theme)} className="rounded-lg font-medium text-xs">
+                {theme.is_pinned ? <><PinOff className="w-3.5 h-3.5 mr-2 text-gray-400" /> Unpin</> : <><Pin className="w-3.5 h-3.5 mr-2 text-gray-400" /> Pin</>}
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => {
-                // Build comprehensive text including all signals
                 let textToCopy = `THEME: ${theme.name}\n\n`;
                 textToCopy += `SUMMARY: ${theme.summary || theme.description || 'No summary'}\n\n`;
                 if (theme.description) {
@@ -112,7 +111,6 @@ export function ThemeCard({
                 textToCopy += `---\n\n`;
                 textToCopy += `SIGNALS (${theme.data_point_count || theme.data_points?.length || 0}):\n\n`;
 
-                // Add all signals
                 if (theme.data_points && theme.data_points.length > 0) {
                   theme.data_points.forEach((msg: any, index: number) => {
                     textToCopy += `[${index + 1}] ${msg.sender_name || 'Unknown'}\n`;
@@ -123,47 +121,47 @@ export function ThemeCard({
                 }
 
                 navigator.clipboard.writeText(textToCopy);
-                alert('Theme and all signals copied to clipboard!');
-              }} className="rounded-xl font-bold text-sm">
-                  <Copy className="w-4 h-4 mr-3 text-gray-400" /> Copy to Clipboard
+                alert('Copied to clipboard!');
+              }} className="rounded-lg font-medium text-xs">
+                  <Copy className="w-3.5 h-3.5 mr-2 text-gray-400" /> Copy
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => onEdit(theme)} className="rounded-xl font-bold text-sm">
-                <Pencil className="w-4 h-4 mr-3 text-gray-400" /> Edit Details
+              <DropdownMenuItem onClick={() => onEdit(theme)} className="rounded-lg font-medium text-xs">
+                <Pencil className="w-3.5 h-3.5 mr-2 text-gray-400" /> Edit
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => onMergeStart(theme)} className="rounded-xl font-bold text-sm">
-                <Merge className="w-4 h-4 mr-3 text-gray-400" /> Merge Themes
+              <DropdownMenuItem onClick={() => onMergeStart(theme)} className="rounded-lg font-medium text-xs">
+                <Merge className="w-3.5 h-3.5 mr-2 text-gray-400" /> Merge
               </DropdownMenuItem>
-              <DropdownMenuSeparator className="my-2 bg-gray-50" />
-              <DropdownMenuItem onClick={() => onDelete(theme.id)} className="rounded-xl font-bold text-sm text-red-600 focus:text-red-600 focus:bg-red-50">
-                <Trash2 className="w-4 h-4 mr-3" /> Delete Theme
+              <DropdownMenuSeparator className="my-1 bg-gray-50" />
+              <DropdownMenuItem onClick={() => onDelete(theme.id)} className="rounded-lg font-medium text-xs text-red-600 focus:text-red-600 focus:bg-red-50">
+                <Trash2 className="w-3.5 h-3.5 mr-2" /> Delete
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         )}
       </CardHeader>
 
-      <CardContent className="flex-1 pb-4 px-6 space-y-5">
-        <p className="text-sm text-gray-500 font-medium leading-relaxed line-clamp-3">
-          {theme.summary || theme.description || "No summary available for this synthesized signal."}
+      <CardContent className="flex-1 pb-3 px-4 space-y-3">
+        <p className="text-sm text-gray-500 font-medium leading-relaxed line-clamp-2">
+          {theme.summary || theme.description || "No summary available."}
         </p>
 
-        <div className="flex flex-wrap gap-2 pt-2">
-          <Badge variant="secondary" className="flex items-center gap-1.5 bg-gray-50 text-gray-600 border-none rounded-xl px-3 py-1 font-bold text-[11px]">
-            <MessageSquare className="w-3.5 h-3.5 text-gray-400" />
+        <div className="flex flex-wrap gap-1.5">
+          <Badge variant="secondary" className="flex items-center gap-1 bg-gray-50 text-gray-600 border-none rounded-md px-2 py-0.5 font-medium text-[10px]">
+            <MessageSquare className="w-3 h-3 text-gray-400" />
             {theme.data_point_count}
           </Badge>
-          <Badge variant="outline" className={`flex items-center gap-1.5 rounded-xl px-3 py-1 font-bold text-[11px] border ${sentimentColor}`}>
+          <Badge variant="outline" className={`flex items-center gap-1 rounded-md px-2 py-0.5 font-medium text-[10px] border ${sentimentColor}`}>
             {sentimentIcon}
             {sentimentLabel}
           </Badge>
         </div>
 
-        <div className="space-y-2">
-           <div className="flex items-center justify-between text-[10px] font-black text-gray-400 uppercase tracking-widest px-0.5">
-             <span>Sentiment Spectrum</span>
-             <span>{Math.round((positive/total)*100)}% Pos</span>
+        <div className="space-y-1.5">
+           <div className="flex items-center justify-between text-[9px] font-medium text-gray-400 uppercase tracking-wider px-0.5">
+             <span>Sentiment</span>
+             <span>{Math.round((positive/total)*100)}% pos</span>
            </div>
-           <div className="h-2 w-full flex rounded-full overflow-hidden bg-gray-100 p-0.5 border border-gray-50">
+           <div className="h-1.5 w-full flex rounded-full overflow-hidden bg-gray-100">
             {posPct > 0 && <div style={{ width: `${posPct}%` }} className="bg-green-400 rounded-full" />}
             {neuPct > 0 && <div style={{ width: `${neuPct}%` }} className="bg-gray-300 rounded-full mx-0.5" />}
             {negPct > 0 && <div style={{ width: `${negPct}%` }} className="bg-red-400 rounded-full" />}
@@ -171,32 +169,32 @@ export function ThemeCard({
         </div>
       </CardContent>
 
-      <CardFooter className="pt-4 pb-6 px-6 border-t border-gray-50 bg-gray-50/30">
+      <CardFooter className="pt-2 pb-3 px-4 border-t border-gray-50 bg-gray-50/30">
         {mergeMode ? (
           <Button 
             disabled={isMergeSource}
             onClick={() => onMergeSelect(theme)}
-            className={`w-full gap-2 rounded-2xl h-11 font-black uppercase tracking-widest text-[11px] transition-all shadow-lg ${
+            className={`w-full gap-1.5 rounded-lg h-9 font-medium text-xs transition-all ${
               isMergeSource 
                 ? 'bg-gray-100 text-gray-400 border-dashed border-2 shadow-none cursor-not-allowed' 
-                : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-100 hover:shadow-indigo-200'
+                : 'bg-indigo-600 hover:bg-indigo-700 text-white'
             }`}
           >
-            {isMergeSource ? "Merging Target" : <><CheckCircle2 className="w-4 h-4" /> Merge Here</>}
+            {isMergeSource ? "Target" : <><CheckCircle2 className="w-3.5 h-3.5" /> Merge Here</>}
           </Button>
         ) : (
           <div className="w-full flex items-center justify-between">
-            <span className="text-[10px] font-bold text-gray-400 flex items-center gap-1.5 uppercase tracking-wider">
+            <span className="text-[9px] font-medium text-gray-400 flex items-center gap-1 uppercase tracking-wider">
                <Clock className="w-3 h-3" />
                {formatDistanceToNow(new Date(theme.last_updated_at), { addSuffix: false })}
             </span>
             <Button 
               variant="ghost" 
-              className="text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50/50 p-0 h-auto font-black text-xs uppercase tracking-widest gap-2 group/btn" 
+              className="text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50/50 p-0 h-auto font-medium text-xs gap-1 group/btn" 
               onClick={() => onView(theme)}
             >
-              Analyze Messages
-              <ArrowRight className="w-4 h-4 transition-transform group-hover/btn:translate-x-1" />
+              View
+              <ArrowRight className="w-3.5 h-3.5 transition-transform group-hover/btn:translate-x-0.5" />
             </Button>
           </div>
         )}
