@@ -103,9 +103,27 @@ export function ThemeCard({
                 {theme.is_pinned ? <><PinOff className="w-4 h-4 mr-3 text-gray-400" /> Unpin</> : <><Pin className="w-4 h-4 mr-3 text-gray-400" /> Pin Theme</>}
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => {
-                const textToCopy = `Theme: ${theme.name}\n\nSummary: ${theme.summary || theme.description || 'No summary'}`;
+                // Build comprehensive text including all signals
+                let textToCopy = `THEME: ${theme.name}\n\n`;
+                textToCopy += `SUMMARY: ${theme.summary || theme.description || 'No summary'}\n\n`;
+                if (theme.description) {
+                  textToCopy += `DESCRIPTION: ${theme.description}\n\n`;
+                }
+                textToCopy += `---\n\n`;
+                textToCopy += `SIGNALS (${theme.data_point_count || theme.data_points?.length || 0}):\n\n`;
+
+                // Add all signals
+                if (theme.data_points && theme.data_points.length > 0) {
+                  theme.data_points.forEach((msg: any, index: number) => {
+                    textToCopy += `[${index + 1}] ${msg.sender_name || 'Unknown'}\n`;
+                    textToCopy += `${msg.content}\n\n`;
+                  });
+                } else {
+                  textToCopy += `No signals in this theme.\n`;
+                }
+
                 navigator.clipboard.writeText(textToCopy);
-                alert('Copied to clipboard!');
+                alert('Theme and all signals copied to clipboard!');
               }} className="rounded-xl font-bold text-sm">
                   <Copy className="w-4 h-4 mr-3 text-gray-400" /> Copy to Clipboard
               </DropdownMenuItem>
