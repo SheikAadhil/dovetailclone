@@ -11,32 +11,46 @@ const getOpenRouterClient = () => {
   });
 };
 
-// Optimized list: Gemini 2.0 Flash is much more reliable than Llama free models on OpenRouter
-const MODELS_TO_TRY = [
+// Optimized list: Qwen3 Next 80B for primary analysis, GLM-4.5-Air for review
+const PRIMARY_MODELS = [
+  "qwen/qwen3-next-80b-a3b-instruct:free",
   "google/gemini-2.0-flash-001",
   "meta-llama/llama-3.3-70b-instruct:free",
-  "mistralai/mistral-7b-instruct:free",
-  "meta-llama/llama-3.2-3b-instruct:free",
-  "google/gemma-3-27b-it:free"
+  "mistralai/mistral-7b-instruct:free"
 ];
 
-async function getCompletion(prompt: string) {
+const REVIEWER_MODELS = [
+  "z-ai/glm-4.5-air:free",
+  "google/gemini-2.0-flash-001"
+];
+
+// Fallback for single-model mode
+const FALLBACK_MODELS = [
+  "google/gemini-2.0-flash-001",
+  "meta-llama/llama-3.3-70b-instruct:free",
+  "mistralai/mistral-7b-instruct:free"
+];
+
+async function getCompletion(prompt: string, modelSet: 'primary' | 'reviewer' | 'fallback' = 'primary') {
+  const models = modelSet === 'primary' ? PRIMARY_MODELS :
+                modelSet === 'reviewer' ? REVIEWER_MODELS :
+                FALLBACK_MODELS;
+
   const client = getOpenRouterClient();
   if (!process.env.OPENROUTER_API_KEY) throw new Error("OPENROUTER_API_KEY is missing");
 
   let lastError: any;
-  for (const model of MODELS_TO_TRY) {
+  for (const model of models) {
     try {
-      console.log(`Trying model: ${model}`);
+      console.log(`Trying model: ${model} (${modelSet} set)`);
       return await client.chat.completions.create({
         model: model,
         messages: [{ role: "user", content: prompt }],
-        // We disable strict JSON mode here to prevent 400 errors from picky providers
       });
     } catch (error: any) {
       console.warn(`Model ${model} failed: ${error.message}`);
       lastError = error;
-      continue; 
+      continue;
     }
   }
   throw lastError || new Error("All models failed");
@@ -80,139 +94,176 @@ export async function analyzeThemesLayer1(messages: { id: string; content: strin
 
   const contextPart = aiContext ? `\nUSER-PROVIDED CONTEXT:\n${aiContext}\n` : '';
 
-  const prompt = `You are a strict product-insight synthesis engine.
+  const prompt = `You are a rigorous qualitative analysis engine for mixed-source signal analysis.
 
-Your job is to analyze a set of user signals and produce a complete, auditable theme report.
+Your job is to analyze a dataset of signals and produce a complete, auditable theme analysis.
 
-Your highest priority is coverage accuracy, not elegant storytelling.
+You must behave like a disciplined qualitative analyst, not a generic summarizer.
 
-CORE FAILURE TO AVOID
+This prompt supports a two-stage workflow:
+- Stage 1: First-pass analysis, coding, clustering, and theme generation
+- Stage 2: Review, audit, challenge, and correction of the first-pass output
 
-Do not produce a clean-looking summary by silently dropping signals.
-
-If a signal does not fit a major theme, it must still appear as either:
-- an isolated issue
-- a positive strength
-- an unrepresented signal that needs review
+You are performing STAGE 1: PRIMARY ANALYSIS.
 
 ${contextPart}
 
-### WORKFLOW
+==================================================
+GLOBAL RULES
+==================================================
 
-STEP 1: BUILD A SIGNAL LEDGER FIRST
-Before writing any themes, create a hidden ledger with one row per signal.
+1. Coverage first
+- Every signal must be represented exactly once in the primary analysis layer.
+- Every signal must end up in one of:
+  - top-level theme
+  - isolated issue
+  - positive strength
+  - unassigned / ambiguous
+- Never silently omit a signal.
 
-Each signal must be assigned to exactly one of these buckets:
-1. Top-level theme
-2. Isolated issue
-3. Positive strength
-4. Unrepresented / needs review
+2. Code before theming
+- Do not jump directly to themes.
+- Move through this sequence: signal -> code -> category -> theme
 
-Rules:
-- Every signal must appear in the ledger.
-- No signal may appear twice in top-level themes.
-- No signal may disappear.
-- If unsure, place it in "Unrepresented / needs review" rather than forcing a weak theme fit.
+3. Evidence before interpretation
+- Every theme must be supported by real evidence from the dataset.
 
-STEP 2: VALIDATE THE LEDGER
-Silently validate:
-- total input signals = total ledger rows
-- total input signals = top-level theme signals + isolated issues + strengths + unrepresented
-- duplicated signals = 0
-- missing signals = 0
+4. Theme count must be data-derived
+- Do not impose any fixed limit on the number of themes.
+- Return as many themes as the evidence supports.
+- Do not compress distinct issues just to make the output shorter.
 
-If validation fails, revise before writing any prose.
+5. Distinguish analytical levels
+- Codes are close to the data.
+- Categories group related codes.
+- Themes explain broader patterns of shared meaning.
+- Latent tensions explain deeper cross-theme dynamics.
 
-STEP 3: DERIVE TOP-LEVEL THEMES
-Create top-level themes only from signals that clearly belong together.
-
-Top-level themes must be:
-- distinct
-- product-actionable
-- understandable in a roadmap review
-- supported by direct evidence
-
-Do not over-compress the taxonomy.
-If keeping fewer themes causes important issues to vanish, use more themes.
-
-STEP 4: PRESERVE IMPORTANT DISTINCTIONS
-Do not collapse these unless the evidence strongly supports it:
-- theme quality vs traceability
+6. Preserve important distinctions when supported by data
+- theme quality vs trust/traceability
 - privacy/governance vs permissions/access
-- integration/import friction vs export/sharing friction
+- import/integration friction vs export/sharing friction
+- onboarding vs ongoing usability
 - actionability vs workflow confusion
 - role-based needs vs automation/manual-control tension
-- cross-source deduplication vs general integration
-- onboarding vs ongoing usability
-- pricing for experimentation vs other complaints
-- positive strengths vs pain points
-- analyst-control features (rename/merge/split) vs generic AI quality issues
 
-STEP 5: HANDLE SINGLETONS CORRECTLY
-If a pattern has only one signal:
-- do not automatically inflate it into a major theme
-- place it in "Isolated issues" if it is real but weakly represented
-- keep it visible
-- recommend monitoring or targeted fixes
+7. Preserve strengths
+- If the dataset contains positive signals, include them explicitly.
 
-STEP 6: DO NOT HIDE STRENGTHS
-If the dataset contains positive signals, include them in a "Strengths" section.
-Do not produce a pain-only report.
+8. Handle weak evidence honestly
+- If a pattern has only one signal, treat it as an isolated issue unless highly consequential.
 
-STEP 7: LATENT THEMES ONLY AFTER COVERAGE IS COMPLETE
-Deep themes must synthesize the top-level themes.
-They must not be used to rescue signals that were omitted from the top-level layer.
-If a deep theme contains an issue missing from top-level themes, fix the top-level themes first.
+9. Avoid narrative inflation
+- Prefer plain, product-usable names.
 
-STEP 8: NAME THEMES PLAINLY
-Use simple names.
-Good:
-- Export traceability issues
-- Low trust in AI-generated themes
-- Regional filtering limitations
+==================================================
+STAGE 1: PRIMARY ANALYSIS
+==================================================
 
-Bad:
-- The burden of validation
-- systemic opacity of informational abstraction
+PHASE 1: DATASET FAMILIARIZATION
+- Read all signals before finalizing any themes.
+- Note source mix, role mix, context, contradictions, and outliers.
 
-STEP 9: RECOMMENDATIONS MUST MATCH EVIDENCE
-For each top-level theme, give:
-- one clear product implication
-- one proportional recommendation
-- recommendation type:
-  - UX fix
-  - IA/content fix
-  - model/AI improvement
-  - integration/platform fix
-  - trust/governance fix
-  - pricing/packaging fix
+PHASE 2: SIGNAL LEDGER
+Build a ledger with one row per signal containing:
+- signal_id
+- short paraphrase
+- source
+- primary issue
+- signal type: pain point / request / workaround / concern / strength / ambiguity
 
-Do not recommend a broad platform redesign from one weak signal.
+PHASE 3: FIRST-CYCLE CODING
+For each signal, create:
+- primary code
+- optional secondary code(s)
+- short evidence note
 
-### OUTPUT FORMAT
+PHASE 4: CODE CONSOLIDATION
+- merge duplicates
+- separate look-alike codes with different meanings
+- identify positive codes separately
 
-Respond with JSON:
+PHASE 5: CATEGORY BUILDING
+Group codes into higher-order categories.
+
+PHASE 6: TOP-LEVEL THEMES
+Construct top-level themes from categories.
+
+Each theme must include:
+- name
+- definition
+- signal_ids
+- message count
+- why these signals belong together
+- representative evidence
+- user/team need
+- implication
+- recommendation
+- recommendation type
+- confidence
+
+PHASE 7: STRENGTHS / ISOLATED ISSUES / UNASSIGNED
+- strengths
+- isolated issues
+- unassigned / ambiguous signals
+
+PHASE 8: LATENT TENSIONS
+After top-level themes, identify cross-theme tensions.
+
+PHASE 9: REVIEWER HANDOFF
+Provide a section called REVIEWER_HANDOFF containing:
+- top concerns about your own analysis
+- themes that may be over-merged
+- ambiguous signals needing challenge
+- possible rival interpretations
+
+==================================================
+OUTPUT FORMAT
+==================================================
+
+Return output in this structure:
 
 {
-  "coverage_report": {
+  "dataset_accounting": {
     "total_signals": 0,
+    "represented_signals": 0,
     "signals_in_top_level_themes": 0,
-    "signals_in_isolated_issues": 0,
     "signals_in_strengths": 0,
-    "signals_in_unrepresented": 0,
-    "missing_signals": "none" or ["id1"],
-    "duplicated_signals": "none" or ["id1"]
+    "signals_in_isolated_issues": 0,
+    "signals_in_unassigned": 0,
+    "duplicated_signals": "none" or ["id1"],
+    "missing_signals": "none" or ["id1"]
   },
+  "first_cycle_coding": [
+    {
+      "signal_id": "1",
+      "paraphrase": "short summary",
+      "source": "slack/csv/markdown",
+      "primary_code": "code name",
+      "secondary_codes": ["code1"],
+      "notes": "evidence note"
+    }
+  ],
+  "categories": [
+    {
+      "name": "Category name",
+      "signal_ids": ["1"],
+      "codes": ["code1"],
+      "why_grouped": "reason",
+      "evidence_strength": "strong" | "moderate" | "weak"
+    }
+  ],
   "top_level_themes": [
     {
       "name": "Theme name",
       "definition": "1-2 sentence definition",
       "signal_ids": ["1", "2"],
       "message_count": 0,
-      "why_together": "why these signals belong together",
-      "evidence": ["excerpt 1", "excerpt 2"],
-      "user_need": "what users need",
-      "product_implication": "what this means for product",
+      "supporting_categories": ["category1"],
+      "representative_evidence": ["excerpt 1", "excerpt 2"],
+      "why_this_is_one_theme": "reason",
+      "user_team_need": "what users need",
+      "implication": "product implication",
       "recommendation": "specific recommendation",
       "recommendation_type": "UX fix" | "IA/content fix" | "model/AI improvement" | "integration/platform fix" | "trust/governance fix" | "pricing/packaging fix",
       "confidence": "High" | "Medium" | "Low"
@@ -223,55 +274,58 @@ Respond with JSON:
       "name": "Strength name",
       "signal_ids": ["1"],
       "why_it_matters": "strategic importance",
-      "how_to_preserve": "how to maintain or expand this strength"
+      "preserve_expand_note": "how to preserve"
     }
   ],
   "isolated_issues": [
     {
       "name": "Issue name",
       "signal_ids": ["1"],
-      "why_not_elevated": "why it was not elevated into a broader theme",
-      "what_to_monitor": "monitoring guidance"
+      "why_not_elevated": "why it was not elevated",
+      "monitoring_note": "what to monitor"
     }
   ],
-  "unrepresented_needs_review": [
+  "unassigned_ambiguous": [
     {
       "signal_id": "1",
-      "signal_content": "the actual signal content",
-      "reason": "why it could not be confidently grouped"
+      "reason": "why unresolved"
     }
   ],
   "latent_tensions": [
     {
       "name": "Tension name",
-      "connected_themes": ["theme1", "theme2"],
-      "deeper_pattern": "what deeper pattern it explains",
-      "strategic_importance": "why it matters strategically",
+      "connected_themes": ["theme1"],
+      "deeper_pattern": "what deeper pattern",
+      "strategic_implication": "why it matters",
       "confidence": "High" | "Medium" | "Low"
     }
-  ]
+  ],
+  "reviewer_handoff": {
+    "likely_weak_spots": ["concern1"],
+    "possible_over_merges": ["theme1"],
+    "signals_needing_challenge": ["1"],
+    "rival_interpretations": ["interpretation1"],
+    "confidence_risks": ["risk1"]
+  }
 }
 
-### FINAL QUALITY GATE
-Before finalizing, silently answer:
+### FINAL SELF-CHECK
+Before finalizing, silently verify:
 - Did I account for every signal?
+- Did I code before theming?
 - Did I avoid double-counting?
 - Did I preserve important distinctions?
-- Did I keep strengths visible?
-- Did I avoid using deep themes to hide top-level omissions?
-- Did I avoid turning weak evidence into big narratives?
+- Did I include strengths?
+- Did I avoid over-compressing the theme set?
+- Did I clearly separate top-level themes from latent tensions?
+- Did I let the number of themes emerge from the data?
 
-If any answer is "no," revise before output.
-
-FINAL INSTRUCTION
-Optimize for complete, decision-grade synthesis.
-Do not optimize for fewer themes.
-A slightly longer but fully auditable report is better than a neat but incomplete one.
+FINAL VALIDATION RULE: If more than 0 signals are missing from the ledger, the analysis is invalid.
 
 ### DATASET (MESSAGES):
 ${JSON.stringify(simplifiedMessages)}`;
 
-  return await performAnalysis(prompt, idMap);
+  return await performAnalysis(prompt, idMap, 'primary');
 }
 
 export async function analyzeThemesLayer2(messages: { id: string; content: string }[], aiContext?: string | null): Promise<ThemeResult[]> {
@@ -310,42 +364,59 @@ JSON SCHEMA: {
   ] 
 }
 
-### DATASET (MESSAGES): 
+### DATASET (MESSAGES):
 ${JSON.stringify(simplifiedMessages)}`;
 
-  return await performAnalysis(prompt, idMap);
+  return await performAnalysis(prompt, idMap, 'reviewer');
 }
 
-async function performAnalysis(prompt: string, idMap: Map<string, string>): Promise<ThemeResult[]> {
+async function performAnalysis(prompt: string, idMap: Map<string, string>, modelSet: 'primary' | 'reviewer' | 'fallback' = 'primary'): Promise<ThemeResult[]> {
   try {
-    const response = await getCompletion(prompt);
+    const response = await getCompletion(prompt, modelSet);
     const text = response.choices[0].message.content || "{}";
     const parsed = extractJson(text);
 
-    // Handle new format with coverage_report and top_level_themes
+    // Handle two-stage workflow format with top_level_themes
     if (parsed.top_level_themes && Array.isArray(parsed.top_level_themes)) {
       const finalThemes = parsed.top_level_themes.map((theme: any) => ({
         name: theme.name,
         summary: theme.definition || theme.summary || "",
-        deep_analysis: theme.product_implication || theme.recommendation || "",
+        deep_analysis: theme.implication || theme.product_implication || theme.recommendation || "",
         message_ids: (theme.signal_ids || theme.message_ids || [])
           .map((sid: any) => idMap.get(sid.toString()))
           .filter((realId: any) => !!realId),
         sentiment: theme.sentiment || 'neutral',
         message_count: theme.message_count,
-        why_together: theme.why_together,
-        evidence: theme.evidence,
-        user_need: theme.user_need,
-        product_implication: theme.product_implication,
+        why_together: theme.why_this_is_one_theme || theme.why_together,
+        evidence: theme.representative_evidence || theme.evidence,
+        user_need: theme.user_team_need || theme.user_need,
+        product_implication: theme.implication || theme.product_implication,
+        implication: theme.implication,
         recommendation: theme.recommendation,
         recommendation_type: theme.recommendation_type,
         confidence: theme.confidence,
-        // Coverage report
-        coverage_report: parsed.coverage_report || parsed.coverage_check,
+        supporting_categories: theme.supporting_categories,
+        representative_evidence: theme.representative_evidence,
+        // Two-stage workflow fields
+        dataset_accounting: parsed.dataset_accounting,
+        first_cycle_coding: parsed.first_cycle_coding,
+        categories: parsed.categories,
+        reviewer_handoff: parsed.reviewer_handoff,
+        // Coverage reports
+        coverage_report: parsed.dataset_accounting ? {
+          total_signals: parsed.dataset_accounting.total_signals,
+          signals_in_top_level_themes: parsed.dataset_accounting.signals_in_top_level_themes,
+          signals_in_isolated_issues: parsed.dataset_accounting.signals_in_isolated_issues,
+          signals_in_strengths: parsed.dataset_accounting.signals_in_strengths,
+          signals_in_unrepresented: parsed.dataset_accounting.signals_in_unassigned,
+          missing_signals: parsed.dataset_accounting.missing_signals,
+          duplicated_signals: parsed.dataset_accounting.duplicated_signals,
+        } : (parsed.coverage_report || parsed.coverage_check),
         // Additional sections
         latent_tensions: parsed.latent_tensions,
         strengths: parsed.strengths,
         isolated_issues: parsed.isolated_issues,
+        unassigned_ambiguous: parsed.unassigned_ambiguous,
         unrepresented_needs_review: parsed.unrepresented_needs_review
       }));
       return finalThemes;
@@ -373,7 +444,7 @@ export async function analyzeSentiment(content: string): Promise<'positive' | 'n
   const systemPrompt = "Classify the sentiment of the message as exactly one word: positive, negative, or neutral.";
   const userPrompt = `Message: "${content}"`;
   try {
-    const response = await getCompletion(`${systemPrompt}\n\nINPUT: ${userPrompt}`);
+    const response = await getCompletion(`${systemPrompt}\n\nINPUT: ${userPrompt}`, 'fallback');
     const result = response.choices[0].message.content?.trim().toLowerCase();
     if (result?.includes('positive')) return 'positive';
     if (result?.includes('negative')) return 'negative';
@@ -395,7 +466,7 @@ JSON SCHEMA: { "topics": [ { "name": "Topic Name", "description": "Max 200 chars
   const userPrompt = `Based on these developed themes, suggest high-level Topics:\n${JSON.stringify(themes)}`;
 
   try {
-    const response = await getCompletion(`${systemPrompt}\n\nINPUT: ${userPrompt}`);
+    const response = await getCompletion(`${systemPrompt}\n\nINPUT: ${userPrompt}`, 'fallback');
     const text = response.choices[0].message.content || "{}";
     const parsed = extractJson(text);
     return parsed.topics || [];
@@ -408,14 +479,14 @@ JSON SCHEMA: { "topics": [ { "name": "Topic Name", "description": "Max 200 chars
 export async function classifyThemesIntoTopics(themes: { id: string; name: string; summary: string }[], topics: { id: string; name: string; description: string | null }[]): Promise<{ theme_id: string; topic_id: string | null }[]> {
   if (themes.length === 0 || topics.length === 0) return [];
 
-  const systemPrompt = `You are classifying themes into topics. 
+  const systemPrompt = `You are classifying themes into topics.
 Assign each theme to the most appropriate topic ID from the list. If none fit, use null.
 Respond ONLY with a JSON array: [ { "theme_id": "...", "topic_id": "..." } ]`;
 
   const userPrompt = `TOPICS:\n${JSON.stringify(topics)}\n\nTHEMES:\n${JSON.stringify(themes)}`;
 
   try {
-    const response = await getCompletion(`${systemPrompt}\n\nINPUT: ${userPrompt}`);
+    const response = await getCompletion(`${systemPrompt}\n\nINPUT: ${userPrompt}`, 'fallback');
     const text = response.choices[0].message.content || "[]";
     const parsed = extractJson(text);
     return Array.isArray(parsed) ? parsed : [];
@@ -431,6 +502,40 @@ export interface ThemeResult {
   deep_analysis: string;
   message_ids: string[];
   sentiment: 'positive' | 'negative' | 'mixed' | 'neutral';
+
+  // Two-stage workflow fields
+  dataset_accounting?: {
+    total_signals: number;
+    represented_signals: number;
+    signals_in_top_level_themes: number;
+    signals_in_strengths: number;
+    signals_in_isolated_issues: number;
+    signals_in_unassigned: number;
+    duplicated_signals: string | string[];
+    missing_signals: string | string[];
+  };
+  first_cycle_coding?: Array<{
+    signal_id: string;
+    paraphrase: string;
+    source: string;
+    primary_code: string;
+    secondary_codes?: string[];
+    notes?: string;
+  }>;
+  categories?: Array<{
+    name: string;
+    signal_ids: string[];
+    codes: string[];
+    why_grouped: string;
+    evidence_strength: 'strong' | 'moderate' | 'weak';
+  }>;
+  reviewer_handoff?: {
+    likely_weak_spots?: string[];
+    possible_over_merges?: string[];
+    signals_needing_challenge?: string[];
+    rival_interpretations?: string[];
+    confidence_risks?: string[];
+  };
   // Coverage report (new format)
   coverage_report?: {
     total_signals: number;
@@ -455,16 +560,21 @@ export interface ThemeResult {
   why_together?: string;
   evidence?: string[];
   user_need?: string;
+  user_team_need?: string;
   product_implication?: string;
+  implication?: string;
   recommendation?: string;
   recommendation_type?: 'UX fix' | 'IA/content fix' | 'model/AI improvement' | 'integration/platform fix' | 'trust/governance fix' | 'pricing/packaging fix';
   confidence?: 'High' | 'Medium' | 'Low';
+  supporting_categories?: string[];
+  representative_evidence?: string[];
   // Additional sections
   latent_tensions?: Array<{
     name: string;
     deeper_pattern?: string;
     connected_themes: string[];
     strategic_importance?: string;
+    strategic_implication?: string;
     strategic_meaning?: string;
     confidence: 'High' | 'Medium' | 'Low';
   }>;
@@ -476,6 +586,7 @@ export interface ThemeResult {
     why_it_matters?: string;
     evidence?: string;
     how_to_preserve?: string;
+    preserve_expand_note?: string;
   }>;
   isolated_issues?: Array<{
     name?: string;
@@ -484,8 +595,13 @@ export interface ThemeResult {
     why_not_grouped?: string;
     why_not_elevated?: string;
     what_to_monitor?: string;
+    monitoring_note?: string;
     reason_not_elevated?: string;
     signal_id?: string;
+  }>;
+  unassigned_ambiguous?: Array<{
+    signal_id: string;
+    reason: string;
   }>;
   unrepresented_needs_review?: Array<{
     signal_id: string;
