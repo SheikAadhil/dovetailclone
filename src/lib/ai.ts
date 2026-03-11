@@ -14,32 +14,39 @@ const getOpenRouterClient = () => {
 // Get models from environment variables, with fallbacks
 const getPrimaryModels = (): string[] => {
   const envModel = process.env.PRIMARY_MODEL;
-  if (envModel) return [envModel];
-  return [
-    "qwen/qwen3-next-80b-a3b-instruct:free",
+  const fallbacks = [
     "google/gemini-2.0-flash-001",
     "meta-llama/llama-3.3-70b-instruct:free",
     "mistralai/mistral-7b-instruct:free"
+  ];
+  if (envModel) return [envModel, ...fallbacks];
+  return [
+    "qwen/qwen3-next-80b-a3b-instruct:free",
+    ...fallbacks
   ];
 };
 
 const getReviewerModels = (): string[] => {
   const envModel = process.env.REVIEWER_MODEL;
-  if (envModel) return [envModel];
+  const fallbacks = [
+    "google/gemini-2.0-flash-001"
+  ];
+  if (envModel) return [envModel, ...fallbacks];
   return [
     "z-ai/glm-4.5-air:free",
-    "google/gemini-2.0-flash-001"
+    ...fallbacks
   ];
 };
 
 const getFallbackModels = (): string[] => {
   const envModel = process.env.FALLBACK_MODEL;
-  if (envModel) return [envModel];
-  return [
+  const fallbacks = [
     "google/gemini-2.0-flash-001",
     "meta-llama/llama-3.3-70b-instruct:free",
     "mistralai/mistral-7b-instruct:free"
   ];
+  if (envModel) return [envModel, ...fallbacks];
+  return fallbacks;
 };
 
 async function getCompletion(prompt: string, modelSet: 'primary' | 'reviewer' | 'fallback' = 'primary') {
