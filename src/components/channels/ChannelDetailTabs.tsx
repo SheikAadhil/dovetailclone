@@ -752,7 +752,6 @@ export function ChannelDetailTabs({ channel }: ChannelDetailTabsProps) {
                         onPin={handlePinTheme}
                         onMergeStart={startMerge}
                         onMergeSelect={handleMergeComplete}
-                        onCopy={handleCopyTheme}
                         mergeMode={mergeMode}
                         isMergeSource={mergeSource?.id === theme.id}
                       />
