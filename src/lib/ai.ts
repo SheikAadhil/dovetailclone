@@ -11,30 +11,39 @@ const getOpenRouterClient = () => {
   });
 };
 
-// Optimized list: Qwen3 Next 80B for primary analysis, GLM-4.5-Air for review
-const PRIMARY_MODELS = [
-  "qwen/qwen3-next-80b-a3b-instruct:free",
-  "google/gemini-2.0-flash-001",
-  "meta-llama/llama-3.3-70b-instruct:free",
-  "mistralai/mistral-7b-instruct:free"
-];
+// Get models from environment variables, with fallbacks
+const getPrimaryModels = (): string[] => {
+  const envModel = process.env.PRIMARY_MODEL;
+  if (envModel) return [envModel];
+  return [
+    "qwen/qwen3-next-80b-a3b-instruct:free",
+    "google/gemini-2.0-flash-001",
+    "meta-llama/llama-3.3-70b-instruct:free",
+    "mistralai/mistral-7b-instruct:free"
+  ];
+};
 
-const REVIEWER_MODELS = [
-  "z-ai/glm-4.5-air:free",
-  "google/gemini-2.0-flash-001"
-];
+const getReviewerModels = (): string[] => {
+  return [
+    "z-ai/glm-4.5-air:free",
+    "google/gemini-2.0-flash-001"
+  ];
+};
 
-// Fallback for single-model mode
-const FALLBACK_MODELS = [
-  "google/gemini-2.0-flash-001",
-  "meta-llama/llama-3.3-70b-instruct:free",
-  "mistralai/mistral-7b-instruct:free"
-];
+const getFallbackModels = (): string[] => {
+  const envModel = process.env.FALLBACK_MODEL;
+  if (envModel) return [envModel];
+  return [
+    "google/gemini-2.0-flash-001",
+    "meta-llama/llama-3.3-70b-instruct:free",
+    "mistralai/mistral-7b-instruct:free"
+  ];
+};
 
 async function getCompletion(prompt: string, modelSet: 'primary' | 'reviewer' | 'fallback' = 'primary') {
-  const models = modelSet === 'primary' ? PRIMARY_MODELS :
-                modelSet === 'reviewer' ? REVIEWER_MODELS :
-                FALLBACK_MODELS;
+  const models = modelSet === 'primary' ? getPrimaryModels() :
+                modelSet === 'reviewer' ? getReviewerModels() :
+                getFallbackModels();
 
   const client = getOpenRouterClient();
   if (!process.env.OPENROUTER_API_KEY) throw new Error("OPENROUTER_API_KEY is missing");
