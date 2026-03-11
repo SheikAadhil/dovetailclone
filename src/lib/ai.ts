@@ -95,13 +95,14 @@ ${contextPart}
 
 2. OUTPUT FORMAT (MANDATORY):
 You MUST include a dataset accounting section in your response:
-```
+
+[JSON STRUCTURE EXAMPLE]
 ## A. Dataset Accounting
 - Total signals: [EXACT COUNT]
 - Assigned to top-level themes: [MUST EQUAL TOTAL]
 - Unassigned: none (or list any that couldn't be assigned)
 - Duplicates: none (or list any duplicates)
-```
+[/JSON STRUCTURE EXAMPLE]
 
 3. THEME OUTPUT FORMAT (MANDATORY):
 For each theme, include:
