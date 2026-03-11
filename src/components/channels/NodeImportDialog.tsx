@@ -187,7 +187,7 @@ export function NodeImportDialog({ channelId, isOpen, onClose, onSuccess }: Node
         </ScrollArea>
 
         <div className="p-10 pt-4 border-t border-gray-50 bg-gray-50/30 shrink-0">
-          <DialogFooter className="gap-3 sm:justify-start flex-col sm:flex-row">
+          <div className="flex flex-col sm:flex-row gap-3 sm:justify-start">
             {step === "success" ? (
               <Button onClick={handleClose} className="rounded-2xl h-14 px-10 bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs uppercase tracking-widest shadow-xl shadow-indigo-100 w-full">
                 Return to Dashboard
@@ -203,7 +203,7 @@ export function NodeImportDialog({ channelId, isOpen, onClose, onSuccess }: Node
                 </Button>
               </>
             )}
-          </DialogFooter>
+          </div>
         </div>
       </DialogContent>
     </Dialog>

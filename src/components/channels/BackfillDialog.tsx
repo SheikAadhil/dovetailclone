@@ -92,8 +92,8 @@ export function BackfillDialog({ channelId, isOpen, onClose, onSuccess }: Backfi
           </div>
         </ScrollArea>
 
-        <div className="p-6 sm:p-10 pt-4 border-t border-gray-50 bg-gray-50/30">
-          <DialogFooter className="gap-3 sm:justify-start flex-col sm:flex-row">
+        <div className="p-6 sm:p-10 pt-4 border-t border-gray-50 bg-gray-50/30 shrink-0">
+          <div className="flex flex-col sm:flex-row gap-3 sm:justify-start">
             <Button variant="outline" onClick={onClose} disabled={loading} className="rounded-2xl h-12 sm:h-14 px-8 font-black text-xs uppercase tracking-widest border-gray-200 bg-white w-full sm:w-auto">
               Cancel
             </Button>
@@ -101,7 +101,7 @@ export function BackfillDialog({ channelId, isOpen, onClose, onSuccess }: Backfi
               {loading ? <Loader2 className="w-5 h-5 animate-spin mr-3" /> : <History className="w-5 h-5 mr-3" />}
               Execute Sync
             </Button>
-          </DialogFooter>
+          </div>
         </div>
       </DialogContent>
     </Dialog>

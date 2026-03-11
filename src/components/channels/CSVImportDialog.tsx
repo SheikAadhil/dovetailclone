@@ -203,22 +203,24 @@ export function CSVImportDialog({ channelId, isOpen, onClose, onSuccess }: CSVIm
           )}
         </div>
 
-        <DialogFooter className="p-6 border-t bg-gray-50/50">
-          {step === 2 && (
-            <>
-              <Button variant="ghost" onClick={() => setStep(1)} disabled={loading}>
-                <ChevronLeft className="w-4 h-4 mr-2" /> Back
-              </Button>
-              <Button onClick={handleImport} disabled={loading || !contentCol} className="bg-indigo-600">
-                {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Plus className="w-4 h-4 mr-2" />}
-                Import {previewData.row_count} rows
-              </Button>
-            </>
-          )}
-          {step === 3 && (
-            <Button onClick={onClose} className="w-full">Close</Button>
-          )}
-        </DialogFooter>
+        <div className="p-6 border-t bg-gray-50/50 shrink-0">
+          <div className="flex gap-3 justify-end">
+            {step === 2 && (
+              <>
+                <Button variant="ghost" onClick={() => setStep(1)} disabled={loading}>
+                  <ChevronLeft className="w-4 h-4 mr-2" /> Back
+                </Button>
+                <Button onClick={handleImport} disabled={loading || !contentCol} className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold">
+                  {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Plus className="w-4 h-4 mr-2" />}
+                  Import {previewData.row_count} rows
+                </Button>
+              </>
+            )}
+            {step === 3 && (
+              <Button onClick={onClose} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold">Close</Button>
+            )}
+          </div>
+        </div>
       </DialogContent>
     </Dialog>
   );
