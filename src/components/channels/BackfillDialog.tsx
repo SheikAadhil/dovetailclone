@@ -61,7 +61,7 @@ export function BackfillDialog({ channelId, isOpen, onClose, onSuccess }: Backfi
           </DialogHeader>
         </div>
 
-        <ScrollArea className="flex-1 px-6 sm:px-10">
+        <ScrollArea className="flex-1 min-h-0 px-6 sm:px-10">
           <div className="py-2 space-y-6">
             <div className="flex items-center gap-2 mb-2">
               <Calendar className="w-4 h-4 text-indigo-600" />
