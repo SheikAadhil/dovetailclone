@@ -48,7 +48,7 @@ export function BackfillDialog({ channelId, isOpen, onClose, onSuccess }: Backfi
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="rounded-[2.5rem] p-0 border-none shadow-2xl w-[90vw] max-w-4xl max-h-[90vh] flex flex-col overflow-hidden">
+      <DialogContent className="rounded-[2.5rem] p-0 border-none shadow-2xl w-[98vw] max-w-6xl max-h-[85vh] flex flex-col overflow-hidden">
         <div className="p-6 sm:p-10 pb-0">
           <DialogHeader className="mb-6">
             <div className="w-12 h-12 bg-indigo-50 rounded-2xl flex items-center justify-center text-indigo-600 mb-4 shadow-sm">
