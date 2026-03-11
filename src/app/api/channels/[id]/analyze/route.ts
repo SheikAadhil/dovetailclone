@@ -70,11 +70,14 @@ export async function POST(
     content: dp.content
   }));
 
-  // 2. STAGE 1: PRODUCT LEVEL ANALYSIS
+  // 2. STAGE 1: PRIMARY ANALYSIS
   const layer1Themes = await analyzeThemesLayer1(messagesForAi, channel?.ai_context);
-  
-  // 3. STAGE 2: DEEP/LATENT ANALYSIS
-  const layer2Themes = await analyzeThemesLayer2(messagesForAi, channel?.ai_context);
+
+  // 3. STAGE 2: REVIEW/AUDIT - only run if Layer 1 succeeded
+  let layer2Themes: ThemeResult[] = [];
+  if (layer1Themes && layer1Themes.length > 0) {
+    layer2Themes = await analyzeThemesLayer2(messagesForAi, channel?.ai_context);
+  }
 
   // 4. Ensure System Topics exist for categorization
   const LAYER_TOPICS = [
