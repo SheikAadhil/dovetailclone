@@ -4,7 +4,10 @@
       "Bash(vercel:*)",
       "Bash(npx vercel:*)",
       "Bash(npx tsc:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git push:*)",
+      "Bash(gh run:*)",
+      "Bash(git status:*)"
     ]
   }
 }
