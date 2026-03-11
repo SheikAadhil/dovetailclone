@@ -134,7 +134,8 @@ export async function POST(request: Request) {
         // Increment source count
         await supabase.rpc('increment_source_count', { source_uuid: src.id });
 
-        const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+        // Trigger embed processing (fire and forget, don't fail if it errors)
+        const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://dovetailclone.vercel.app';
         fetch(`${appUrl}/api/data-points/embed`, {
           method: 'POST',
           headers: {
@@ -142,7 +143,7 @@ export async function POST(request: Request) {
             'Authorization': `Bearer ${process.env.CRON_SECRET}`
           },
           body: JSON.stringify({ dataPointId: inserted.id })
-        }).catch(err => console.error('[Slack Events] Error triggering embed:', err));
+        }).catch(() => {}); // Silent fail - embed processing is optional
       }
     }
   }
