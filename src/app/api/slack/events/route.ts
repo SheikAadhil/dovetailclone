@@ -106,6 +106,19 @@ export async function POST(request: Request) {
 
       console.log(`[Slack Events] Inserting data point for channel_id: ${src.channel_id}, source: ${src.source_label}`);
 
+      // Check if this message already exists
+      const { data: existing } = await supabase
+        .from('data_points')
+        .select('id')
+        .eq('channel_id', src.channel_id)
+        .eq('external_id', ts)
+        .maybeSingle();
+
+      if (existing) {
+        console.log('[Slack Events] Data point already exists, skipping:', existing.id);
+        continue;
+      }
+
       const { data: inserted, error: insertError } = await supabase
         .from('data_points')
         .insert({
@@ -123,7 +136,7 @@ export async function POST(request: Request) {
         })
         .select('id')
         .single();
-        
+
       if (insertError) {
         console.error('[Slack Events] Error inserting data point:', insertError);
         continue;
