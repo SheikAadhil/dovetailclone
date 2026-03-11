@@ -24,6 +24,8 @@ const getPrimaryModels = (): string[] => {
 };
 
 const getReviewerModels = (): string[] => {
+  const envModel = process.env.REVIEWER_MODEL;
+  if (envModel) return [envModel];
   return [
     "z-ai/glm-4.5-air:free",
     "google/gemini-2.0-flash-001"
