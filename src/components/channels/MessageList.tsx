@@ -178,6 +178,25 @@ export function MessageList({ channelId }: MessageListProps) {
     } catch (e) { alert("Tagging failed"); } finally { setTagging(false); }
   };
 
+  const handleDeleteMessage = async (messageId: string) => {
+    try {
+      const res = await fetch(`/api/data-points/${messageId}`, {
+        method: 'DELETE'
+      });
+      if (res.ok) {
+        // Remove from local state
+        setMessages(prev => prev.filter(m => m.id !== messageId));
+        // Also refresh to get updated counts
+        router.refresh();
+      } else {
+        const data = await res.json();
+        alert(data.message || "Failed to delete message");
+      }
+    } catch (e) {
+      alert("Delete failed");
+    }
+  };
+
   const updateMetadataFilter = (column: string, value: string) => {
     setMetadataFilters(prev => ({ ...prev, [column]: value }));
   };
@@ -233,13 +252,14 @@ export function MessageList({ channelId }: MessageListProps) {
 
       <div className="space-y-4">
         {messages && messages.map((msg) => (
-          <MessageCard 
-            key={msg.id} 
-            message={msg} 
-            selected={selectedIds.has(msg.id)} 
-            onSelect={handleToggleSelect} 
+          <MessageCard
+            key={msg.id}
+            message={msg}
+            selected={selectedIds.has(msg.id)}
+            onSelect={handleToggleSelect}
             onAnalyze={handleAnalyzeSingle}
             onExpand={setExpandedMessage}
+            onDelete={handleDeleteMessage}
           />
         ))}
         {loading && <div className="flex justify-center py-10"><Loader2 className="w-6 h-6 animate-spin text-indigo-600" /></div>}

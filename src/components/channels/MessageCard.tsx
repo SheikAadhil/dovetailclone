@@ -2,9 +2,9 @@ import { DataPoint, Theme } from "@/types";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { formatDistanceToNow } from "date-fns";
-import { 
-  Smile, Frown, Meh, Slack, FileText, FileCode, Database, 
-  ChevronDown, Brain, Loader2
+import {
+  Smile, Frown, Meh, Slack, FileText, FileCode, Database,
+  ChevronDown, Brain, Loader2, Trash2
 } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -17,10 +17,12 @@ interface MessageCardProps {
   onSelect?: (id: string, checked: boolean) => void;
   onAnalyze?: (id: string) => Promise<void>;
   onExpand?: (message: DataPoint) => void;
+  onDelete?: (id: string) => Promise<void>;
 }
 
-export function MessageCard({ message, themes, onClick, selected, onSelect, onAnalyze, onExpand }: MessageCardProps) {
+export function MessageCard({ message, themes, onClick, selected, onSelect, onAnalyze, onExpand, onDelete }: MessageCardProps) {
   const [analyzing, setAnalyzing] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const isLongContent = message.content.length > 300 || message.content.split('\n').length > 4;
   const isNode = message.source === 'node' || message.source === 'markdown';
@@ -59,6 +61,18 @@ export function MessageCard({ message, themes, onClick, selected, onSelect, onAn
       await onAnalyze(message.id);
     } finally {
       setAnalyzing(false);
+    }
+  };
+
+  const handleDeleteClick = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!onDelete) return;
+    if (!confirm("Are you sure you want to delete this signal? This action cannot be undone.")) return;
+    setDeleting(true);
+    try {
+      await onDelete(message.id);
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -140,15 +154,28 @@ export function MessageCard({ message, themes, onClick, selected, onSelect, onAn
             ))}
 
             {(isNode || isCsv) && onAnalyze && (
-              <Button 
-                size="sm" 
-                variant="ghost" 
+              <Button
+                size="sm"
+                variant="ghost"
                 onClick={handleAnalyzeClick}
                 disabled={analyzing}
-                className="ml-auto h-8 rounded-xl gap-2 text-indigo-600 hover:bg-indigo-50 hover:text-indigo-700 font-black text-[10px] uppercase tracking-widest"
+                className="h-8 rounded-xl gap-2 text-indigo-600 hover:bg-indigo-50 hover:text-indigo-700 font-black text-[10px] uppercase tracking-widest"
               >
                 {analyzing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Brain className="w-3.5 h-3.5" />}
                 {analyzing ? "Thinking..." : "Analyze Individually"}
+              </Button>
+            )}
+
+            {onDelete && (
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={handleDeleteClick}
+                disabled={deleting}
+                className="h-8 rounded-xl gap-2 text-red-500 hover:bg-red-50 hover:text-red-600 font-black text-[10px] uppercase tracking-widest ml-auto"
+              >
+                {deleting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                Delete
               </Button>
             )}
           </div>

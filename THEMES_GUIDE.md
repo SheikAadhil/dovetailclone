@@ -65,3 +65,125 @@ Every time analysis runs, the system records a snapshot in the `theme_snapshots`
 
 ### C. Topic Categorization
 Themes are automatically grouped into **Topics** (e.g., "Onboarding", "Billing", "Mobile App"). This allows users to filter their entire dashboard by broad categories while still seeing specific thematic insights.
+
+---
+
+## 5. Rigorous Analysis Framework
+
+This section defines the quality standards and methodology for theme extraction to ensure high precision, full traceability, and zero narrative inflation.
+
+### 5.1 Coverage Discipline
+
+- **Every signal must be counted exactly once** in the top-level theme layer.
+- Do not drop any signal.
+- Do not double-count signals across top-level themes.
+- If a signal relates to multiple ideas, assign it to one primary theme and optionally list secondary tags separately.
+- **Coverage check required** at the end of each analysis:
+  - Total input signals
+  - Total signals assigned to top-level themes
+  - Any unassigned signals
+  - Any duplicated signals
+
+### 5.2 Two-Layer Structure
+
+Produce exactly two layers:
+
+1. **Top-level product themes** - For prioritization and roadmap decisions
+2. **Latent tensions or cross-cutting dynamics** - For interpretation and strategy
+
+Do not mix these layers. A latent theme must synthesize across multiple top-level themes, not simply rename one.
+
+### 5.3 Non-Overlapping Themes
+
+- Each top-level theme must be distinct and non-overlapping.
+- Avoid theme overlap such as "trust vs accuracy vs transparency" saying the same thing.
+- If two themes could be merged without losing decision value, merge them.
+
+### 5.4 Plain Naming Conventions
+
+- Use simple, product-usable names.
+- Avoid theatrical or consultant-style labels.
+- Examples:
+  - Bad: "The Performative Facade of AI-Driven Insight"
+  - Good: "Low trust in AI-generated themes"
+
+### 5.5 Evidence Requirements
+
+Every theme must include:
+- Theme name
+- 1-sentence definition
+- Signal IDs assigned to it
+- Why those signals belong together
+- Representative quotes or paraphrases
+- Product implication
+
+### 5.6 Important Distinctions to Preserve
+
+Keep these distinctions visible when present in the data:
+- Actionability vs. workflow confusion
+- Trust/traceability vs. theme quality
+- Ingestion/import friction vs. sharing/export friction
+- Privacy/security concerns vs. permissions/access issues
+- Role-based needs vs. automation-vs-control tension
+- Cross-source deduplication/fusion vs. basic integration/import
+- Onboarding vs. ongoing usability
+- Pricing for experimentation vs. general pricing complaints
+
+### 5.7 Include Positive Signals
+
+- Do not output only pain points.
+- If input includes strengths, wins, or sticky behaviors, capture them in a "Strengths / pull factors" section or assign to a positive theme.
+
+### 5.8 Role Sensitivity
+
+- Identify when different user groups want different things.
+- Distinguish managers, researchers, sales, customer success, and individual contributors if signals support it.
+
+### 5.9 Actionability Standard
+
+Recommendations must be specific and proportional to evidence. Label each recommendation as:
+- UX fix
+- IA/content fix
+- Model/AI improvement
+- Integration/platform fix
+- Trust/governance fix
+- Pricing/packaging consideration
+
+### 5.10 Analysis Output Format
+
+For each analysis run, produce:
+
+**A. Dataset Accounting**
+- Total signals: X
+- Assigned to top-level themes: X
+- Unassigned: list or "none"
+- Duplicates: list or "none"
+
+**B. Top-level themes**
+For each theme:
+- Name
+- Definition
+- Signal IDs
+- Why this is one theme
+- Representative evidence
+- User need
+- Product implication
+- Recommendation
+- Confidence: High / Medium / Low
+
+**C. Latent tensions**
+For each tension:
+- Name
+- What deeper pattern it explains
+- Which top-level themes it connects
+- Why it matters strategically
+- Confidence: High / Medium / Low
+
+**D. Strengths**
+- List positive signals separately
+- Explain what users already value
+
+**E. Missed or weak areas**
+- Call out singleton issues
+- Identify themes too weak to generalize
+- State where more data is needed
