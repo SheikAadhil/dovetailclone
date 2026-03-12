@@ -33,7 +33,7 @@ const getReviewerModels = (): string[] => {
   ];
   if (envModel) return [envModel, ...fallbacks];
   return [
-    "z-ai/glm-4.5-air:free",
+    "google/gemini-2.0-flash-001",
     ...fallbacks
   ];
 };
@@ -57,14 +57,28 @@ async function getCompletion(prompt: string, modelSet: 'primary' | 'reviewer' | 
   const client = getOpenRouterClient();
   if (!process.env.OPENROUTER_API_KEY) throw new Error("OPENROUTER_API_KEY is missing");
 
+  // Timeout for each model attempt (in ms)
+  const MODEL_TIMEOUT = 120000; // 2 minutes per model
+
   let lastError: any;
   for (const model of models) {
     try {
       console.log(`Trying model: ${model} (${modelSet} set)`);
-      return await client.chat.completions.create({
-        model: model,
-        messages: [{ role: "user", content: prompt }],
-      });
+
+      // Create an AbortController for timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), MODEL_TIMEOUT);
+
+      try {
+        return await client.chat.completions.create({
+          model: model,
+          messages: [{ role: "user", content: prompt }],
+        }, {
+          signal: controller.signal
+        });
+      } finally {
+        clearTimeout(timeoutId);
+      }
     } catch (error: any) {
       console.warn(`Model ${model} failed: ${error.message}`);
       lastError = error;

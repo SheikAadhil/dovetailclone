@@ -87,6 +87,8 @@ export function ChannelDetailTabs({ channel }: ChannelDetailTabsProps) {
   const [loadingThemes, setLoadingThemes] = useState(true);
   const [loadingTopics, setLoadingTopics] = useState(true);
   const [analyzing, setAnalyzing] = useState(false);
+  const [analysisProgress, setAnalysisProgress] = useState<string>("");
+  const [analysisStep, setAnalysisStep] = useState<number>(0);
   const [channelAlerts, setChannelAlerts] = useState<AnomalyAlert[]>([]);
   
   const [selectedTheme, setSelectedTheme] = useState<Theme | null>(null);
@@ -171,24 +173,65 @@ export function ChannelDetailTabs({ channel }: ChannelDetailTabsProps) {
 
   const handleAnalyze = async (forceRefresh = false) => {
     setAnalyzing(true);
+    setAnalysisProgress("Connecting to analysis service...");
+    setAnalysisStep(0);
     try {
-      const res = await fetch(`/api/channels/${channel.id}/analyze`, { 
+      const res = await fetch(`/api/channels/${channel.id}/analyze`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'text/event-stream'
+        },
         body: JSON.stringify({ forceRefresh })
       });
-      const data = await res.json();
-      if (data.error) {
-        alert(data.error);
-      } else {
-        await fetchTopics();
-        await fetchThemes();
-        await fetchChannelAlerts();
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        alert(errorData.error || 'Analysis failed');
+        return;
       }
+
+      const reader = res.body?.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      if (reader) {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              const data = line.slice(6);
+              if (data === '[DONE]') continue;
+              try {
+                const parsed = JSON.parse(data);
+                if (parsed.progress) {
+                  setAnalysisProgress(parsed.progress);
+                  if (parsed.step) setAnalysisStep(parsed.step);
+                }
+              } catch (e) {
+                // Try to show raw progress message
+                setAnalysisProgress(data);
+              }
+            }
+          }
+        }
+      }
+
+      await fetchTopics();
+      await fetchThemes();
+      await fetchChannelAlerts();
     } catch (e) {
       alert('Analysis failed');
     } finally {
       setAnalyzing(false);
+      setAnalysisProgress("");
+      setAnalysisStep(0);
     }
   };
 
@@ -515,19 +558,39 @@ export function ChannelDetailTabs({ channel }: ChannelDetailTabsProps) {
             
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="default" size="sm" disabled={analyzing} className="rounded-lg bg-indigo-600 hover:bg-indigo-700 shadow-md h-8 px-4 text-xs font-medium">
+                <Button variant="default" size="sm" disabled={analyzing} className="rounded-lg bg-indigo-600 hover:bg-indigo-700 shadow-md h-8 px-4 text-xs font-medium min-w-[120px]">
                   {analyzing ? <RefreshCcw className="w-3.5 h-3.5 animate-spin mr-1.5" /> : <Sparkles className="w-3.5 h-3.5 mr-1.5" />}
                   {analyzing ? "Analyzing..." : "Analyze"}
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="rounded-xl border-gray-100 shadow-xl p-1.5 w-48">
-                <DropdownMenuItem onClick={() => handleAnalyze(false)} className="rounded-lg font-medium text-xs py-2">
-                  <Zap className="w-3.5 h-3.5 mr-2 text-indigo-600" /> Analyze New Signals
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => handleAnalyze(true)} className="rounded-lg font-medium text-xs py-2">
-                  <RefreshCcw className="w-3.5 h-3.5 mr-2 text-indigo-600" /> Force Re-analysis All
-                </DropdownMenuItem>
+              <DropdownMenuContent align="end" className="rounded-xl border-gray-100 shadow-xl p-1.5 w-64">
+                {!analyzing ? (
+                  <>
+                    <DropdownMenuItem onClick={() => handleAnalyze(false)} className="rounded-lg font-medium text-xs py-2">
+                      <Zap className="w-3.5 h-3.5 mr-2 text-indigo-600" /> Analyze New Signals
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={() => handleAnalyze(true)} className="rounded-lg font-medium text-xs py-2">
+                      <RefreshCcw className="w-3.5 h-3.5 mr-2 text-indigo-600" /> Force Re-analysis All
+                    </DropdownMenuItem>
+                  </>
+                ) : (
+                  <div className="px-3 py-2 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <div className={`w-2 h-2 rounded-full ${analysisStep >= 1 ? 'bg-green-500' : 'bg-gray-300'}`} />
+                      <span className="text-xs text-gray-600">Layer 1: Primary Analysis</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className={`w-2 h-2 rounded-full ${analysisStep >= 2 ? 'bg-green-500' : 'bg-gray-300'}`} />
+                      <span className="text-xs text-gray-600">Layer 2: Deep Review</span>
+                    </div>
+                    {analysisProgress && (
+                      <div className="mt-2 pt-2 border-t border-gray-100">
+                        <p className="text-xs text-indigo-600 font-medium">{analysisProgress}</p>
+                      </div>
+                    )}
+                  </div>
+                )}
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
