@@ -125,235 +125,311 @@ export async function analyzeThemesLayer1(messages: { id: string; content: strin
     return { id: simpleId, content: m.content };
   });
 
-  const contextPart = aiContext ? `\nUSER-PROVIDED CONTEXT:\n${aiContext}\n` : '';
+  const prompt = `You are revising a theme-analysis output that is currently too compressed and incomplete.
 
-  const prompt = `You are a rigorous qualitative analysis engine for mixed-source signal analysis.
+Your primary goal is not to make the report shorter or cleaner.
 
-Your job is to analyze a dataset of signals and produce a complete, auditable theme analysis.
+Your primary goal is to make the analysis complete, auditable, and decision-grade.
 
-You must behave like a disciplined qualitative analyst, not a generic summarizer.
+CURRENT FAILURE MODE TO CORRECT
 
-This prompt supports a two-stage workflow:
-- Stage 1: First-pass analysis, coding, clustering, and theme generation
-- Stage 2: Review, audit, challenge, and correction of the first-pass output
+The current analysis is over-compressing the top-level themes.
 
-You are performing STAGE 1: PRIMARY ANALYSIS.
+It creates a neat-looking summary by merging too many issues into broad buckets and silently dropping important signals.
 
-${contextPart}
+You must fix that.
 
-==================================================
-GLOBAL RULES
-==================================================
+MANDATORY CORRECTIONS
 
-1. Coverage first
-- Every signal must be represented exactly once in the primary analysis layer.
-- Every signal must end up in one of:
+1. Do not drop signals
+
+- Every signal must be represented exactly once at the primary analysis layer.
+
+- Every signal must end in one of:
+
   - top-level theme
+
   - isolated issue
+
   - positive strength
+
   - unassigned / ambiguous
-- Never silently omit a signal.
 
-2. Code before theming
-- Do not jump directly to themes.
-- Move through this sequence: signal -> code -> category -> theme
+- No silent omissions.
 
-3. Evidence before interpretation
-- Every theme must be supported by real evidence from the dataset.
+- If a signal does not fit a major theme, keep it visible as an isolated issue or unassigned signal.
 
-4. Theme count must be data-derived
-- Do not impose any fixed limit on the number of themes.
-- Return as many themes as the evidence supports.
-- Do not compress distinct issues just to make the output shorter.
+2. Do not over-compress top-level themes
 
-5. Distinguish analytical levels
-- Codes are close to the data.
-- Categories group related codes.
-- Themes explain broader patterns of shared meaning.
-- Latent tensions explain deeper cross-theme dynamics.
+- Do not force the dataset into too few themes.
 
-6. Preserve important distinctions when supported by data
-- theme quality vs trust/traceability
-- privacy/governance vs permissions/access
-- import/integration friction vs export/sharing friction
-- onboarding vs ongoing usability
-- actionability vs workflow confusion
-- role-based needs vs automation/manual-control tension
+- If broad themes hide important distinctions, split them.
 
-7. Preserve strengths
-- If the dataset contains positive signals, include them explicitly.
+- A neat 4-theme output is worse than a complete 8-theme output if the 4-theme version loses signal coverage.
 
-8. Handle weak evidence honestly
-- If a pattern has only one signal, treat it as an isolated issue unless highly consequential.
+3. Restore missing issue types when present
 
-9. Avoid narrative inflation
-- Prefer plain, product-usable names.
+Make sure the analysis preserves these as distinct concerns when supported by data:
 
-==================================================
-STAGE 1: PRIMARY ANALYSIS
-==================================================
+- reliability / processing bugs
 
-PHASE 1: DATASET FAMILIARIZATION
-- Read all signals before finalizing any themes.
-- Note source mix, role mix, context, contradictions, and outliers.
+- integration friction
 
-PHASE 2: SIGNAL LEDGER
-Build a ledger with one row per signal containing:
+- privacy / data governance concerns
+
+- notification overload
+
+- pricing for experimentation
+
+- positive strengths
+
+- analyst control features like rename / merge / split
+
+- actionability gaps
+
+- trust / traceability
+
+- permissions / access issues
+
+- role-based needs
+
+- cross-source deduplication
+
+- regional filtering / segmentation
+
+4. Split broad buckets when needed
+
+Do not hide different problems inside vague themes like:
+
+- "usability and onboarding"
+
+- "grouping and filtering"
+
+- "general friction"
+
+If the grouped signals imply different product fixes, separate them.
+
+5. Preserve positive evidence
+
+- If users explicitly value a feature, keep it in a Strengths section.
+
+- Do not output a pain-only report.
+
+6. Handle singleton issues honestly
+
+- If a pattern has only one signal, keep it as an isolated issue unless it is strategically important enough to elevate.
+
+- Do not inflate weak evidence into big themes.
+
+- Do not erase singleton issues either.
+
+7. Deep themes cannot compensate for missing top-level coverage
+
+- If an issue appears in deep analysis but not in top-level themes, fix the top-level layer first.
+
+- Deep themes must synthesize top-level themes, not rescue missing signal coverage.
+
+8. Plain naming only
+
+- Use clear product-usable names.
+
+- Avoid theatrical or consultant-style labels.
+
+- Theme names must make sense in a roadmap review.
+
+9. Recommendations must match evidence
+
+For each theme, give a recommendation that is proportional to the evidence and label it as one of:
+
+- UX fix
+
+- IA/content fix
+
+- model/AI improvement
+
+- integration/platform fix
+
+- trust/governance fix
+
+- pricing/packaging fix
+
+- workflow/process fix
+
+REQUIRED WORKFLOW
+
+STEP 1: Build a signal ledger
+
+Create a hidden ledger with one row per signal:
+
 - signal_id
-- short paraphrase
-- source
+
+- paraphrase
+
 - primary issue
-- signal type: pain point / request / workaround / concern / strength / ambiguity
 
-PHASE 3: FIRST-CYCLE CODING
-For each signal, create:
-- primary code
-- optional secondary code(s)
-- short evidence note
+- optional secondary issue
 
-PHASE 4: CODE CONSOLIDATION
-- merge duplicates
-- separate look-alike codes with different meanings
-- identify positive codes separately
+- role/stakeholder if visible
 
-PHASE 5: CATEGORY BUILDING
-Group codes into higher-order categories.
+- source type if visible
 
-PHASE 6: TOP-LEVEL THEMES
-Construct top-level themes from categories.
+- final bucket:
 
-Each theme must include:
-- name
-- definition
-- signal_ids
-- message count
-- why these signals belong together
-- representative evidence
-- user/team need
-- implication
-- recommendation
-- recommendation type
-- confidence
+  - top-level theme
 
-PHASE 7: STRENGTHS / ISOLATED ISSUES / UNASSIGNED
+  - isolated issue
+
+  - positive strength
+
+  - unassigned / ambiguous
+
+STEP 2: Validate coverage
+
+Before writing any narrative, silently verify:
+
+- total input signals = total represented signals
+
+- missing signals = 0
+
+- duplicate signals = 0
+
+If validation fails, revise the clustering before writing the output.
+
+STEP 3: Rebuild top-level themes
+
+- Create as many themes as the evidence supports.
+
+- Do not optimize for fewer themes.
+
+- Split themes when they hide distinct product problems.
+
+- Merge themes only when they truly represent the same issue.
+
+STEP 4: Separate layers
+
+Produce:
+
+- top-level themes
+
 - strengths
+
 - isolated issues
-- unassigned / ambiguous signals
 
-PHASE 8: LATENT TENSIONS
-After top-level themes, identify cross-theme tensions.
+- unassigned / ambiguous
 
-PHASE 9: REVIEWER HANDOFF
-Provide a section called REVIEWER_HANDOFF containing:
-- top concerns about your own analysis
-- themes that may be over-merged
-- ambiguous signals needing challenge
-- possible rival interpretations
+- latent tensions
 
-==================================================
+Latent tensions must connect multiple top-level themes.
+
+They must not replace missing top-level themes.
+
 OUTPUT FORMAT
-==================================================
 
-Return output in this structure:
+A. Dataset accounting
 
-{
-  "dataset_accounting": {
-    "total_signals": 0,
-    "represented_signals": 0,
-    "signals_in_top_level_themes": 0,
-    "signals_in_strengths": 0,
-    "signals_in_isolated_issues": 0,
-    "signals_in_unassigned": 0,
-    "duplicated_signals": "none" or ["id1"],
-    "missing_signals": "none" or ["id1"]
-  },
-  "first_cycle_coding": [
-    {
-      "signal_id": "1",
-      "paraphrase": "short summary",
-      "source": "slack/csv/markdown",
-      "primary_code": "code name",
-      "secondary_codes": ["code1"],
-      "notes": "evidence note"
-    }
-  ],
-  "categories": [
-    {
-      "name": "Category name",
-      "signal_ids": ["1"],
-      "codes": ["code1"],
-      "why_grouped": "reason",
-      "evidence_strength": "strong" | "moderate" | "weak"
-    }
-  ],
-  "top_level_themes": [
-    {
-      "name": "Theme name",
-      "definition": "1-2 sentence definition",
-      "signal_ids": ["1", "2"],
-      "message_count": 0,
-      "supporting_categories": ["category1"],
-      "representative_evidence": ["excerpt 1", "excerpt 2"],
-      "why_this_is_one_theme": "reason",
-      "user_team_need": "what users need",
-      "implication": "product implication",
-      "recommendation": "specific recommendation",
-      "recommendation_type": "UX fix" | "IA/content fix" | "model/AI improvement" | "integration/platform fix" | "trust/governance fix" | "pricing/packaging fix",
-      "confidence": "High" | "Medium" | "Low"
-    }
-  ],
-  "strengths": [
-    {
-      "name": "Strength name",
-      "signal_ids": ["1"],
-      "why_it_matters": "strategic importance",
-      "preserve_expand_note": "how to preserve"
-    }
-  ],
-  "isolated_issues": [
-    {
-      "name": "Issue name",
-      "signal_ids": ["1"],
-      "why_not_elevated": "why it was not elevated",
-      "monitoring_note": "what to monitor"
-    }
-  ],
-  "unassigned_ambiguous": [
-    {
-      "signal_id": "1",
-      "reason": "why unresolved"
-    }
-  ],
-  "latent_tensions": [
-    {
-      "name": "Tension name",
-      "connected_themes": ["theme1"],
-      "deeper_pattern": "what deeper pattern",
-      "strategic_implication": "why it matters",
-      "confidence": "High" | "Medium" | "Low"
-    }
-  ],
-  "reviewer_handoff": {
-    "likely_weak_spots": ["concern1"],
-    "possible_over_merges": ["theme1"],
-    "signals_needing_challenge": ["1"],
-    "rival_interpretations": ["interpretation1"],
-    "confidence_risks": ["risk1"]
-  }
-}
+- Total signals
 
-### FINAL SELF-CHECK
+- Represented signals
+
+- Signals in top-level themes
+
+- Signals in strengths
+
+- Signals in isolated issues
+
+- Signals in unassigned / ambiguous
+
+- Missing signals: none or list
+
+- Duplicate signals: none or list
+
+B. Top-level themes
+
+For each theme:
+
+- Name
+
+- Definition
+
+- Signal IDs
+
+- Message count
+
+- Why these signals belong together
+
+- Representative evidence
+
+- User need
+
+- Product implication
+
+- Recommendation
+
+- Recommendation type
+
+- Confidence
+
+C. Strengths
+
+For each strength:
+
+- Name
+
+- Signal IDs
+
+- Why it matters
+
+- How to preserve or expand it
+
+D. Isolated issues
+
+For each issue:
+
+- Name
+
+- Signal IDs
+
+- Why not elevated into a broader theme
+
+- Monitoring note
+
+E. Unassigned / ambiguous
+
+- Signal IDs
+
+- Why unresolved
+
+F. Latent tensions
+
+For each tension:
+
+- Name
+
+- Connected top-level themes
+
+- What deeper pattern it explains
+
+- Why it matters strategically
+
+- Confidence
+
+FINAL QUALITY GATE
+
 Before finalizing, silently verify:
-- Did I account for every signal?
-- Did I code before theming?
-- Did I avoid double-counting?
-- Did I preserve important distinctions?
-- Did I include strengths?
-- Did I avoid over-compressing the theme set?
-- Did I clearly separate top-level themes from latent tensions?
-- Did I let the number of themes emerge from the data?
 
-FINAL VALIDATION RULE: If more than 0 signals are missing from the ledger, the analysis is invalid.
+- Did I account for every signal?
+
+- Did I avoid over-compressing the top-level taxonomy?
+
+- Did I preserve positive signals?
+
+- Did I keep singleton issues visible?
+
+- Did I prevent deep themes from hiding top-level omissions?
+
+- Are recommendations tied directly to evidence?
+
+If any answer is no, revise before output.
 
 ### DATASET (MESSAGES):
 ${JSON.stringify(simplifiedMessages)}`;
