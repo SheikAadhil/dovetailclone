@@ -157,7 +157,22 @@ export async function analyzeThemesLayer1(messages: { id: string; content: strin
     return { id: simpleId, content: m.content };
   });
 
-  const prompt = `You are revising a theme-analysis output that is currently too compressed and incomplete.
+  const prompt = `You are a rigorous qualitative analysis engine.
+
+STRICT OUTPUT REQUIREMENT: You MUST respond with ONLY valid JSON. No conversational text. No markdown. No explanations. No introductions. Just pure JSON.
+
+Output format must be:
+{
+  "dataset_accounting": { ... },
+  "top_level_themes": [ ... ],
+  ...
+}
+
+If you cannot produce valid JSON for any reason, output: {"error": "reason"}
+
+Now produce the analysis:
+
+You are revising a theme-analysis output that is currently too compressed and incomplete.
 
 Your primary goal is not to make the report shorter or cleaner.
 
@@ -482,6 +497,14 @@ export async function analyzeThemesLayer2(messages: { id: string; content: strin
   const contextPart = aiContext ? `\nUSER-PROVIDED CONTEXT:\n${aiContext}\n` : '';
 
   const prompt = `You are an expert Qualitative Researcher specializing in Reflexive Thematic Analysis (Braun & Clarke).
+
+STRICT OUTPUT REQUIREMENT: You MUST respond with ONLY valid JSON. No conversational text. No markdown. No explanations. No introductions. Just pure JSON.
+
+Output format must be:
+{
+  "themes": [ { "name": "...", ... } ]
+}
+
 Your goal is to extract Deep, Latent, and Interpretive patterns from these signals.
 
 ${contextPart}
