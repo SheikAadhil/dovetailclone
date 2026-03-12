@@ -8,7 +8,30 @@
       "Bash(git push:*)",
       "Bash(gh run:*)",
       "Bash(git status:*)",
-      "Bash(npm run:*)"
+      "Bash(npm run:*)",
+      "WebSearch",
+      "WebFetch(domain:openrouter.ai)",
+      "Bash(curl -s \"https://openrouter.ai/api/v1/models?limit=1000\" | head -c 50000)",
+      "Bash(curl -s \"https://openrouter.ai/api/v1/models?limit=1000\" | grep -o '\"id\":\"[^\"]*gemini[^\"]*\"' | head -20)",
+      "Bash(curl -s \"https://openrouter.ai/api/v1/models?limit=1000\" | grep -o '\"id\":\"[^\"]*llama[^\"]*\"' | head -20)",
+      "Bash(curl -s \"https://openrouter.ai/api/v1/models?limit=1000\" | grep -o '\"id\":\"[^\"]*mistral[^\"]*\"' | head -20)",
+      "Bash(curl -s \"https://openrouter.ai/api/v1/models?limit=1000\" | grep -o '\"id\":\"[^\"]*qwen[^\"]*\"' | head -20)",
+      "Bash(curl -s \"https://openrouter.ai/api/v1/models?limit=1000\" | grep -o '\"id\":\"qwen/qwen3-next[^\"]*\"')",
+      "Bash(curl -s \"https://openrouter.ai/api/v1/models?limit=1000\" | grep -o '\"id\":\"z-ai/glm[^\"]*\"')",
+      "Bash(curl -s \"https://openrouter.ai/api/v1/models?limit=1000\" | grep -o '\"id\":\"mistralai/mistral.*:free\"')",
+      "Bash(curl -s \"https://openrouter.ai/api/v1/models?limit=1000\" | grep -i \"mistral.*:free\" | grep -o '\"id\":\"[^\"]*\"' | head -10)",
+      "Bash(curl -s \"https://openrouter.ai/api/v1/models?limit=1000\" | python3 -c \"import sys,json; data=json.load\\(sys.stdin\\); print\\('\\\\n'.join\\([m['id'] for m in data['data'] if 'mistral' in m['id'].lower\\(\\) and ':free' in m['id']]\\)\\)\" 2>/dev/null || echo \"Python not available, trying grep\")",
+      "Bash(curl -s \"https://openrouter.ai/api/v1/models?limit=1000\" | grep -o '\"id\":\"[^\"]*:free\"' | head -30)",
+      "WebFetch(domain:www.amazon.com)",
+      "WebFetch(domain:howtofuture.com)",
+      "WebFetch(domain:www.weforum.org)",
+      "WebFetch(domain:www.mindtools.com)",
+      "WebFetch(domain:www.ottawa.ca)",
+      "WebFetch(domain:medium.com)",
+      "WebFetch(domain:www.youtube.com)",
+      "WebFetch(domain:en.wikipedia.org)",
+      "WebFetch(domain:www.giftatwork.com)",
+      "WebFetch(domain:www.alterthink.co.uk)"
     ]
   }
 }

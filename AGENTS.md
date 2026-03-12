@@ -35,6 +35,8 @@ npm install -D vitest @vitejs/plugin-react
 ```
 Then run a single test: `npx vitest run src/path/to/test.test.ts`
 
+Run tests in watch mode: `npx vitest`
+
 ---
 
 ## Code Style Guidelines

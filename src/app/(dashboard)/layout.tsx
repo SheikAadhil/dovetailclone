@@ -1,6 +1,6 @@
 import { UserButton } from "@clerk/nextjs";
 import Link from "next/link";
-import { MessageSquare, Settings, LayoutGrid } from "lucide-react";
+import { MessageSquare, Settings, LayoutGrid, Radar } from "lucide-react";
 
 import { NotificationBell } from "@/components/channels/NotificationBell";
 import { UsageStats } from "@/components/channels/UsageStats";
@@ -20,14 +20,21 @@ export default function DashboardLayout({
             <span>Pulse</span>
           </Link>
         </div>
-        
+
         <nav className="flex-1 p-3 space-y-0.5">
-          <Link 
-            href="/channels" 
-            className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 rounded-md hover:bg-gray-50 bg-gray-100"
+          <Link
+            href="/channels"
+            className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 rounded-md hover:bg-gray-50"
           >
             <MessageSquare className="w-4 h-4" />
             Channels
+          </Link>
+          <Link
+            href="/sensing"
+            className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 rounded-md hover:bg-gray-50"
+          >
+            <Radar className="w-4 h-4" />
+            Sensing
           </Link>
         </nav>
 
