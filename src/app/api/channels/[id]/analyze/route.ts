@@ -35,12 +35,18 @@ export async function POST(
 
       try {
         await handleAnalysis(request, params.id, writer, sendProgress);
-        writer.write('data: [DONE]\n\n');
+        try {
+          writer.write('data: [DONE]\n\n');
+        } catch (e) { /* ignore */ }
         controller.close();
       } catch (error) {
         console.error('Analysis error:', error);
-        sendProgress(writer, `Error: ${error}`, 2);
-        controller.close();
+        try {
+          sendProgress(writer, `Error: ${error}`, 2);
+        } catch (e) { /* ignore write errors */ }
+        try {
+          controller.close();
+        } catch (e) { /* ignore */ }
       }
     }
   });

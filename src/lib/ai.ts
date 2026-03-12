@@ -90,27 +90,59 @@ async function getCompletion(prompt: string, modelSet: 'primary' | 'reviewer' | 
 }
 
 function extractJson(text: string) {
+  // Handle empty or non-string input
+  if (!text || typeof text !== 'string') {
+    throw new Error("Invalid response: empty or non-string");
+  }
+
+  const trimmed = text.trim();
+  if (!trimmed) {
+    throw new Error("Invalid response: empty after trim");
+  }
+
   try {
     // 1. Try direct parse
-    return JSON.parse(text);
+    return JSON.parse(trimmed);
   } catch (e) {
     // 2. Try to find the first '{' and last '}'
-    const start = text.indexOf('{');
-    const end = text.lastIndexOf('}');
-    if (start !== -1 && end !== -1) {
+    const start = trimmed.indexOf('{');
+    const end = trimmed.lastIndexOf('}');
+    if (start !== -1 && end !== -1 && end > start) {
       try {
-        const jsonStr = text.substring(start, end + 1);
+        const jsonStr = trimmed.substring(start, end + 1);
         return JSON.parse(jsonStr);
       } catch (e2) {
         // 3. Try to find the first '[' and last ']' if it returned an array
-        const startArr = text.indexOf('[');
-        const endArr = text.lastIndexOf(']');
-        if (startArr !== -1 && endArr !== -1) {
-          const arrStr = text.substring(startArr, endArr + 1);
-          return JSON.parse(arrStr);
+        const startArr = trimmed.indexOf('[');
+        const endArr = trimmed.lastIndexOf(']');
+        if (startArr !== -1 && endArr !== -1 && endArr > startArr) {
+          try {
+            const arrStr = trimmed.substring(startArr, endArr + 1);
+            return JSON.parse(arrStr);
+          } catch (e3) {
+            // 4. Try removing markdown code blocks
+            const withoutMarkdown = trimmed
+              .replace(/```json\n?/gi, '')
+              .replace(/```\n?/g, '');
+            try {
+              return JSON.parse(withoutMarkdown);
+            } catch (e4) {
+              // 5. Try finding any balanced JSON-like structure
+              const jsonMatch = trimmed.match(/\{[\s\S]*\}/);
+              if (jsonMatch) {
+                try {
+                  return JSON.parse(jsonMatch[0]);
+                } catch (e5) {
+                  // Ignore
+                }
+              }
+            }
+          }
         }
       }
     }
+    // Log the problematic response for debugging
+    console.error("Failed to parse AI response:", trimmed.substring(0, 500));
     throw new Error("Could not find valid JSON in AI response");
   }
 }
