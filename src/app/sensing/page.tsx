@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Radar, TrendingUp, AlertTriangle, Zap, Copy, ExternalLink, ArrowRight } from "lucide-react";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Dialog,
   DialogContent,
@@ -24,6 +24,28 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Radar,
+  TrendingUp,
+  AlertTriangle,
+  Zap,
+  Copy,
+  ExternalLink,
+  ArrowRight,
+  Search,
+  Globe,
+  Calendar,
+  BarChart3,
+  Target,
+  Brain,
+  Sparkles,
+  ChevronDown,
+  ChevronRight,
+  CheckCircle2,
+  Clock,
+  XCircle,
+  X
+} from "lucide-react";
 
 interface SensingQuery {
   id: string;
@@ -64,12 +86,20 @@ export default function SensingPage() {
   const [loading, setLoading] = useState(true);
   const [newQuery, setNewQuery] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [selectedQuery, setSelectedQuery] = useState<SensingQuery | null>(null);
+  const [selectedQueryId, setSelectedQueryId] = useState<string | null>(null);
   const [copyDialogOpen, setCopyDialogOpen] = useState(false);
   const [channels, setChannels] = useState<Channel[]>([]);
   const [selectedChannel, setSelectedChannel] = useState("");
   const [selectedSignals, setSelectedSignals] = useState<number[]>([]);
   const [copying, setCopying] = useState(false);
+  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
+    signals: true,
+    weakSignals: true,
+    trends: true,
+    drivers: true
+  });
+
+  const selectedQuery = queries.find(q => q.id === selectedQueryId) || null;
 
   useEffect(() => {
     fetchQueries();
@@ -105,22 +135,19 @@ export default function SensingPage() {
       if (res.ok) {
         setNewQuery("");
         // Immediately trigger the research
-        const execRes = await fetch(`/api/sensing/${data.id}/execute`, {
-          method: 'POST'
-        });
-        await fetchQueries();
+        await fetch(`/api/sensing/${data.id}/execute`, { method: 'POST' });
 
-        // Refresh until completed
+        // Select the new query and poll for completion
+        setSelectedQueryId(data.id);
+
         const poll = setInterval(async () => {
           await fetchQueries();
           const updated = queries.find(q => q.id === data.id);
           if (updated?.status === 'completed' || updated?.status === 'failed') {
             clearInterval(poll);
-            setSelectedQuery(updated || null);
           }
-        }, 2000);
+        }, 3000);
 
-        // Clear poll after 5 minutes
         setTimeout(() => clearInterval(poll), 300000);
       }
     } catch (error) {
@@ -161,267 +188,420 @@ export default function SensingPage() {
   };
 
   const openCopyDialog = (query: SensingQuery) => {
-    setSelectedQuery(query);
     setSelectedSignals(query.results.signals?.map((_, i) => i) || []);
     setCopyDialogOpen(true);
   };
 
-  const getStatusColor = (status: string) => {
+  const toggleSection = (section: string) => {
+    setExpandedSections(prev => ({ ...prev, [section]: !prev[section] }));
+  };
+
+  const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'completed': return 'bg-green-100 text-green-800';
-      case 'processing': return 'bg-blue-100 text-blue-800';
-      case 'failed': return 'bg-red-100 text-red-800';
-      default: return 'bg-gray-100 text-gray-800';
+      case 'completed': return <CheckCircle2 className="w-4 h-4 text-green-500" />;
+      case 'processing': return <Clock className="w-4 h-4 text-blue-500 animate-pulse" />;
+      case 'failed': return <XCircle className="w-4 h-4 text-red-500" />;
+      default: return <Clock className="w-4 h-4 text-gray-400" />;
     }
   };
 
-  const getDirectionIcon = (direction: string) => {
+  const getDirectionColor = (direction: string) => {
     switch (direction) {
-      case 'rising': return <TrendingUp className="w-4 h-4 text-green-500" />;
-      case 'falling': return <TrendingUp className="w-4 h-4 text-red-500 rotate-180" />;
-      default: return <TrendingUp className="w-4 h-4 text-gray-400" />;
+      case 'rising': return 'from-green-500/20 to-green-500/5 border-green-200';
+      case 'falling': return 'from-red-500/20 to-red-500/5 border-red-200';
+      default: return 'from-gray-500/20 to-gray-500/5 border-gray-200';
     }
+  };
+
+  const getCategoryColor = (category: string) => {
+    const colors: Record<string, string> = {
+      social: 'bg-pink-100 text-pink-700 border-pink-200',
+      technological: 'bg-blue-100 text-blue-700 border-blue-200',
+      economic: 'bg-green-100 text-green-700 border-green-200',
+      environmental: 'bg-emerald-100 text-emerald-700 border-emerald-200',
+      political: 'bg-purple-100 text-purple-700 border-purple-200',
+      legal: 'bg-orange-100 text-orange-700 border-orange-200',
+      ethical: 'bg-indigo-100 text-indigo-700 border-indigo-200',
+    };
+    return colors[category.toLowerCase()] || 'bg-gray-100 text-gray-700 border-gray-200';
   };
 
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
-        <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
+        <div className="text-center">
+          <div className="w-12 h-12 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-gray-500">Loading...</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6">
-      {/* Header */}
-      <div className="flex items-center gap-3">
-        <div className="p-2 bg-indigo-100 rounded-lg">
-          <Radar className="w-6 h-6 text-indigo-600" />
-        </div>
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Sensing</h1>
-          <p className="text-sm text-gray-500">Strategic foresight research tool</p>
+    <div className="flex h-full gap-6">
+      {/* Left Panel - Query List */}
+      <div className="w-80 flex-shrink-0 flex flex-col">
+        {/* Search Input */}
+        <Card className="mb-4 border-0 shadow-sm bg-gradient-to-br from-indigo-50 to-white">
+          <CardContent className="p-4">
+            <form onSubmit={handleSubmit} className="space-y-3">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <Textarea
+                  placeholder="What do you want to sense?"
+                  value={newQuery}
+                  onChange={(e) => setNewQuery(e.target.value)}
+                  className="pl-10 min-h-[80px] resize-none border-indigo-100 focus:border-indigo-300 focus:ring-indigo-200"
+                />
+              </div>
+              <Button
+                type="submit"
+                disabled={submitting || !newQuery.trim()}
+                className="w-full bg-indigo-600 hover:bg-indigo-700"
+              >
+                {submitting ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />
+                    Researching...
+                  </>
+                ) : (
+                  <>
+                    <Radar className="w-4 h-4 mr-2" />
+                    Start Sensing
+                  </>
+                )}
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+
+        {/* Query History */}
+        <div className="flex-1 overflow-auto">
+          <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 px-1">
+            Research History
+          </h3>
+          <div className="space-y-2">
+            {queries.length === 0 ? (
+              <p className="text-sm text-gray-400 text-center py-8">
+                No research yet. Start by entering a topic above.
+              </p>
+            ) : (
+              queries.map((query) => (
+                <button
+                  key={query.id}
+                  onClick={() => setSelectedQueryId(query.id)}
+                  className={`w-full text-left p-3 rounded-xl transition-all ${
+                    selectedQueryId === query.id
+                      ? 'bg-indigo-50 border-indigo-200 border shadow-sm'
+                      : 'hover:bg-gray-50 border border-transparent'
+                  }`}
+                >
+                  <div className="flex items-start gap-2">
+                    {getStatusIcon(query.status)}
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-gray-900 text-sm truncate">{query.query}</p>
+                      <p className="text-xs text-gray-400 mt-1">
+                        {new Date(query.created_at).toLocaleDateString()}
+                      </p>
+                    </div>
+                  </div>
+                </button>
+              ))
+            )}
+          </div>
         </div>
       </div>
 
-      {/* New Query Form */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">New Research</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <Textarea
-              placeholder="What do you want to sense? E.g., 'AI trends in healthcare 2025', 'EV market developments', 'remote work future trends'"
-              value={newQuery}
-              onChange={(e) => setNewQuery(e.target.value)}
-              className="min-h-[100px]"
-            />
-            <Button type="submit" disabled={submitting || !newQuery.trim()}>
-              {submitting ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Starting Research...
-                </>
-              ) : (
-                <>
-                  <Radar className="w-4 h-4 mr-2" />
-                  Start Sensing
-                </>
-              )}
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
-
-      {/* Previous Queries */}
-      <div className="space-y-4">
-        <h2 className="text-lg font-semibold text-gray-900">Research History</h2>
-        {queries.length === 0 ? (
-          <p className="text-gray-500 text-sm">No research queries yet. Start by researching a topic above.</p>
+      {/* Right Panel - Results */}
+      <div className="flex-1 overflow-auto">
+        {!selectedQuery ? (
+          <div className="flex flex-col items-center justify-center h-full text-center">
+            <div className="w-20 h-20 bg-gradient-to-br from-indigo-100 to-purple-100 rounded-2xl flex items-center justify-center mb-4">
+              <Brain className="w-10 h-10 text-indigo-500" />
+            </div>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Strategic Foresight</h3>
+            <p className="text-gray-500 max-w-md">
+              Select a research query from the left panel to view signals, trends, and drivers, or create a new research to discover emerging patterns.
+            </p>
+          </div>
+        ) : selectedQuery.status === 'processing' ? (
+          <div className="flex flex-col items-center justify-center h-full">
+            <div className="relative mb-6">
+              <div className="w-24 h-24 border-4 border-indigo-100 border-t-indigo-500 rounded-full animate-spin" />
+              <div className="absolute inset-0 flex items-center justify-center">
+                <Sparkles className="w-8 h-8 text-indigo-500 animate-pulse" />
+              </div>
+            </div>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Analyzing {selectedQuery.query}</h3>
+            <p className="text-gray-500">Scanning sources and identifying patterns...</p>
+          </div>
+        ) : selectedQuery.status === 'failed' ? (
+          <div className="flex flex-col items-center justify-center h-full">
+            <div className="w-20 h-20 bg-red-100 rounded-2xl flex items-center justify-center mb-4">
+              <XCircle className="w-10 h-10 text-red-500" />
+            </div>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Research Failed</h3>
+            <p className="text-gray-500">Please try again with a different query.</p>
+          </div>
         ) : (
-          <div className="grid gap-4">
-            {queries.map((query) => (
-              <Card key={query.id} className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => setSelectedQuery(query)}>
-                <CardContent className="p-4">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <h3 className="font-medium text-gray-900">{query.query}</h3>
-                      <p className="text-sm text-gray-500 mt-1">
-                        {new Date(query.created_at).toLocaleDateString()} at {new Date(query.created_at).toLocaleTimeString()}
-                      </p>
-                    </div>
-                    <Badge className={getStatusColor(query.status)}>
-                      {query.status}
-                    </Badge>
-                  </div>
+          <div className="space-y-6 pb-8">
+            {/* Header */}
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-xl font-bold text-gray-900">{selectedQuery.query}</h2>
+                <p className="text-sm text-gray-500 mt-1">
+                  Completed {new Date(selectedQuery.completed_at || selectedQuery.created_at).toLocaleString()}
+                </p>
+              </div>
+              <Button onClick={() => openCopyDialog(selectedQuery)} className="bg-indigo-600 hover:bg-indigo-700">
+                <Copy className="w-4 h-4 mr-2" />
+                Copy to Channel
+              </Button>
+            </div>
 
-                  {query.status === 'completed' && query.results && (
-                    <div className="mt-3 flex gap-4 text-sm">
-                      {query.results.signals?.length > 0 && (
-                        <span className="flex items-center gap-1 text-gray-600">
-                          <Zap className="w-3 h-3" /> {query.results.signals.length} signals
-                        </span>
-                      )}
-                      {query.results.weak_signals?.length > 0 && (
-                        <span className="flex items-center gap-1 text-gray-600">
-                          <AlertTriangle className="w-3 h-3" /> {query.results.weak_signals.length} weak signals
-                        </span>
-                      )}
-                      {query.results.trends?.length > 0 && (
-                        <span className="flex items-center gap-1 text-gray-600">
-                          <TrendingUp className="w-3 h-3" /> {query.results.trends.length} trends
-                        </span>
-                      )}
-                      {query.results.drivers?.length > 0 && (
-                        <span className="flex items-center gap-1 text-gray-600">
-                          <ArrowRight className="w-3 h-3" /> {query.results.drivers.length} drivers
-                        </span>
-                      )}
-                    </div>
+            {/* Signals Section */}
+            {selectedQuery.results.signals && selectedQuery.results.signals.length > 0 && (
+              <div className="space-y-3">
+                <button
+                  onClick={() => toggleSection('signals')}
+                  className="flex items-center gap-2 text-left w-full group"
+                >
+                  {expandedSections.signals ? (
+                    <ChevronDown className="w-5 h-5 text-gray-400" />
+                  ) : (
+                    <ChevronRight className="w-5 h-5 text-gray-400" />
                   )}
-                </CardContent>
-              </Card>
-            ))}
+                  <div className="p-2 bg-indigo-100 rounded-lg">
+                    <Zap className="w-4 h-4 text-indigo-600" />
+                  </div>
+                  <h3 className="font-semibold text-gray-900">Signals</h3>
+                  <Badge variant="secondary" className="bg-indigo-50 text-indigo-700">
+                    {selectedQuery.results.signals.length}
+                  </Badge>
+                </button>
+
+                {expandedSections.signals && (
+                  <div className="grid grid-cols-1 gap-3 pl-7">
+                    {selectedQuery.results.signals.map((signal, i) => (
+                      <Card key={i} className="border-indigo-100 hover:border-indigo-200 hover:shadow-md transition-all group">
+                        <CardContent className="p-4">
+                          <div className="flex items-start justify-between gap-4">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-2">
+                                <h4 className="font-medium text-gray-900">{signal.title}</h4>
+                                <Badge
+                                  variant="outline"
+                                  className={`text-xs ${
+                                    signal.relevance === 'high' ? 'border-green-300 text-green-700' :
+                                    signal.relevance === 'medium' ? 'border-yellow-300 text-yellow-700' :
+                                    'border-gray-300 text-gray-600'
+                                  }`}
+                                >
+                                  {signal.relevance}
+                                </Badge>
+                              </div>
+                              <p className="text-sm text-gray-600">{signal.description}</p>
+                              <div className="flex items-center gap-3 mt-2">
+                                <span className="flex items-center gap-1 text-xs text-gray-500">
+                                  <Globe className="w-3 h-3" />
+                                  {signal.source}
+                                </span>
+                                {signal.date && (
+                                  <span className="flex items-center gap-1 text-xs text-gray-400">
+                                    <Calendar className="w-3 h-3" />
+                                    {signal.date}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            {signal.source_url && (
+                              <a
+                                href={signal.source_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="opacity-0 group-hover:opacity-100 p-2 hover:bg-indigo-50 rounded-lg transition-all"
+                              >
+                                <ExternalLink className="w-4 h-4 text-indigo-600" />
+                              </a>
+                            )}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Weak Signals Section */}
+            {selectedQuery.results.weak_signals && selectedQuery.results.weak_signals.length > 0 && (
+              <div className="space-y-3">
+                <button
+                  onClick={() => toggleSection('weakSignals')}
+                  className="flex items-center gap-2 text-left w-full group"
+                >
+                  {expandedSections.weakSignals ? (
+                    <ChevronDown className="w-5 h-5 text-gray-400" />
+                  ) : (
+                    <ChevronRight className="w-5 h-5 text-gray-400" />
+                  )}
+                  <div className="p-2 bg-amber-100 rounded-lg">
+                    <AlertTriangle className="w-4 h-4 text-amber-600" />
+                  </div>
+                  <h3 className="font-semibold text-gray-900">Weak Signals</h3>
+                  <Badge variant="secondary" className="bg-amber-50 text-amber-700">
+                    {selectedQuery.results.weak_signals.length}
+                  </Badge>
+                </button>
+
+                {expandedSections.weakSignals && (
+                  <div className="grid grid-cols-1 gap-3 pl-7">
+                    {selectedQuery.results.weak_signals.map((signal, i) => (
+                      <Card key={i} className="border-amber-100 bg-gradient-to-r from-amber-50/50 to-white hover:shadow-md transition-all">
+                        <CardContent className="p-4">
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <p className="text-sm text-gray-800 font-medium">{signal.description}</p>
+                              <div className="mt-2 flex items-center gap-4">
+                                <span className="text-xs text-gray-500">
+                                  <span className="font-medium">Impact:</span> {signal.potential_impact}
+                                </span>
+                                <Badge
+                                  variant="outline"
+                                  className={`text-xs ${
+                                    signal.uncertainty_level === 'high' ? 'border-red-300 text-red-700' :
+                                    signal.uncertainty_level === 'medium' ? 'border-yellow-300 text-yellow-700' :
+                                    'border-green-300 text-green-700'
+                                  }`}
+                                >
+                                  {signal.uncertainty_level} uncertainty
+                                </Badge>
+                              </div>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Trends Section */}
+            {selectedQuery.results.trends && selectedQuery.results.trends.length > 0 && (
+              <div className="space-y-3">
+                <button
+                  onClick={() => toggleSection('trends')}
+                  className="flex items-center gap-2 text-left w-full group"
+                >
+                  {expandedSections.trends ? (
+                    <ChevronDown className="w-5 h-5 text-gray-400" />
+                  ) : (
+                    <ChevronRight className="w-5 h-5 text-gray-400" />
+                  )}
+                  <div className="p-2 bg-green-100 rounded-lg">
+                    <BarChart3 className="w-4 h-4 text-green-600" />
+                  </div>
+                  <h3 className="font-semibold text-gray-900">Trends</h3>
+                  <Badge variant="secondary" className="bg-green-50 text-green-700">
+                    {selectedQuery.results.trends.length}
+                  </Badge>
+                </button>
+
+                {expandedSections.trends && (
+                  <div className="grid grid-cols-1 gap-3 pl-7">
+                    {selectedQuery.results.trends.map((trend, i) => (
+                      <Card
+                        key={i}
+                        className={`border bg-gradient-to-r ${getDirectionColor(trend.direction)} hover:shadow-md transition-all`}
+                      >
+                        <CardContent className="p-4">
+                          <div className="flex items-start justify-between">
+                            <div className="flex items-center gap-2 mb-2">
+                              {trend.direction === 'rising' && <TrendingUp className="w-5 h-5 text-green-600" />}
+                              {trend.direction === 'falling' && <TrendingUp className="w-5 h-5 text-red-500 rotate-180" />}
+                              {trend.direction === 'stable' && <TrendingUp className="w-5 h-5 text-gray-400" />}
+                              <h4 className="font-semibold text-gray-900">{trend.name}</h4>
+                              <Badge
+                                variant="outline"
+                                className={`text-xs capitalize ${
+                                  trend.direction === 'rising' ? 'border-green-400 text-green-700' :
+                                  trend.direction === 'falling' ? 'border-red-400 text-red-700' :
+                                  'border-gray-400 text-gray-600'
+                                }`}
+                              >
+                                {trend.direction}
+                              </Badge>
+                            </div>
+                          </div>
+                          <p className="text-sm text-gray-700 mb-2">{trend.description}</p>
+                          {trend.evidence && trend.evidence.length > 0 && (
+                            <div className="mt-2 pt-2 border-t border-gray-200/50">
+                              <p className="text-xs font-medium text-gray-500 mb-1">Evidence:</p>
+                              <ul className="text-xs text-gray-600 space-y-1">
+                                {trend.evidence.map((e, j) => (
+                                  <li key={j} className="flex items-start gap-1">
+                                    <span className="text-gray-400">•</span>
+                                    {e}
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Drivers Section */}
+            {selectedQuery.results.drivers && selectedQuery.results.drivers.length > 0 && (
+              <div className="space-y-3">
+                <button
+                  onClick={() => toggleSection('drivers')}
+                  className="flex items-center gap-2 text-left w-full group"
+                >
+                  {expandedSections.drivers ? (
+                    <ChevronDown className="w-5 h-5 text-gray-400" />
+                  ) : (
+                    <ChevronRight className="w-5 h-5 text-gray-400" />
+                  )}
+                  <div className="p-2 bg-purple-100 rounded-lg">
+                    <Target className="w-4 h-4 text-purple-600" />
+                  </div>
+                  <h3 className="font-semibold text-gray-900">Drivers</h3>
+                  <Badge variant="secondary" className="bg-purple-50 text-purple-700">
+                    {selectedQuery.results.drivers.length}
+                  </Badge>
+                </button>
+
+                {expandedSections.drivers && (
+                  <div className="grid grid-cols-2 gap-3 pl-7">
+                    {selectedQuery.results.drivers.map((driver, i) => (
+                      <Card
+                        key={i}
+                        className="border-purple-100 bg-gradient-to-br from-purple-50/50 to-white hover:shadow-md transition-all"
+                      >
+                        <CardContent className="p-4">
+                          <Badge className={`text-xs mb-2 border ${getCategoryColor(driver.category)}`}>
+                            {driver.category}
+                          </Badge>
+                          <p className="text-sm text-gray-800 font-medium">{driver.description}</p>
+                          <p className="text-xs text-gray-500 mt-2">
+                            <span className="font-medium">Impact:</span> {driver.impact}
+                          </p>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
       </div>
-
-      {/* Results Dialog */}
-      <Dialog open={!!selectedQuery && selectedQuery?.status === 'completed'} onOpenChange={(open) => !open && setSelectedQuery(null)}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>{selectedQuery?.query}</DialogTitle>
-            <DialogDescription>
-              Strategic foresight research results
-            </DialogDescription>
-          </DialogHeader>
-
-          {selectedQuery?.results && (
-            <div className="space-y-6">
-              {/* Signals */}
-              {selectedQuery.results.signals && selectedQuery.results.signals.length > 0 && (
-                <div>
-                  <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                    <Zap className="w-5 h-5 text-indigo-600" />
-                    Signals ({selectedQuery.results.signals.length})
-                  </h3>
-                  <div className="space-y-2 max-h-60 overflow-y-auto">
-                    {selectedQuery.results.signals.map((signal, i) => (
-                      <div key={i} className="p-3 bg-gray-50 rounded-lg">
-                        <div className="flex items-start justify-between">
-                          <div>
-                            <h4 className="font-medium text-gray-900">{signal.title}</h4>
-                            <p className="text-sm text-gray-600 mt-1">{signal.description}</p>
-                            <div className="flex gap-2 mt-2">
-                              <span className="text-xs text-gray-500">{signal.source}</span>
-                              {signal.date && <span className="text-xs text-gray-400">• {signal.date}</span>}
-                            </div>
-                          </div>
-                          {signal.source_url && (
-                            <a href={signal.source_url} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:text-indigo-800">
-                              <ExternalLink className="w-4 h-4" />
-                            </a>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="mt-3"
-                    onClick={() => openCopyDialog(selectedQuery)}
-                  >
-                    <Copy className="w-4 h-4 mr-2" />
-                    Copy Signals to Channel
-                  </Button>
-                </div>
-              )}
-
-              {/* Weak Signals */}
-              {selectedQuery.results.weak_signals && selectedQuery.results.weak_signals.length > 0 && (
-                <div>
-                  <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                    <AlertTriangle className="w-5 h-5 text-amber-500" />
-                    Weak Signals ({selectedQuery.results.weak_signals.length})
-                  </h3>
-                  <div className="space-y-2">
-                    {selectedQuery.results.weak_signals.map((signal, i) => (
-                      <div key={i} className="p-3 bg-amber-50 rounded-lg">
-                        <p className="text-sm text-gray-800">{signal.description}</p>
-                        <p className="text-xs text-gray-500 mt-1">Potential impact: {signal.potential_impact}</p>
-                        <Badge variant="outline" className="mt-2 text-xs">
-                          Uncertainty: {signal.uncertainty_level}
-                        </Badge>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Trends */}
-              {selectedQuery.results.trends && selectedQuery.results.trends.length > 0 && (
-                <div>
-                  <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                    <TrendingUp className="w-5 h-5 text-green-600" />
-                    Trends ({selectedQuery.results.trends.length})
-                  </h3>
-                  <div className="space-y-2">
-                    {selectedQuery.results.trends.map((trend, i) => (
-                      <div key={i} className="p-3 bg-green-50 rounded-lg">
-                        <div className="flex items-center gap-2">
-                          {getDirectionIcon(trend.direction)}
-                          <h4 className="font-medium text-gray-900">{trend.name}</h4>
-                          <Badge variant="outline" className="text-xs capitalize">
-                            {trend.direction}
-                          </Badge>
-                        </div>
-                        <p className="text-sm text-gray-600 mt-1">{trend.description}</p>
-                        {trend.evidence && trend.evidence.length > 0 && (
-                          <ul className="text-xs text-gray-500 mt-2 list-disc list-inside">
-                            {trend.evidence.map((e, j) => (
-                              <li key={j}>{e}</li>
-                            ))}
-                          </ul>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Drivers */}
-              {selectedQuery.results.drivers && selectedQuery.results.drivers.length > 0 && (
-                <div>
-                  <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                    <ArrowRight className="w-5 h-5 text-purple-600" />
-                    Drivers ({selectedQuery.results.drivers.length})
-                  </h3>
-                  <div className="grid grid-cols-2 gap-2">
-                    {selectedQuery.results.drivers.map((driver, i) => (
-                      <div key={i} className="p-3 bg-purple-50 rounded-lg">
-                        <Badge className="bg-purple-200 text-purple-800 text-xs mb-1">
-                          {driver.category}
-                        </Badge>
-                        <p className="text-sm text-gray-800">{driver.description}</p>
-                        <p className="text-xs text-gray-500 mt-1">{driver.impact}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {selectedQuery?.status === 'processing' && (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="w-8 h-8 animate-spin text-indigo-600 mr-2" />
-              <span className="text-gray-600">Research in progress...</span>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
 
       {/* Copy to Channel Dialog */}
       <Dialog open={copyDialogOpen} onOpenChange={setCopyDialogOpen}>
@@ -452,28 +632,33 @@ export default function SensingPage() {
 
             <div>
               <label className="text-sm font-medium text-gray-700">Select Signals</label>
-              <div className="mt-1 space-y-2 max-h-60 overflow-y-auto border rounded-lg p-2">
-                {selectedQuery?.results.signals?.map((signal, i) => (
-                  <label key={i} className="flex items-start gap-2 p-2 hover:bg-gray-50 rounded cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={selectedSignals.includes(i)}
-                      onChange={(e) => {
-                        if (e.target.checked) {
-                          setSelectedSignals([...selectedSignals, i]);
-                        } else {
-                          setSelectedSignals(selectedSignals.filter(s => s !== i));
-                        }
-                      }}
-                      className="mt-1"
-                    />
-                    <div>
-                      <p className="text-sm font-medium">{signal.title}</p>
-                      <p className="text-xs text-gray-500">{signal.source}</p>
-                    </div>
-                  </label>
-                ))}
-              </div>
+              <ScrollArea className="mt-1 h-[200px] border rounded-lg p-2">
+                <div className="space-y-2">
+                  {selectedQuery?.results.signals?.map((signal, i) => (
+                    <label
+                      key={i}
+                      className="flex items-start gap-2 p-2 hover:bg-gray-50 rounded-lg cursor-pointer"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedSignals.includes(i)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedSignals([...selectedSignals, i]);
+                          } else {
+                            setSelectedSignals(selectedSignals.filter(s => s !== i));
+                          }
+                        }}
+                        className="mt-1"
+                      />
+                      <div>
+                        <p className="text-sm font-medium">{signal.title}</p>
+                        <p className="text-xs text-gray-500">{signal.source}</p>
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              </ScrollArea>
             </div>
           </div>
 
@@ -487,7 +672,7 @@ export default function SensingPage() {
             >
               {copying ? (
                 <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />
                   Copying...
                 </>
               ) : (
