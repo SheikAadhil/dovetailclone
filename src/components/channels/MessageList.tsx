@@ -45,6 +45,9 @@ export function MessageList({ channelId }: MessageListProps) {
   const [isTagDialogOpen, setIsTagDialogOpen] = useState(false);
   const [tagging, setTagging] = useState(false);
   const [expandedMessage, setExpandedMessage] = useState<DataPoint | null>(null);
+  const [analysisProgressOpen, setAnalysisProgressOpen] = useState(false);
+  const [analysisProgress, setAnalysisProgress] = useState("");
+  const [analysisStep, setAnalysisStep] = useState(0);
 
   useEffect(() => {
     setMounted(true);
@@ -122,27 +125,81 @@ export function MessageList({ channelId }: MessageListProps) {
   const handleAnalyzeSelected = async () => {
     const selectedMessages = messages.filter(m => selectedIds.has(m.id));
     const hasOnlyObservationNodes = selectedMessages.every(m => m.source === 'node' || m.source === 'markdown');
-    
+
     if (hasOnlyObservationNodes) {
       if (selectedIds.size < 1) { alert("Please select at least 1 observation node."); return; }
     } else {
       if (selectedIds.size < 2) { alert("Please select at least 2 signals."); return; }
     }
+
     setAnalyzingBatch(true);
+    setAnalysisProgressOpen(true);
+    setAnalysisProgress("Starting analysis...");
+    setAnalysisStep(0);
+
     try {
       const res = await fetch(`/api/channels/${channelId}/analyze`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'text/event-stream'
+        },
         body: JSON.stringify({ messageIds: Array.from(selectedIds) })
       });
-      const data = await res.json();
-      if (data.error) alert(data.error);
-      else {
-        alert(`Successfully analyzed ${selectedIds.size} messages!`);
-        setSelectedIds(new Set());
-        router.refresh();
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        alert(errorData.error || 'Analysis failed');
+        return;
       }
-    } catch (e) { alert("Analysis failed."); } finally { setAnalyzingBatch(false); }
+
+      const reader = res.body?.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      if (reader) {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              const data = line.slice(6);
+              if (data === '[DONE]') continue;
+              try {
+                const parsed = JSON.parse(data);
+                if (parsed.progress) {
+                  setAnalysisProgress(parsed.progress);
+                  if (parsed.step) setAnalysisStep(parsed.step);
+                }
+              } catch (e) {
+                setAnalysisProgress(data);
+              }
+            }
+          }
+        }
+      }
+
+      setSelectedIds(new Set());
+      setAnalysisProgress("Analysis complete!");
+      router.refresh();
+
+      // Close dialog after a short delay
+      setTimeout(() => {
+        setAnalysisProgressOpen(false);
+        setAnalysisProgress("");
+        setAnalysisStep(0);
+      }, 1500);
+
+    } catch (e) {
+      alert("Analysis failed.");
+    } finally {
+      setAnalyzingBatch(false);
+    }
   };
 
   const handleAnalyzeSingle = async (id: string) => {
@@ -357,6 +414,64 @@ export function MessageList({ channelId }: MessageListProps) {
           </div>
         </div>
       )}
+
+      {/* Analysis Progress Dialog */}
+      <Dialog open={analysisProgressOpen} onOpenChange={setAnalysisProgressOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Brain className="w-5 h-5 text-indigo-600" />
+              Analyzing Signals
+            </DialogTitle>
+            <DialogDescription>
+              {selectedIds.size} signals selected for analysis
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4 space-y-4">
+            {/* Progress Steps */}
+            <div className="space-y-3">
+              <div className="flex items-center gap-3">
+                <div className={`w-3 h-3 rounded-full ${analysisStep >= 1 ? 'bg-green-500' : 'bg-gray-300'} ${analyzingBatch && analysisStep < 1 ? 'animate-pulse' : ''}`} />
+                <span className={`text-sm ${analysisStep >= 1 ? 'text-gray-900 font-medium' : 'text-gray-500'}`}>
+                  Layer 1: Primary Analysis
+                </span>
+              </div>
+              <div className="flex items-center gap-3 ml-3">
+                <div className="w-0.5 h-4 bg-gray-200" />
+                <div className={`w-3 h-3 rounded-full ${analysisStep >= 2 ? 'bg-green-500' : 'bg-gray-300'} ${analyzingBatch && analysisStep >= 1 && analysisStep < 2 ? 'animate-pulse' : ''}`} />
+                <span className={`text-sm ${analysisStep >= 2 ? 'text-gray-900 font-medium' : 'text-gray-500'}`}>
+                  Layer 2: Deep Review
+                </span>
+              </div>
+            </div>
+
+            {/* Current Status */}
+            <div className="bg-indigo-50 rounded-lg p-3">
+              <p className="text-sm text-indigo-700 font-medium">{analysisProgress || "Initializing..."}</p>
+            </div>
+
+            {/* Loading Animation */}
+            {analyzingBatch && (
+              <div className="flex items-center justify-center gap-2">
+                <Loader2 className="w-5 h-5 animate-spin text-indigo-600" />
+                <span className="text-sm text-gray-500">Processing...</span>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setAnalysisProgressOpen(false);
+                setAnalyzingBatch(false);
+              }}
+              disabled={analyzingBatch}
+            >
+              {analyzingBatch ? "Please wait..." : "Cancel"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

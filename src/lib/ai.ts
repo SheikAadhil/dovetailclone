@@ -16,12 +16,13 @@ const getPrimaryModels = (): string[] => {
   const envModel = process.env.PRIMARY_MODEL;
   const fallbacks = [
     "google/gemini-2.0-flash-001",
+    "google/gemma-3-4b-it:free",
     "meta-llama/llama-3.3-70b-instruct:free",
     "mistralai/mistral-small-3.1-24b-instruct:free"
   ];
   if (envModel) return [envModel, ...fallbacks];
   return [
-    "qwen/qwen3-next-80b-a3b-instruct:free",
+    "google/gemini-2.0-flash-001",
     ...fallbacks
   ];
 };
