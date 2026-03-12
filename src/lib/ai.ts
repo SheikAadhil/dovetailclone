@@ -17,7 +17,7 @@ const getPrimaryModels = (): string[] => {
   const fallbacks = [
     "google/gemini-2.0-flash-001",
     "meta-llama/llama-3.3-70b-instruct:free",
-    "mistralai/mistral-7b-instruct:free"
+    "mistralai/mistral-small-3.1-24b-instruct:free"
   ];
   if (envModel) return [envModel, ...fallbacks];
   return [
@@ -43,7 +43,7 @@ const getFallbackModels = (): string[] => {
   const fallbacks = [
     "google/gemini-2.0-flash-001",
     "meta-llama/llama-3.3-70b-instruct:free",
-    "mistralai/mistral-7b-instruct:free"
+    "mistralai/mistral-small-3.1-24b-instruct:free"
   ];
   if (envModel) return [envModel, ...fallbacks];
   return fallbacks;
