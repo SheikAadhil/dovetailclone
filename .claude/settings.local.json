@@ -33,7 +33,8 @@
       "WebFetch(domain:www.giftatwork.com)",
       "WebFetch(domain:www.alterthink.co.uk)",
       "Bash(git -C \"C:\\\\Users\\\\Hxtreme\\\\Dovetail Clone\" log --oneline -20)",
-      "Bash(cd \"C:\\\\Users\\\\Hxtreme\\\\Dovetail Clone\" && npm install)"
+      "Bash(cd \"C:\\\\Users\\\\Hxtreme\\\\Dovetail Clone\" && npm install)",
+      "WebFetch(domain:ai.google.dev)"
     ]
   }
 }
