@@ -44,8 +44,8 @@ const getOpenRouterClient = () => {
 const getFallbackModels = (): string[] => {
   const envModel = process.env.FALLBACK_MODEL;
   const fallbacks = [
-    "google/gemini-2.0-flash-lite-preview-02-05:free",
-    "meta-llama/llama-3.1-8b-instruct:free"
+    "qwen/qwen3-8b-instruct:free",
+    "deepseek/deepseek-chat:free"
   ];
   if (envModel) return [envModel, ...fallbacks];
   return fallbacks;
