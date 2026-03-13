@@ -220,309 +220,199 @@ If you cannot produce valid JSON for any reason, output: {"error": "reason"}
 
 Now produce the analysis:
 
-You are revising a theme-analysis output that is currently too compressed and incomplete.
+## MISSION
 
-Your primary goal is not to make the report shorter or cleaner.
+You are revising a theme-analysis that has important gaps and taxonomy problems.
 
-Your primary goal is to make the analysis complete, auditable, and decision-grade.
+Your job is to improve it into a complete, decision-grade analysis.
 
-CURRENT FAILURE MODE TO CORRECT
+## EXPECTED CHANGES
 
-The current analysis is over-compressing the top-level themes.
-
-It creates a neat-looking summary by merging too many issues into broad buckets and silently dropping important signals.
-
-You must fix that.
-
-MANDATORY CORRECTIONS
-
-1. Do not drop signals
-
-- Every signal must be represented exactly once at the primary analysis layer.
-
-- Every signal must end in one of:
-
+### 1. Fix full signal accounting
+- Every input signal must be represented exactly once in the primary output layer.
+- Every signal must end up in one of:
   - top-level theme
-
+  - strength
   - isolated issue
-
-  - positive strength
-
   - unassigned / ambiguous
+- No signal may disappear.
+- No signal may be counted twice across top-level themes.
 
-- No silent omissions.
+### 2. Restore the missing signals explicitly
+The revised output must account for all currently missing signals, including:
+- reliability / processing failure signals
+- positive strength signals
+- mobile usability issues
+- pricing for experimentation concerns
+- role differences between managers and individual contributors
 
-- If a signal does not fit a major theme, keep it visible as an isolated issue or unassigned signal.
+### 3. Do not let deep themes rescue top-level omissions
+- If an issue appears in a deep theme but not in the product-level output, move it into the correct top-level layer.
+- Deep themes must synthesize across top-level themes.
+- Deep themes must not compensate for incomplete product-level coverage.
 
-2. Do not over-compress top-level themes
+### 4. Improve theme boundaries
+Review the current top-level themes and tighten any that are still over-merged.
+Pay special attention to these possible problems:
+- "Workflow and IA Ambiguity" may be mixing onboarding, conceptual confusion, and ongoing usability
+- "Permissions and Governance" may be mixing privacy/data governance with access/permission friction
+- "Actionability and Output Utility" may need clearer boundaries from prioritization and role-based reporting needs
 
-- Do not force the dataset into too few themes.
+### 5. Preserve good distinctions already found
+Keep these distinctions visible when supported by the data:
+- actionability vs prioritization
+- trust/traceability vs analyst control
+- permissions/access vs privacy/governance
+- integration/ingestion vs cross-source analysis
+- onboarding/IA confusion vs general usability
+- automation needs vs manual-control needs
+- role-based needs vs general workflow friction
 
-- If broad themes hide important distinctions, split them.
+### 6. Preserve positive evidence
+- If users explicitly value something, it must appear in a Strengths section unless there is a strong reason not to.
+- Do not output a pain-only report.
 
-- A neat 4-theme output is worse than a complete 8-theme output if the 4-theme version loses signal coverage.
+### 7. Use plain product language
+- Keep top-level theme names simple and roadmap-usable.
+- Avoid theatrical, philosophical, or consultant-style wording.
+- Deep themes may be somewhat interpretive, but still should remain clear and useful.
 
-3. Restore missing issue types when present
+### 8. Keep singleton issues visible
+- If a signal does not belong in a broader theme, keep it as an isolated issue.
+- Do not erase a valid signal just because it has low frequency.
+
+### 9. Recommendations must map to evidence
+For each top-level theme, give a recommendation that fits the evidence and label it as one of:
+- UX fix
+- IA/content fix
+- model/AI improvement
+- integration/platform fix
+- trust/governance fix
+- pricing/packaging fix
+- workflow/process fix
+
+## MANDATORY WORKFLOW
+
+### STEP 1: Build a signal ledger
+Create a hidden ledger with one row per input signal:
+- signal_id
+- short paraphrase
+- current theme assignment if any
+- revised primary bucket
+- optional secondary tag
+- notes on why it belongs there
+
+### STEP 2: Run a coverage audit before rewriting
+Silently verify:
+- total input signals
+- represented signals
+- missing signals
+- duplicate signals
+
+If missing signals > 0, revise before finalizing.
+
+### STEP 3: Revise the product-level layer
+- Keep strong existing themes where they are valid.
+- Split themes only where boundaries are unclear or multiple product problems are being mixed.
+- Add a Strengths section if positive evidence exists.
+- Add an Isolated Issues section if some signals should not be forced into broader themes.
+
+### STEP 4: Revise the deep themes
+- Make deep themes synthesize across the corrected top-level structure.
+- Remove any deep theme content that is only compensating for top-level gaps.
+- Use clearer, less theatrical names.
+
+## ISSUE TYPES TO TRACK EXPLICITLY
 
 Make sure the analysis preserves these as distinct concerns when supported by data:
 
 - reliability / processing bugs
-
 - integration friction
-
 - privacy / data governance concerns
-
 - notification overload
-
 - pricing for experimentation
-
 - positive strengths
-
 - analyst control features like rename / merge / split
-
 - actionability gaps
-
 - trust / traceability
-
 - permissions / access issues
-
 - role-based needs
-
 - cross-source deduplication
-
 - regional filtering / segmentation
-
-4. Split broad buckets when needed
-
-Do not hide different problems inside vague themes like:
-
-- "usability and onboarding"
-
-- "grouping and filtering"
-
-- "general friction"
-
-If the grouped signals imply different product fixes, separate them.
-
-5. Preserve positive evidence
-
-- If users explicitly value a feature, keep it in a Strengths section.
-
-- Do not output a pain-only report.
-
-6. Handle singleton issues honestly
-
-- If a pattern has only one signal, keep it as an isolated issue unless it is strategically important enough to elevate.
-
-- Do not inflate weak evidence into big themes.
-
-- Do not erase singleton issues either.
-
-7. Deep themes cannot compensate for missing top-level coverage
-
-- If an issue appears in deep analysis but not in top-level themes, fix the top-level layer first.
-
-- Deep themes must synthesize top-level themes, not rescue missing signal coverage.
-
-8. Plain naming only
-
-- Use clear product-usable names.
-
-- Avoid theatrical or consultant-style labels.
-
-- Theme names must make sense in a roadmap review.
-
-9. Recommendations must match evidence
-
-For each theme, give a recommendation that is proportional to the evidence and label it as one of:
-
-- UX fix
-
-- IA/content fix
-
-- model/AI improvement
-
-- integration/platform fix
-
-- trust/governance fix
-
-- pricing/packaging fix
-
-- workflow/process fix
-
-REQUIRED WORKFLOW
-
-STEP 1: Build a signal ledger
-
-Create a hidden ledger with one row per signal:
-
-- signal_id
-
-- paraphrase
-
-- primary issue
-
-- optional secondary issue
-
-- role/stakeholder if visible
-
-- source type if visible
-
-- final bucket:
-
-  - top-level theme
-
-  - isolated issue
-
-  - positive strength
-
-  - unassigned / ambiguous
-
-STEP 2: Validate coverage
-
-Before writing any narrative, silently verify:
-
-- total input signals = total represented signals
-
-- missing signals = 0
-
-- duplicate signals = 0
-
-If validation fails, revise the clustering before writing the output.
-
-STEP 3: Rebuild top-level themes
-
-- Create as many themes as the evidence supports.
-
-- Do not optimize for fewer themes.
-
-- Split themes when they hide distinct product problems.
-
-- Merge themes only when they truly represent the same issue.
-
-STEP 4: Separate layers
-
-Produce:
-
-- top-level themes
-
-- strengths
-
-- isolated issues
-
-- unassigned / ambiguous
-
-- latent tensions
-
-Latent tensions must connect multiple top-level themes.
-
-They must not replace missing top-level themes.
-
-OUTPUT FORMAT
+- mobile usability
+- onboarding friction
+- conceptual/IA confusion
+- prioritization needs
+- manual control vs automation needs
+
+## SPLIT TRIGGERS
+
+Do not hide different problems inside vague themes. Split when:
+- "usability and onboarding" contains both onboarding-specific AND ongoing usability issues
+- "permissions and governance" mixes privacy concerns with access friction
+- "actionability" blends output utility with prioritization needs
+- A theme implies different product fixes for different signal subgroups
+
+## OUTPUT FORMAT
 
 A. Dataset accounting
-
 - Total signals
-
 - Represented signals
-
 - Signals in top-level themes
-
 - Signals in strengths
-
 - Signals in isolated issues
-
 - Signals in unassigned / ambiguous
-
 - Missing signals: none or list
-
 - Duplicate signals: none or list
 
-B. Top-level themes
-
+B. Revised product themes
 For each theme:
-
 - Name
-
 - Definition
-
 - Signal IDs
-
-- Message count
-
 - Why these signals belong together
-
 - Representative evidence
-
 - User need
-
 - Product implication
-
 - Recommendation
-
 - Recommendation type
-
 - Confidence
 
 C. Strengths
-
-For each strength:
-
+For each:
 - Name
-
 - Signal IDs
-
 - Why it matters
-
 - How to preserve or expand it
 
 D. Isolated issues
-
-For each issue:
-
+For each:
 - Name
-
 - Signal IDs
-
 - Why not elevated into a broader theme
-
 - Monitoring note
 
 E. Unassigned / ambiguous
-
 - Signal IDs
-
 - Why unresolved
 
-F. Latent tensions
-
-For each tension:
-
+F. Revised deep themes
+For each:
 - Name
-
 - Connected top-level themes
-
 - What deeper pattern it explains
-
 - Why it matters strategically
-
 - Confidence
 
-FINAL QUALITY GATE
+## FINAL QUALITY GATE
 
-Before finalizing, silently verify:
-
-- Did I account for every signal?
-
-- Did I avoid over-compressing the top-level taxonomy?
-
-- Did I preserve positive signals?
-
-- Did I keep singleton issues visible?
-
-- Did I prevent deep themes from hiding top-level omissions?
-
-- Are recommendations tied directly to evidence?
+Before finalizing, silently check:
+- Did I account for every signal exactly once at the primary layer?
+- Did I restore the missing signals?
+- Did I keep strengths visible?
+- Did I stop deep themes from rescuing top-level omissions?
+- Did I improve over-merged boundaries?
+- Are the top-level names plain and product-usable?
 
 If any answer is no, revise before output.
 
@@ -554,30 +444,50 @@ STRICT OUTPUT REQUIREMENT: You MUST respond with ONLY valid JSON. No conversatio
 
 Output format must be:
 {
-  "themes": [ { "name": "...", ... } ]
+  "deep_themes": [ { "name": "...", ... } ]
 }
 
-Your goal is to extract Deep, Latent, and Interpretive patterns from these signals.
+## MISSION
+
+Your goal is to synthesize DEEP, LATENT, and INTERPRETIVE patterns that connect the top-level themes.
+
+## CRITICAL CONSTRAINT
+
+Deep themes must SYNTHESIZE across top-level themes, not RESCUE them.
+
+- If a deep theme would contain signals that are missing from top-level, that's a TOP-LEVEL problem - fix the top-level layer first.
+- Deep themes explain PATTERNS across themes, they do not fill coverage gaps.
+- If you find signals that should be in top-level but aren't, note them but do not elevate them to deep themes.
+
+## ANALYSIS PRINCIPLES (LAYER 2 - DEEP ANALYSIS)
+
+1. INTERPRETIVE DEPTH: Go beyond the surface. Identify underlying assumptions, organizational dynamics, and systemic issues.
+
+2. DEVELOPED THEMES: Themes must represent a pattern of shared meaning united by a central organizing concept that spans multiple top-level themes.
+
+3. CROSS-THEME SYNTHESIS: A deep theme should connect insights from at least 2 different top-level themes. If it only explains one theme, it's not deep - it's just elaboration.
+
+4. NO COVERAGE RESCUE: Do not let deep themes compensate for incomplete top-level coverage. If signals are missing from top-level, flag them separately.
 
 ${contextPart}
 
-### ANALYSIS PRINCIPLES (LAYER 2 - DEEP ANALYSIS):
-1. INTERPRETIVE DEPTH: Go beyond the surface. Identify underlying assumptions, organizational dynamics, and systemic issues (e.g. "Invisible Labor", "The Silence Paradox").
-2. DEVELOPED THEMES: Themes must represent a pattern of shared meaning united by a central organizing concept.
-3. REFLEXIVITY: Actively interpret the data. What is being said *implicitly*?
-
-### FORMAT: 
+### FORMAT:
 Respond ONLY with a JSON object. No other text.
-JSON SCHEMA: { 
-  "themes": [ 
-    { 
-      "name": "Deep Theme Title", 
-      "summary": "Central Organizing Concept: 1-2 sentences on the underlying interpretive pattern.", 
+JSON SCHEMA: {
+  "deep_themes": [
+    {
+      "name": "Deep Theme Title",
+      "summary": "Central Organizing Concept: 1-2 sentences on the underlying interpretive pattern.",
       "deep_analysis": "Latent Analysis: 1-2 paragraphs exploring conceptual significance, assumptions, and systemic dynamics.",
-      "message_ids": ["1", "2"], 
-      "sentiment": "mixed" 
-    } 
-  ] 
+      "connected_top_level_themes": ["theme1", "theme2"],
+      "message_ids": ["1", "2"],
+      "sentiment": "mixed",
+      "why_synthesizes": "How this connects across multiple top-level themes"
+    }
+  ],
+  "signals_that_need_top_level_coverage": [
+    { "signal_id": "1", "why_missing": "explanation" }
+  ]
 }
 
 ### DATASET (MESSAGES):
