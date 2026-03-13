@@ -48,6 +48,8 @@ export function MessageList({ channelId }: MessageListProps) {
   const [analysisProgressOpen, setAnalysisProgressOpen] = useState(false);
   const [analysisProgress, setAnalysisProgress] = useState("");
   const [analysisStep, setAnalysisStep] = useState(0);
+  const [progressLogs, setProgressLogs] = useState<{ time: string; message: string; type: 'info' | 'success' | 'error' }[]>([]);
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -136,6 +138,8 @@ export function MessageList({ channelId }: MessageListProps) {
     setAnalysisProgressOpen(true);
     setAnalysisProgress("Starting analysis...");
     setAnalysisStep(0);
+    setProgressLogs([{ time: new Date().toLocaleTimeString(), message: "Starting analysis...", type: 'info' }]);
+    setAnalysisError(null);
 
     try {
       const res = await fetch(`/api/channels/${channelId}/analyze`, {
@@ -149,7 +153,8 @@ export function MessageList({ channelId }: MessageListProps) {
 
       if (!res.ok) {
         const errorData = await res.json();
-        alert(errorData.error || 'Analysis failed');
+        setAnalysisError(errorData.error || 'Analysis failed');
+        setProgressLogs(prev => [...prev, { time: new Date().toLocaleTimeString(), message: `Error: ${errorData.error || 'Analysis failed'}`, type: 'error' }]);
         return;
       }
 
@@ -172,12 +177,17 @@ export function MessageList({ channelId }: MessageListProps) {
               if (data === '[DONE]') continue;
               try {
                 const parsed = JSON.parse(data);
-                if (parsed.progress) {
+                if (parsed.error) {
+                  setAnalysisError(parsed.error);
+                  setProgressLogs(prev => [...prev, { time: new Date().toLocaleTimeString(), message: `Error: ${parsed.error}`, type: 'error' }]);
+                } else if (parsed.progress) {
                   setAnalysisProgress(parsed.progress);
                   if (parsed.step) setAnalysisStep(parsed.step);
+                  setProgressLogs(prev => [...prev, { time: new Date().toLocaleTimeString(), message: parsed.progress, type: 'info' }]);
                 }
               } catch (e) {
                 setAnalysisProgress(data);
+                setProgressLogs(prev => [...prev, { time: new Date().toLocaleTimeString(), message: data, type: 'info' }]);
               }
             }
           }
@@ -186,6 +196,7 @@ export function MessageList({ channelId }: MessageListProps) {
 
       setSelectedIds(new Set());
       setAnalysisProgress("Analysis complete!");
+      setProgressLogs(prev => [...prev, { time: new Date().toLocaleTimeString(), message: "Analysis complete!", type: 'success' }]);
       router.refresh();
 
       // Close dialog after a short delay
@@ -193,10 +204,12 @@ export function MessageList({ channelId }: MessageListProps) {
         setAnalysisProgressOpen(false);
         setAnalysisProgress("");
         setAnalysisStep(0);
-      }, 1500);
+        setProgressLogs([]);
+      }, 3000);
 
-    } catch (e) {
-      alert("Analysis failed.");
+    } catch (e: any) {
+      setAnalysisError(e.message || "Analysis failed");
+      setProgressLogs(prev => [...prev, { time: new Date().toLocaleTimeString(), message: `Error: ${e.message || "Analysis failed"}`, type: 'error' }]);
     } finally {
       setAnalyzingBatch(false);
     }
@@ -417,7 +430,7 @@ export function MessageList({ channelId }: MessageListProps) {
 
       {/* Analysis Progress Dialog */}
       <Dialog open={analysisProgressOpen} onOpenChange={setAnalysisProgressOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-lg max-h-[80vh]">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Brain className="w-5 h-5 text-indigo-600" />
@@ -429,32 +442,59 @@ export function MessageList({ channelId }: MessageListProps) {
           </DialogHeader>
           <div className="py-4 space-y-4">
             {/* Progress Steps */}
-            <div className="space-y-3">
-              <div className="flex items-center gap-3">
+            <div className="flex items-center gap-4 text-sm">
+              <div className="flex items-center gap-2">
                 <div className={`w-3 h-3 rounded-full ${analysisStep >= 1 ? 'bg-green-500' : 'bg-gray-300'} ${analyzingBatch && analysisStep < 1 ? 'animate-pulse' : ''}`} />
-                <span className={`text-sm ${analysisStep >= 1 ? 'text-gray-900 font-medium' : 'text-gray-500'}`}>
-                  Layer 1: Primary Analysis
+                <span className={analysisStep >= 1 ? 'text-gray-900 font-medium' : 'text-gray-500'}>
+                  Layer 1
                 </span>
               </div>
-              <div className="flex items-center gap-3 ml-3">
-                <div className="w-0.5 h-4 bg-gray-200" />
+              <div className="flex items-center gap-2">
                 <div className={`w-3 h-3 rounded-full ${analysisStep >= 2 ? 'bg-green-500' : 'bg-gray-300'} ${analyzingBatch && analysisStep >= 1 && analysisStep < 2 ? 'animate-pulse' : ''}`} />
-                <span className={`text-sm ${analysisStep >= 2 ? 'text-gray-900 font-medium' : 'text-gray-500'}`}>
-                  Layer 2: Deep Review
+                <span className={analysisStep >= 2 ? 'text-gray-900 font-medium' : 'text-gray-500'}>
+                  Layer 2
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className={`w-3 h-3 rounded-full ${!analyzingBatch && analysisStep >= 2 ? 'bg-green-500' : 'bg-gray-300'}`} />
+                <span className={!analyzingBatch && analysisStep >= 2 ? 'text-gray-900 font-medium' : 'text-gray-500'}>
+                  Save
                 </span>
               </div>
             </div>
 
-            {/* Current Status */}
-            <div className="bg-indigo-50 rounded-lg p-3">
-              <p className="text-sm text-indigo-700 font-medium">{analysisProgress || "Initializing..."}</p>
+            {/* Progress Log - Scrollable */}
+            <div className="bg-gray-900 rounded-lg p-3 max-h-64 overflow-y-auto">
+              <div className="space-y-1.5">
+                {progressLogs.map((log, index) => (
+                  <div key={index} className="flex items-start gap-2 text-xs font-mono">
+                    <span className="text-gray-500 shrink-0">[{log.time}]</span>
+                    {log.type === 'error' && <span className="text-red-400">✗</span>}
+                    {log.type === 'success' && <span className="text-green-400">✓</span>}
+                    {log.type === 'info' && <span className="text-blue-400">›</span>}
+                    <span className={
+                      log.type === 'error' ? 'text-red-300' :
+                      log.type === 'success' ? 'text-green-300' :
+                      'text-gray-300'
+                    }>
+                      {log.message}
+                    </span>
+                  </div>
+                ))}
+                {analyzingBatch && (
+                  <div className="flex items-center gap-2 text-xs font-mono text-gray-500">
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                    <span>Waiting for response...</span>
+                  </div>
+                )}
+              </div>
             </div>
 
-            {/* Loading Animation */}
-            {analyzingBatch && (
-              <div className="flex items-center justify-center gap-2">
-                <Loader2 className="w-5 h-5 animate-spin text-indigo-600" />
-                <span className="text-sm text-gray-500">Processing...</span>
+            {/* Error Display */}
+            {analysisError && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                <p className="text-sm text-red-700 font-medium">Error</p>
+                <p className="text-sm text-red-600 mt-1">{analysisError}</p>
               </div>
             )}
           </div>
@@ -464,10 +504,12 @@ export function MessageList({ channelId }: MessageListProps) {
               onClick={() => {
                 setAnalysisProgressOpen(false);
                 setAnalyzingBatch(false);
+                setProgressLogs([]);
+                setAnalysisError(null);
               }}
               disabled={analyzingBatch}
             >
-              {analyzingBatch ? "Please wait..." : "Cancel"}
+              {analyzingBatch ? "Processing..." : "Close"}
             </Button>
           </DialogFooter>
         </DialogContent>
