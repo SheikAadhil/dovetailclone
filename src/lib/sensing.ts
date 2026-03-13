@@ -39,12 +39,27 @@ const getFallbackModels = (): string[] => {
 
 // ======== WEB SEARCH FUNCTIONS ========
 
+// Source categories to search from
+type SourceCategory = 'social' | 'news' | 'research' | 'community' | 'corporate_market' | 'general_web';
+
 interface SearchResult {
   title: string;
   url: string;
   content: string;
   published_date?: string;
+  source_type: SourceCategory;
+  source_name: string;
 }
+
+// Search queries for different source categories
+const searchQueries: Record<SourceCategory, string> = {
+  social: "site:twitter.com OR site:linkedin.com OR site:x.com",
+  news: "site:reuters.com OR site:bloomberg.com OR site:techcrunch.com OR site:theverge.com OR site:wsj.com OR site:ft.com",
+  research: "site:arxiv.org OR site:nature.com OR site:science.org OR site:mit.edu OR site:stanford.edu OR research paper",
+  community: "site:reddit.com OR site:hackernews.com OR site:dev.to OR site:medium.com",
+  corporate_market: "investor relations OR earnings report OR IPO OR funding round OR acquisition",
+  general_web: "latest trends 2025 2026"
+};
 
 async function performWebSearch(query: string): Promise<SearchResult[]> {
   const tavilyKey = process.env.TAVILY_API_KEY;
@@ -54,32 +69,65 @@ async function performWebSearch(query: string): Promise<SearchResult[]> {
     return [];
   }
 
+  const allResults: SearchResult[] = [];
+
   try {
-    // Search for recent information (last 6 months)
-    const searchQuery = `${query} 2025 2026 latest news trends`;
-    const response = await fetch(`https://api.tavily.com/search?q=${encodeURIComponent(searchQuery)}&api_key=${tavilyKey}&max_results=15&include_answer=true&include_raw_content=true`, {
-      method: 'GET',
-      headers: { 'Content-Type': 'application/json' }
+    // Search each category in parallel
+    const searchPromises = Object.entries(searchQueries).map(async ([category, searchModifier]) => {
+      const searchQuery = `${query} ${searchModifier} 2025 2026`;
+      console.log(`[Sensing] Searching ${category}...`);
+
+      try {
+        const response = await fetch(
+          `https://api.tavily.com/search?q=${encodeURIComponent(searchQuery)}&api_key=${tavilyKey}&max_results=8&include_answer=true&include_raw_content=true`,
+          { method: 'GET', headers: { 'Content-Type': 'application/json' } }
+        );
+
+        if (!response.ok) {
+          console.error(`[Sensing] Tavily search failed for ${category}:`, response.status);
+          return [];
+        }
+
+        const data = await response.json();
+        const results: SearchResult[] = (data.results || []).map((r: any) => ({
+          title: r.title || "",
+          url: r.url || "",
+          content: r.content || "",
+          published_date: r.published_date || "",
+          source_type: category as SourceCategory,
+          source_name: extractSourceName(r.url || "")
+        }));
+
+        console.log(`[Sensing] ${category}: ${results.length} results`);
+        return results;
+      } catch (error) {
+        console.error(`[Sensing] Search error for ${category}:`, error);
+        return [];
+      }
     });
 
-    if (!response.ok) {
-      console.error("[Sensing] Tavily search failed:", response.status);
-      return [];
-    }
+    const categoryResults = await Promise.all(searchPromises);
+    categoryResults.forEach(results => allResults.push(...results));
 
-    const data = await response.json();
-    const results: SearchResult[] = (data.results || []).map((r: any) => ({
-      title: r.title || "",
-      url: r.url || "",
-      content: r.content || "",
-      published_date: r.published_date || ""
-    }));
-
-    console.log(`[Sensing] Web search returned ${results.length} results`);
-    return results;
+    console.log(`[Sensing] Total web search results: ${allResults.length}`);
+    return allResults;
   } catch (error) {
     console.error("[Sensing] Web search error:", error);
     return [];
+  }
+}
+
+function extractSourceName(url: string): string {
+  try {
+    const hostname = new URL(url).hostname;
+    // Extract domain name without TLD
+    const parts = hostname.replace('www.', '').split('.');
+    if (parts.length >= 2) {
+      return parts[0].charAt(0).toUpperCase() + parts[0].slice(1);
+    }
+    return hostname;
+  } catch {
+    return "Unknown";
   }
 }
 
@@ -239,6 +287,7 @@ export async function researchTopic(query: string): Promise<{
     description: string;
     source: string;
     source_url?: string;
+    source_type: 'social' | 'news' | 'research' | 'community' | 'corporate_market' | 'general_web';
     date?: string;
     relevance: 'high' | 'medium' | 'low';
   }>;
@@ -268,7 +317,14 @@ export async function researchTopic(query: string): Promise<{
   // Step 2: Get summary of search results if we have any
   const sourcesSummary = await getSearchResultsSummary(query, searchResults);
 
-  // Step 3: Build the expert-level research prompt
+  // Step 3: Build the expert-level research prompt with search context
+  const searchContext = searchResults.length > 0 ? searchResults.slice(0, 20).map(r => `
+Source: ${r.source_name} (${r.source_type})
+URL: ${r.url}
+Date: ${r.published_date || 'Unknown'}
+Content: ${r.content.substring(0, 500)}
+`).join('\n---\n') : '';
+
   const prompt = `You are a Senior Strategic Foresight Expert with 20+ years of experience in futures research, scenario planning, and trend analysis. You've worked with Fortune 500 companies and government agencies to identify emerging signals and strategic opportunities.
 
 ## MISSION
@@ -286,6 +342,7 @@ Research the topic below and conduct a thorough, expert-level analysis to identi
 - Must cite SOURCE (publication, company, research institution)
 - Each signal must be a distinct, non-overlapping data point
 - Prioritize RECENT signals (2025-2026)
+- source_type MUST be one of: social, news, research, community, corporate_market, general_web
 
 ### For WEAK SIGNALS (minimum 10):
 - These are early indicators, not yet proven
@@ -301,8 +358,8 @@ Research the topic below and conduct a thorough, expert-level analysis to identi
 - Cover multiple STEEPLE categories
 - Explain the causal mechanism
 
-${sourcesSummary ? `## RECENT WEB RESEARCH (use this information to inform your analysis)
-${sourcesSummary}
+${searchContext ? `## RECENT WEB RESEARCH (use this information to inform your analysis - cite these sources where possible)
+${searchContext}
 ` : ''}
 
 ## OUTPUT FORMAT
@@ -316,6 +373,7 @@ Output format:
       "description": "detailed explanation of what this signal is and why it matters",
       "source": "publication name, company, or institution",
       "source_url": "url if available",
+      "source_type": "social|news|research|community|corporate_market|general_web",
       "date": "YYYY-MM-DD or just year if unknown",
       "relevance": "high|medium|low"
     }
