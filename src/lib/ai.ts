@@ -11,7 +11,7 @@ const getGeminiClient = () => {
 
 // Get the Gemini model name from env or use default
 const getGeminiModel = (): string => {
-  return process.env.GEMINI_MODEL || "gemini-2.5-pro-preview-05-20";
+  return process.env.GEMINI_MODEL || "gemini-2.0-flash";
 };
 
 // OpenRouter client for fallback models

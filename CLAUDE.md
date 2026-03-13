@@ -38,7 +38,7 @@ Required environment variables in `.env.local`:
 - **Authentication:** `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`
 - **Database:** `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`
 - **Slack:** `SLACK_CLIENT_ID`, `SLACK_CLIENT_SECRET`, `SLACK_SIGNING_SECRET`
-- **AI:** `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY`, `GEMINI_MODEL` (defaults to `gemini-2.5-pro-preview-05-20`), `OPENROUTER_API_KEY` (fallback only)
+- **AI:** `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY`, `GEMINI_MODEL` (defaults to `gemini-2.0-flash`), `OPENROUTER_API_KEY` (fallback only)
 - **Email:** `RESEND_API_KEY`, `RESEND_FROM_EMAIL`
 - **App:** `NEXT_PUBLIC_APP_URL`, `CRON_SECRET`
 
