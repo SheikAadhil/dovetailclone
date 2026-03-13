@@ -34,7 +34,8 @@
       "WebFetch(domain:www.alterthink.co.uk)",
       "Bash(git -C \"C:\\\\Users\\\\Hxtreme\\\\Dovetail Clone\" log --oneline -20)",
       "Bash(cd \"C:\\\\Users\\\\Hxtreme\\\\Dovetail Clone\" && npm install)",
-      "WebFetch(domain:ai.google.dev)"
+      "WebFetch(domain:ai.google.dev)",
+      "Bash(cd \"C:\\\\Users\\\\Hxtreme\\\\Dovetail Clone\" && sed -i 's/\\\\r$//' src/lib/ai.ts)"
     ]
   }
 }
