@@ -38,7 +38,7 @@ Required environment variables in `.env.local`:
 - **Authentication:** `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`
 - **Database:** `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`
 - **Slack:** `SLACK_CLIENT_ID`, `SLACK_CLIENT_SECRET`, `SLACK_SIGNING_SECRET`
-- **AI:** `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `OPENROUTER_API_KEY`
+- **AI:** `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY`, `GEMINI_MODEL` (defaults to `gemini-2.5-pro-preview-05-20`), `OPENROUTER_API_KEY` (fallback only)
 - **Email:** `RESEND_API_KEY`, `RESEND_FROM_EMAIL`
 - **App:** `NEXT_PUBLIC_APP_URL`, `CRON_SECRET`
 
@@ -56,6 +56,7 @@ Copy `.env.local.example` to `.env.local` and fill in values.
 - **ChannelSource** - Tracks data sources (Slack channel, CSV import)
 - **ThemeSnapshot** - Time-series data for trend charts
 - **AnomalyAlert** - Spike/drop detection alerts
+- **ChannelField** - Custom field definitions for CSV imports (text, select, date, number types)
 
 ### Key API Routes (`src/app/api/`)
 
@@ -90,9 +91,13 @@ Copy `.env.local.example` to `.env.local` and fill in values.
 
 **Integrations:**
 - `/api/slack/events` - Slack Events API for real-time ingestion
+- `/api/slack/install` - Slack app installation
 - `/api/slack/callback` - OAuth callback
 - `/api/slack/channels` - List Slack channels
 - `/api/email/digest` - Weekly digest email
+
+**Testing:**
+- `/api/channels/[id]/test-digest-slack` - Test Slack webhook notifications
 
 **Workspace:**
 - `/api/workspace/usage` - Usage statistics
@@ -123,10 +128,29 @@ UI components are in `src/components/ui/` (Shadcn) and feature-specific componen
 
 ## AI Analysis Pipeline
 
+The analysis uses:
+- **Gemini** (via Google AI) for primary and reviewer models - configured with `GEMINI_API_KEY` and `GEMINI_MODEL` env vars
+- **OpenRouter** for fallback models (if Gemini fails) - uses `OPENROUTER_API_KEY`
+
 1. Signals are ingested as DataPoints with vector embeddings
 2. `/analyze` endpoint clusters signals into 2-8 themes with sentiment classification
 3. Topics are suggested (3-5 broad buckets) and themes are classified into topics
 4. ThemeSnapshots record daily state for trend visualization
+5. Results stream back to client via Server-Sent Events (SSE)
+
+## Sensing (Strategic Foresight)
+
+A separate tool for strategic foresight research accessible at `/sensing`:
+- AI-powered research queries to discover weak signals and trends
+- Categories: Signals, Weak Signals, Trends, Drivers
+- Results can be copied to a channel as DataPoints
+- API routes: `/api/sensing`, `/api/sensing/[id]`, `/api/sensing/[id]/execute`, `/api/sensing/copy-to-channel`
+
+## Alerts & Notifications
+
+- **Anomaly Detection** (`/api/alerts`) - Spike/drop detection based on `alert_threshold_percent`
+- **Weekly Digest** (`/api/email/digest`) - Email summaries via Resend
+- **Slack Digest** (`/api/channels/[id]/test-digest-slack`) - Slack webhook notifications
 
 ## Database
 

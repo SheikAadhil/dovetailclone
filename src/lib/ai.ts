@@ -1,5 +1,20 @@
 import OpenAI from "openai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
+// Google Gemini client
+const getGeminiClient = () => {
+  if (!process.env.GEMINI_API_KEY) {
+    throw new Error("GEMINI_API_KEY is missing");
+  }
+  return new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+};
+
+// Get the Gemini model name from env or use default
+const getGeminiModel = (): string => {
+  return process.env.GEMINI_MODEL || "gemini-2.5-pro-preview-05-20";
+};
+
+// OpenRouter client for fallback models
 const getOpenRouterClient = () => {
   return new OpenAI({
     baseURL: "https://openrouter.ai/api/v1",
@@ -11,50 +26,58 @@ const getOpenRouterClient = () => {
   });
 };
 
-// Get models from environment variables, with fallbacks
-const getPrimaryModels = (): string[] => {
-  const envModel = process.env.PRIMARY_MODEL;
-  const fallbacks = [
-    "google/gemini-2.0-flash-001",
-    "google/gemma-3-4b-it:free",
-    "meta-llama/llama-3.3-70b-instruct:free",
-    "mistralai/mistral-small-3.1-24b-instruct:free"
-  ];
-  if (envModel) return [envModel, ...fallbacks];
-  return [
-    "google/gemini-2.0-flash-001",
-    ...fallbacks
-  ];
-};
-
-const getReviewerModels = (): string[] => {
-  const envModel = process.env.REVIEWER_MODEL;
-  const fallbacks = [
-    "google/gemini-2.0-flash-001"
-  ];
-  if (envModel) return [envModel, ...fallbacks];
-  return [
-    "google/gemini-2.0-flash-001",
-    ...fallbacks
-  ];
-};
-
+// Get fallback models from environment variables
 const getFallbackModels = (): string[] => {
   const envModel = process.env.FALLBACK_MODEL;
   const fallbacks = [
-    "google/gemini-2.0-flash-001",
-    "meta-llama/llama-3.3-70b-instruct:free",
-    "mistralai/mistral-small-3.1-24b-instruct:free"
+    "google/gemini-2.0-flash-lite-preview-02-05:free",
+    "meta-llama/llama-3.1-8b-instruct:free"
   ];
   if (envModel) return [envModel, ...fallbacks];
   return fallbacks;
 };
 
 async function getCompletion(prompt: string, modelSet: 'primary' | 'reviewer' | 'fallback' = 'primary') {
-  const models = modelSet === 'primary' ? getPrimaryModels() :
-                modelSet === 'reviewer' ? getReviewerModels() :
-                getFallbackModels();
+  // Primary and Reviewer models use Gemini directly
+  if (modelSet === 'primary' || modelSet === 'reviewer') {
+    try {
+      const genAI = getGeminiClient();
+      const modelName = getGeminiModel();
+      console.log(`Using Gemini: ${modelName} (${modelSet} set)`);
 
+      const model = genAI.getGenerativeModel({ model: modelName });
+
+      // Timeout for Gemini request (2 minutes)
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 120000);
+
+      try {
+        const result = await model.generateContent(prompt);
+        clearTimeout(timeoutId);
+
+        const response = result.response;
+        const text = response.text();
+
+        // Convert Gemini response to OpenAI-compatible format
+        return {
+          choices: [{
+            message: {
+              content: text,
+              role: "assistant" as const
+            }
+          }]
+        };
+      } finally {
+        clearTimeout(timeoutId);
+      }
+    } catch (error: any) {
+      console.warn(`Gemini failed for ${modelSet}: ${error.message}`);
+      throw error;
+    }
+  }
+
+  // Fallback models use OpenRouter
+  const models = getFallbackModels();
   const client = getOpenRouterClient();
   if (!process.env.OPENROUTER_API_KEY) throw new Error("OPENROUTER_API_KEY is missing");
 
@@ -64,7 +87,7 @@ async function getCompletion(prompt: string, modelSet: 'primary' | 'reviewer' | 
   let lastError: any;
   for (const model of models) {
     try {
-      console.log(`Trying model: ${model} (${modelSet} set)`);
+      console.log(`Trying model: ${model} (fallback set)`);
 
       // Create an AbortController for timeout
       const controller = new AbortController();

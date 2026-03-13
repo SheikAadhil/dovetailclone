@@ -1,5 +1,20 @@
 import OpenAI from "openai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
+// Google Gemini client for Sensing
+const getGeminiClient = () => {
+  if (!process.env.GEMINI_API_KEY) {
+    throw new Error("GEMINI_API_KEY is missing");
+  }
+  return new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+};
+
+// Get the Gemini model name from env or use default
+const getSensingModel = (): string => {
+  return process.env.GEMINI_MODEL || "gemini-2.5-pro-preview-05-20";
+};
+
+// OpenRouter client for fallback (if Gemini fails)
 const getOpenRouterClient = () => {
   return new OpenAI({
     baseURL: "https://openrouter.ai/api/v1",
@@ -11,20 +26,55 @@ const getOpenRouterClient = () => {
   });
 };
 
-// Research models - prioritize fast and capable models
-const getResearchModels = (): string[] => {
-  const envModel = process.env.SENSING_MODEL;
+// Fallback models for Sensing
+const getFallbackModels = (): string[] => {
+  const envModel = process.env.FALLBACK_MODEL;
   const fallbacks = [
-    "google/gemini-2.0-flash-001",
-    "google/gemma-3-4b-it:free",
-    "meta-llama/llama-3.3-70b-instruct:free"
+    "google/gemini-2.0-flash-lite-preview-02-05:free",
+    "meta-llama/llama-3.1-8b-instruct:free"
   ];
   if (envModel) return [envModel, ...fallbacks];
   return fallbacks;
 };
 
 async function getCompletion(prompt: string) {
-  const models = getResearchModels();
+  // Try Gemini first for Sensing
+  try {
+    const genAI = getGeminiClient();
+    const modelName = getSensingModel();
+    console.log(`[Sensing] Using Gemini: ${modelName}`);
+
+    const model = genAI.getGenerativeModel({ model: modelName });
+
+    // Timeout for Gemini request (3 minutes)
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 180000);
+
+    try {
+      const result = await model.generateContent(prompt);
+      clearTimeout(timeoutId);
+
+      const response = result.response;
+      const text = response.text();
+
+      // Convert Gemini response to OpenAI-compatible format
+      return {
+        choices: [{
+          message: {
+            content: text,
+            role: "assistant" as const
+          }
+        }]
+      };
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  } catch (error: any) {
+    console.warn(`[Sensing] Gemini failed: ${error.message}`);
+  }
+
+  // Fallback to OpenRouter if Gemini fails
+  const models = getFallbackModels();
   const client = getOpenRouterClient();
 
   if (!process.env.OPENROUTER_API_KEY) {
@@ -36,7 +86,7 @@ async function getCompletion(prompt: string) {
   let lastError: any;
   for (const model of models) {
     try {
-      console.log(`[Sensing] Trying model: ${model}`);
+      console.log(`[Sensing] Trying fallback model: ${model}`);
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), MODEL_TIMEOUT);
 
@@ -50,7 +100,7 @@ async function getCompletion(prompt: string) {
         clearTimeout(timeoutId);
       }
     } catch (error: any) {
-      console.warn(`[Sensing] Model ${model} failed: ${error.message}`);
+      console.warn(`[Sensing] Fallback model ${model} failed: ${error.message}`);
       lastError = error;
       continue;
     }
