@@ -161,16 +161,12 @@ async function handleAnalysis(
   const layer1Themes = await analyzeThemesLayer1(messagesForAi, channel?.ai_context);
   console.log(`Layer 1 returned ${layer1Themes?.length || 0} themes`);
 
-  // 3. STAGE 2: REVIEW/AUDIT - only run if Layer 1 succeeded
+  // 3. STAGE 2: DEEP REVIEW - always run to get deep themes
   let layer2Themes: ThemeResult[] = [];
-  if (layer1Themes && layer1Themes.length > 0) {
-    sendProgress?.(`Layer 1 complete. Found ${layer1Themes.length} themes. Running Layer 2...`, 1);
-    sendProgress?.("Running Layer 2: Deep Review & Audit...", 2);
-    layer2Themes = await analyzeThemesLayer2(messagesForAi, channel?.ai_context);
-    console.log(`Layer 2 returned ${layer2Themes?.length || 0} themes`);
-  } else {
-    console.log("Skipping Layer 2 - no Layer 1 themes");
-  }
+  sendProgress?.(`Layer 1 complete. Found ${layer1Themes?.length || 0} themes. Running Layer 2...`, 1);
+  sendProgress?.("Running Layer 2: Deep Review & Audit...", 2);
+  layer2Themes = await analyzeThemesLayer2(messagesForAi, channel?.ai_context);
+  console.log(`Layer 2 returned ${layer2Themes?.length || 0} themes`);
 
   // 4. Ensure System Topics exist for categorization
   const LAYER_TOPICS = [

@@ -37,6 +37,88 @@ const getFallbackModels = (): string[] => {
   return fallbacks;
 };
 
+// ======== WEB SEARCH FUNCTIONS ========
+
+interface SearchResult {
+  title: string;
+  url: string;
+  content: string;
+  published_date?: string;
+}
+
+async function performWebSearch(query: string): Promise<SearchResult[]> {
+  const tavilyKey = process.env.TAVILY_API_KEY;
+
+  if (!tavilyKey) {
+    console.log("[Sensing] No Tavily API key, using AI-only mode");
+    return [];
+  }
+
+  try {
+    // Search for recent information (last 6 months)
+    const searchQuery = `${query} 2025 2026 latest news trends`;
+    const response = await fetch(`https://api.tavily.com/search?q=${encodeURIComponent(searchQuery)}&api_key=${tavilyKey}&max_results=15&include_answer=true&include_raw_content=true`, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' }
+    });
+
+    if (!response.ok) {
+      console.error("[Sensing] Tavily search failed:", response.status);
+      return [];
+    }
+
+    const data = await response.json();
+    const results: SearchResult[] = (data.results || []).map((r: any) => ({
+      title: r.title || "",
+      url: r.url || "",
+      content: r.content || "",
+      published_date: r.published_date || ""
+    }));
+
+    console.log(`[Sensing] Web search returned ${results.length} results`);
+    return results;
+  } catch (error) {
+    console.error("[Sensing] Web search error:", error);
+    return [];
+  }
+}
+
+async function getSearchResultsSummary(query: string, searchResults: SearchResult[]): Promise<string> {
+  if (searchResults.length === 0) {
+    return "";
+  }
+
+  const context = searchResults.slice(0, 10).map(r => `
+Source: ${r.title}
+URL: ${r.url}
+Date: ${r.published_date || 'Unknown'}
+Content: ${r.content.substring(0, 800)}
+`).join('\n---\n');
+
+  const summaryPrompt = `You are a research assistant. Summarize the key information from these search results about "${query}". Focus on:
+- Recent developments and news (2025-2026)
+- Key trends and patterns
+- Important announcements
+- Industry shifts
+
+SEARCH RESULTS:
+${context}
+
+Provide a comprehensive summary (3-4 paragraphs) of the most important recent information.`;
+
+  try {
+    const genAI = getGeminiClient();
+    const model = genAI.getGenerativeModel({ model: getSensingModel() });
+    const result = await model.generateContent(summaryPrompt);
+    return result.response.text();
+  } catch (error) {
+    console.error("[Sensing] Failed to summarize search results:", error);
+    return "";
+  }
+}
+
+// ======== AI COMPLETION ========
+
 async function getCompletion(prompt: string) {
   // Try Gemini first for Sensing
   try {
@@ -150,7 +232,7 @@ function extractJson(text: string) {
   }
 }
 
-// The main research function
+// The main research function - expert-level strategic foresight
 export async function researchTopic(query: string): Promise<{
   signals: Array<{
     title: string;
@@ -176,40 +258,81 @@ export async function researchTopic(query: string): Promise<{
     description: string;
     impact: string;
   }>;
+  sources_summary?: string;
 }> {
-  const prompt = `You are a strategic foresight researcher. Your task is to research the topic below and identify:
-1. SIGNALS - Specific data points, events, or observations that indicate change is happening
-2. WEAK SIGNALS - Early, unclear indicators of potential future changes
-3. TRENDS - Directional patterns over time (rising/falling/stable)
-4. DRIVERS - Underlying forces (STEEPLE: Social, Technological, Economic, Environmental, Political, Legal, Ethical)
+  console.log(`[Sensing] Starting research on: ${query}`);
 
-STRICT OUTPUT REQUIREMENT: You MUST respond with ONLY valid JSON. No conversational text. No markdown. No explanations.
+  // Step 1: Perform web search for recent information
+  const searchResults = await performWebSearch(query);
+
+  // Step 2: Get summary of search results if we have any
+  const sourcesSummary = await getSearchResultsSummary(query, searchResults);
+
+  // Step 3: Build the expert-level research prompt
+  const prompt = `You are a Senior Strategic Foresight Expert with 20+ years of experience in futures research, scenario planning, and trend analysis. You've worked with Fortune 500 companies and government agencies to identify emerging signals and strategic opportunities.
+
+## MISSION
+Research the topic below and conduct a thorough, expert-level analysis to identify:
+1. SIGNALS - Specific, concrete data points, events, or observations that indicate change is ALREADY happening
+2. WEAK SIGNALS - Early, ambiguous indicators of potential future changes (emerging patterns)
+3. TRENDS - Directional patterns that can be measured over time
+4. DRIVERS - Underlying forces using STEEPLE (Social, Technological, Economic, Environmental, Political, Legal, Ethical)
+
+## CRITICAL REQUIREMENTS
+
+### For SIGNALS (minimum 15):
+- Must be SPECIFIC and VERIFIABLE
+- Must have clear DATES (2025-2026 preferred, 2024 acceptable)
+- Must cite SOURCE (publication, company, research institution)
+- Each signal must be a distinct, non-overlapping data point
+- Prioritize RECENT signals (2025-2026)
+
+### For WEAK SIGNALS (minimum 10):
+- These are early indicators, not yet proven
+- Focus on emerging technologies, shifting consumer behaviors, regulatory discussions
+- Explain WHY they might matter in 3-5 years
+
+### For TRENDS (minimum 8):
+- Must have clear DIRECTION (rising/falling/stable)
+- Must cite quantitative evidence where possible
+- Must explain the mechanism driving the trend
+
+### For DRIVERS (minimum 6):
+- Cover multiple STEEPLE categories
+- Explain the causal mechanism
+
+${sourcesSummary ? `## RECENT WEB RESEARCH (use this information to inform your analysis)
+${sourcesSummary}
+` : ''}
+
+## OUTPUT FORMAT
+STRICT: You MUST respond with ONLY valid JSON. No conversational text. No markdown. No explanations.
 
 Output format:
 {
   "signals": [
     {
-      "title": "signal title",
-      "description": "what this signal is",
-      "source": "where you found it",
+      "title": "specific event/announcement/data point",
+      "description": "detailed explanation of what this signal is and why it matters",
+      "source": "publication name, company, or institution",
       "source_url": "url if available",
-      "date": "when it was observed",
+      "date": "YYYY-MM-DD or just year if unknown",
       "relevance": "high|medium|low"
     }
   ],
   "weak_signals": [
     {
-      "description": "description of weak signal",
-      "potential_impact": "how it might impact the future",
+      "description": "description of the weak signal",
+      "potential_impact": "how this could impact the industry/market in 3-5 years",
       "uncertainty_level": "high|medium|low"
     }
   ],
   "trends": [
     {
-      "name": "trend name",
+      "name": "clear trend name",
       "direction": "rising|falling|stable",
-      "description": "what the trend is",
-      "evidence": ["evidence 1", "evidence 2"]
+      "description": "what the trend is and its current state",
+      "evidence": ["specific data point 1", "specific data point 2", "specific data point 3"]
     }
   ],
   "drivers": [
@@ -223,18 +346,28 @@ Output format:
 
 Research topic: ${query}
 
-Provide as many relevant signals, weak signals, trends, and drivers as you can find. Be specific and cite sources where possible.`;
+Remember:
+- Prioritize RECENT (2025-2026) information
+- Be specific and actionable
+- Each signal must be unique and non-overlapping
+- Provide comprehensive coverage (aim for maximum items in each category)`;
 
+  console.log(`[Sensing] Sending prompt to AI (${prompt.length} chars)`);
   const response = await getCompletion(prompt);
   const text = response.choices[0]?.message?.content || "";
 
+  console.log(`[Sensing] Received response (${text.length} chars)`);
+
   const parsed = extractJson(text);
+
+  console.log(`[Sensing] Parsed: ${parsed.signals?.length || 0} signals, ${parsed.weak_signals?.length || 0} weak signals, ${parsed.trends?.length || 0} trends, ${parsed.drivers?.length || 0} drivers`);
 
   // Validate the structure
   return {
     signals: parsed.signals || [],
     weak_signals: parsed.weak_signals || [],
     trends: parsed.trends || [],
-    drivers: parsed.drivers || []
+    drivers: parsed.drivers || [],
+    sources_summary: sourcesSummary
   };
 }

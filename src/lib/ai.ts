@@ -505,7 +505,7 @@ async function performAnalysis(prompt: string, idMap: Map<string, string>, model
     const parsed = extractJson(text);
     console.log(`Parsed JSON keys: ${Object.keys(parsed).join(', ')}`);
 
-    // Handle two-stage workflow format with top_level_themes or revised_product_themes
+    // Handle two-stage workflow format with top_level_themes or revised_product_themes (Layer 1)
     const themesArray = parsed.top_level_themes || parsed.revised_product_themes;
     if (themesArray && Array.isArray(themesArray)) {
       console.log(`Found ${themesArray.length} top-level themes`);
@@ -551,6 +551,23 @@ async function performAnalysis(prompt: string, idMap: Map<string, string>, model
         unrepresented_needs_review: parsed.unrepresented_needs_review
       }));
       return finalThemes;
+    }
+
+    // Handle Layer 2 deep themes format (revised_deep_themes or deep_themes)
+    const deepThemesArray = parsed.revised_deep_themes || parsed.deep_themes;
+    if (deepThemesArray && Array.isArray(deepThemesArray)) {
+      console.log(`Found ${deepThemesArray.length} deep themes`);
+      return deepThemesArray.map((theme: any) => ({
+        name: theme.name,
+        summary: theme.summary || "",
+        deep_analysis: theme.deep_analysis || "",
+        message_ids: (theme.message_ids || [])
+          .map((sid: any) => idMap.get(sid.toString()))
+          .filter((realId: any) => !!realId),
+        sentiment: theme.sentiment || 'mixed',
+        why_together: theme.why_synthesizes,
+        connected_top_level_themes: theme.connected_top_level_themes
+      }));
     }
 
     // Legacy format handling
