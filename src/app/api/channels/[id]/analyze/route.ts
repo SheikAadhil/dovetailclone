@@ -159,6 +159,7 @@ async function handleAnalysis(
   // 2. STAGE 1: PRIMARY ANALYSIS
   sendProgress?.("Running Layer 1: Primary Analysis...", 1);
   const layer1Themes = await analyzeThemesLayer1(messagesForAi, channel?.ai_context);
+  console.log(`Layer 1 returned ${layer1Themes?.length || 0} themes`);
 
   // 3. STAGE 2: REVIEW/AUDIT - only run if Layer 1 succeeded
   let layer2Themes: ThemeResult[] = [];
@@ -166,6 +167,9 @@ async function handleAnalysis(
     sendProgress?.(`Layer 1 complete. Found ${layer1Themes.length} themes. Running Layer 2...`, 1);
     sendProgress?.("Running Layer 2: Deep Review & Audit...", 2);
     layer2Themes = await analyzeThemesLayer2(messagesForAi, channel?.ai_context);
+    console.log(`Layer 2 returned ${layer2Themes?.length || 0} themes`);
+  } else {
+    console.log("Skipping Layer 2 - no Layer 1 themes");
   }
 
   // 4. Ensure System Topics exist for categorization
@@ -204,11 +208,18 @@ async function handleAnalysis(
     if (!topic) return;
 
     for (const theme of themesResult) {
+      console.log(`Processing theme: ${theme.name}, message_ids: ${JSON.stringify(theme.message_ids)}`);
+
       const validMessageIds = (theme.message_ids || []).filter(id =>
         dataPoints.some(dp => dp.id.trim() === id.trim())
       );
 
-      if (validMessageIds.length === 0) continue;
+      console.log(`Valid message IDs for theme ${theme.name}: ${validMessageIds.length} out of ${theme.message_ids?.length || 0}`);
+
+      if (validMessageIds.length === 0) {
+        console.log(`Skipping theme ${theme.name} - no matching data points`);
+        continue;
+      }
 
       const breakdown: Record<string, number> = { positive: 0, negative: 0, neutral: 0 };
       validMessageIds.forEach(id => {
@@ -276,8 +287,16 @@ async function handleAnalysis(
   };
 
   sendProgress?.("Saving themes to database...", 2);
-  await processLayer(layer1Themes, 'Product Insights (Layer 1)');
-  await processLayer(layer2Themes, 'Deep Analysis (Layer 2)');
+  try {
+    await processLayer(layer1Themes, 'Product Insights (Layer 1)');
+  } catch (e) {
+    console.error("Error processing Layer 1 themes:", e);
+  }
+  try {
+    await processLayer(layer2Themes, 'Deep Analysis (Layer 2)');
+  } catch (e) {
+    console.error("Error processing Layer 2 themes:", e);
+  }
 
   // 5. Update channel timestamp
   await supabase

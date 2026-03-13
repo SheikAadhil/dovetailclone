@@ -74,7 +74,8 @@ async function getCompletion(prompt: string, modelSet: 'primary' | 'reviewer' | 
         const response = result.response;
         const text = response.text();
 
-        sendProgress(`Response received (${text.length} chars)`);
+        console.log(`AI response received: ${text.length} chars`);
+        sendProgress(`Response received (${text.length} chars), parsing...`);
 
         // Convert Gemini response to OpenAI-compatible format
         return {
@@ -500,10 +501,13 @@ async function performAnalysis(prompt: string, idMap: Map<string, string>, model
   try {
     const response = await getCompletion(prompt, modelSet);
     const text = response.choices[0].message.content || "{}";
+    console.log(`Raw AI response (first 500 chars): ${text.substring(0, 500)}`);
     const parsed = extractJson(text);
+    console.log(`Parsed JSON keys: ${Object.keys(parsed).join(', ')}`);
 
     // Handle two-stage workflow format with top_level_themes
     if (parsed.top_level_themes && Array.isArray(parsed.top_level_themes)) {
+      console.log(`Found ${parsed.top_level_themes.length} top-level themes`);
       const finalThemes = parsed.top_level_themes.map((theme: any) => ({
         name: theme.name,
         summary: theme.definition || theme.summary || "",
