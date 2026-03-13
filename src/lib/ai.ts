@@ -1,6 +1,20 @@
 import OpenAI from "openai";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
+// Progress callback type
+type ProgressCallback = (progress: string) => void;
+let globalProgressCallback: ProgressCallback | null = null;
+
+export function setProgressCallback(callback: ProgressCallback | null) {
+  globalProgressCallback = callback;
+}
+
+function sendProgress(progress: string) {
+  if (globalProgressCallback) {
+    globalProgressCallback(progress);
+  }
+}
+
 // Google Gemini client
 const getGeminiClient = () => {
   if (!process.env.GEMINI_API_KEY) {
@@ -44,6 +58,7 @@ async function getCompletion(prompt: string, modelSet: 'primary' | 'reviewer' | 
       const genAI = getGeminiClient();
       const modelName = getGeminiModel();
       console.log(`Using Gemini: ${modelName} (${modelSet} set)`);
+      sendProgress(`Calling Gemini ${modelName}...`);
 
       const model = genAI.getGenerativeModel({ model: modelName });
 
@@ -52,11 +67,14 @@ async function getCompletion(prompt: string, modelSet: 'primary' | 'reviewer' | 
       const timeoutId = setTimeout(() => controller.abort(), 120000);
 
       try {
+        sendProgress("Waiting for AI response...");
         const result = await model.generateContent(prompt);
         clearTimeout(timeoutId);
 
         const response = result.response;
         const text = response.text();
+
+        sendProgress(`Response received (${text.length} chars)`);
 
         // Convert Gemini response to OpenAI-compatible format
         return {
@@ -72,6 +90,7 @@ async function getCompletion(prompt: string, modelSet: 'primary' | 'reviewer' | 
       }
     } catch (error: any) {
       console.warn(`Gemini failed for ${modelSet}: ${error.message}`);
+      sendProgress(`Gemini error: ${error.message}`);
       throw error;
     }
   }
@@ -88,12 +107,14 @@ async function getCompletion(prompt: string, modelSet: 'primary' | 'reviewer' | 
   for (const model of models) {
     try {
       console.log(`Trying model: ${model} (fallback set)`);
+      sendProgress(`Trying fallback model: ${model}...`);
 
       // Create an AbortController for timeout
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), MODEL_TIMEOUT);
 
       try {
+        sendProgress("Waiting for AI response...");
         return await client.chat.completions.create({
           model: model,
           messages: [{ role: "user", content: prompt }],
@@ -173,12 +194,16 @@ function extractJson(text: string) {
 export async function analyzeThemesLayer1(messages: { id: string; content: string }[], aiContext?: string | null): Promise<ThemeResult[]> {
   if (messages.length === 0) return [];
 
+  sendProgress(`Preparing ${messages.length} signals for Layer 1 analysis...`);
+
   const idMap = new Map<string, string>();
   const simplifiedMessages = messages.map((m, index) => {
     const simpleId = (index + 1).toString();
     idMap.set(simpleId, m.id);
     return { id: simpleId, content: m.content };
   });
+
+  sendProgress("Building Layer 1 analysis prompt...");
 
   const prompt = `You are a rigorous qualitative analysis engine.
 
@@ -510,12 +535,16 @@ ${JSON.stringify(simplifiedMessages)}`;
 export async function analyzeThemesLayer2(messages: { id: string; content: string }[], aiContext?: string | null): Promise<ThemeResult[]> {
   if (messages.length === 0) return [];
 
+  sendProgress(`Preparing ${messages.length} signals for Layer 2 deep analysis...`);
+
   const idMap = new Map<string, string>();
   const simplifiedMessages = messages.map((m, index) => {
     const simpleId = (index + 1).toString();
     idMap.set(simpleId, m.id);
     return { id: simpleId, content: m.content };
   });
+
+  sendProgress("Building Layer 2 deep analysis prompt...");
 
   const contextPart = aiContext ? `\nUSER-PROVIDED CONTEXT:\n${aiContext}\n` : '';
 

@@ -1,7 +1,7 @@
 import { auth } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
 import { createSupabaseServerClient, createSupabaseAdminClient } from '@/lib/supabase-server';
-import { analyzeThemesLayer1, analyzeThemesLayer2, ThemeResult } from '@/lib/ai';
+import { analyzeThemesLayer1, analyzeThemesLayer2, ThemeResult, setProgressCallback } from '@/lib/ai';
 
 function sendProgress(writer: any, progress: string, step?: number) {
   if (writer && typeof writer.write === 'function') {
@@ -44,6 +44,7 @@ export async function POST(
         try {
           sendProgress(writer, `Error: ${error}`, 2);
         } catch (e) { /* ignore write errors */ }
+        setProgressCallback(null);
         try {
           controller.close();
         } catch (e) { /* ignore */ }
@@ -66,7 +67,11 @@ async function handleAnalysis(
   writer: any = null,
   sendProgressFn: any = null
 ) {
-  const sendProgress = (progress: string, step?: number) => sendProgressFn?.(writer, progress, step);
+  // Set up progress callback for AI functions
+  const sendProgress = (progress: string, step?: number) => {
+    sendProgressFn?.(writer, progress, step);
+  };
+  setProgressCallback(sendProgress);
 
   const authHeader = request.headers.get('Authorization');
   let supabase;
@@ -81,6 +86,7 @@ async function handleAnalysis(
         writer.write('data: [DONE]\n\n');
         writer.close();
       }
+      setProgressCallback(null);
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     supabase = await createSupabaseServerClient();
@@ -130,6 +136,7 @@ async function handleAnalysis(
       const data = JSON.stringify({ error: 'Database error fetching messages' });
       writer.write(`data: ${data}\n\n`);
     }
+    setProgressCallback(null);
     return NextResponse.json({ error: 'Database error fetching messages' }, { status: 500 });
   }
 
@@ -138,6 +145,7 @@ async function handleAnalysis(
       const data = JSON.stringify({ error: 'No signals found to analyze' });
       writer.write(`data: ${data}\n\n`);
     }
+    setProgressCallback(null);
     return NextResponse.json({ error: 'No signals found to analyze' }, { status: 400 });
   }
 
@@ -299,6 +307,9 @@ async function handleAnalysis(
   }
 
   sendProgress?.(`Analysis complete! Generated ${processedThemeIds.length} themes.`, 2);
+
+  // Clean up progress callback
+  setProgressCallback(null);
 
   return NextResponse.json({
     themes: processedThemeIds.length,
