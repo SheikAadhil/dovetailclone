@@ -558,7 +558,7 @@ export function ChannelDetailTabs({ channel }: ChannelDetailTabsProps) {
             
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="default" size="sm" disabled={analyzing} className="rounded-lg bg-indigo-600 hover:bg-indigo-700 shadow-md h-8 px-4 text-xs font-medium min-w-[120px]">
+                <Button variant="default" size="sm" className="rounded-lg bg-indigo-600 hover:bg-indigo-700 shadow-md h-8 px-4 text-xs font-medium min-w-[120px]">
                   {analyzing ? <RefreshCcw className="w-3.5 h-3.5 animate-spin mr-1.5" /> : <Sparkles className="w-3.5 h-3.5 mr-1.5" />}
                   {analyzing ? "Analyzing..." : "Analyze"}
                 </Button>
@@ -577,16 +577,23 @@ export function ChannelDetailTabs({ channel }: ChannelDetailTabsProps) {
                 ) : (
                   <div className="px-3 py-2 space-y-2">
                     <div className="flex items-center gap-2">
-                      <div className={`w-2 h-2 rounded-full ${analysisStep >= 1 ? 'bg-green-500' : 'bg-gray-300'}`} />
+                      <div className={`w-2 h-2 rounded-full ${analysisStep >= 1 ? 'bg-green-500' : (analysisStep === 0 ? 'bg-yellow-500 animate-pulse' : 'bg-gray-300')}`} />
                       <span className="text-xs text-gray-600">Layer 1: Primary Analysis</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <div className={`w-2 h-2 rounded-full ${analysisStep >= 2 ? 'bg-green-500' : 'bg-gray-300'}`} />
+                      <div className={`w-2 h-2 rounded-full ${analysisStep >= 2 ? 'bg-green-500' : (analysisStep === 1 ? 'bg-yellow-500 animate-pulse' : 'bg-gray-300')}`} />
                       <span className="text-xs text-gray-600">Layer 2: Deep Review</span>
                     </div>
-                    {analysisProgress && (
+                    {analysisProgress ? (
                       <div className="mt-2 pt-2 border-t border-gray-100">
                         <p className="text-xs text-indigo-600 font-medium">{analysisProgress}</p>
+                      </div>
+                    ) : (
+                      <div className="mt-2 pt-2 border-t border-gray-100">
+                        <div className="flex items-center gap-2">
+                          <RefreshCcw className="w-3 h-3 text-indigo-600 animate-spin" />
+                          <p className="text-xs text-indigo-600">Initializing analysis...</p>
+                        </div>
                       </div>
                     )}
                   </div>
