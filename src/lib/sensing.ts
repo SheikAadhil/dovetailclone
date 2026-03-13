@@ -39,8 +39,8 @@ const getFallbackModels = (): string[] => {
 
 // ======== WEB SEARCH FUNCTIONS ========
 
-// Source categories to search from
-type SourceCategory = 'social' | 'news' | 'research' | 'community' | 'corporate_market' | 'general_web';
+// Source categories for signal classification
+type SourceCategory = 'social' | 'news' | 'research' | 'community' | 'corporate' | 'blog' | 'video' | 'forum' | 'government' | 'market_report';
 
 interface SearchResult {
   title: string;
@@ -51,15 +51,90 @@ interface SearchResult {
   source_name: string;
 }
 
-// Search queries for different source categories
+// Search queries for different source categories - ALWAYS search fresh web data
 const searchQueries: Record<SourceCategory, string> = {
-  social: "site:twitter.com OR site:linkedin.com OR site:x.com",
-  news: "site:reuters.com OR site:bloomberg.com OR site:techcrunch.com OR site:theverge.com OR site:wsj.com OR site:ft.com",
-  research: "site:arxiv.org OR site:nature.com OR site:science.org OR site:mit.edu OR site:stanford.edu OR research paper",
-  community: "site:reddit.com OR site:hackernews.com OR site:dev.to OR site:medium.com",
-  corporate_market: "investor relations OR earnings report OR IPO OR funding round OR acquisition",
-  general_web: "latest trends 2025 2026"
+  social: "site:twitter.com OR site:x.com OR site:linkedin.com OR site:threads.net",
+  news: "site:reuters.com OR site:bloomberg.com OR site:techcrunch.com OR site:theverge.com OR site:wsj.com OR site:ft.com OR site:bbc.com OR site:cnn.com",
+  research: "site:arxiv.org OR site:nature.com OR site:science.org OR site:ieee.org OR site:acm.org OR research paper 2025",
+  community: "site:reddit.com OR site:hackernews.com OR site:news.ycombinator.com",
+  blog: "site:medium.com OR site:dev.to OR site:blog.chromium.org OR site:developer.apple.com OR site:docs.microsoft.com",
+  corporate: "company announcement OR press release OR investor relations OR earnings call Q4 2025",
+  video: "site:youtube.com OR site:ted.com OR site:vimeo.com",
+  forum: "site:stackexchange.com OR site:stackoverflow.com OR site: Quora",
+  government: "site:gov OR site:federalregister.gov OR site:eu OR site:commission.europa.eu policy",
+  market_report: "Gartner OR Forrester OR McKinsey OR IDC OR Gartner report 2025 OR market analysis"
 };
+
+// Categorize URL to source type
+function categorizeUrl(url: string): { type: SourceCategory; name: string } {
+  const urlLower = url.toLowerCase();
+
+  // Social
+  if (urlLower.includes('twitter.com') || urlLower.includes('x.com') || urlLower.includes('linkedin.com') || urlLower.includes('threads.net')) {
+    return { type: 'social', name: extractDomain(url) };
+  }
+
+  // News
+  if (urlLower.includes('reuters.com') || urlLower.includes('bloomberg.com') || urlLower.includes('techcrunch.com') ||
+      urlLower.includes('theverge.com') || urlLower.includes('wsj.com') || urlLower.includes('ft.com') ||
+      urlLower.includes('bbc.com') || urlLower.includes('cnn.com') || urlLower.includes('nytimes.com')) {
+    return { type: 'news', name: extractDomain(url) };
+  }
+
+  // Research
+  if (urlLower.includes('arxiv.org') || urlLower.includes('nature.com') || urlLower.includes('science.org') ||
+      urlLower.includes('ieee.org') || urlLower.includes('acm.org') || urlLower.includes('stanford.edu') ||
+      urlLower.includes('mit.edu') || urlLower.includes('harvard.edu')) {
+    return { type: 'research', name: extractDomain(url) };
+  }
+
+  // Community
+  if (urlLower.includes('reddit.com') || urlLower.includes('hackernews.com') || urlLower.includes('news.ycombinator.com')) {
+    return { type: 'community', name: extractDomain(url) };
+  }
+
+  // Blog
+  if (urlLower.includes('medium.com') || urlLower.includes('dev.to') || urlLower.includes('blog.')) {
+    return { type: 'blog', name: extractDomain(url) };
+  }
+
+  // Video
+  if (urlLower.includes('youtube.com') || urlLower.includes('ted.com') || urlLower.includes('vimeo.com')) {
+    return { type: 'video', name: extractDomain(url) };
+  }
+
+  // Forum
+  if (urlLower.includes('stackoverflow.com') || urlLower.includes('stackexchange.com') || urlLower.includes('quora.com')) {
+    return { type: 'forum', name: extractDomain(url) };
+  }
+
+  // Government
+  if (urlLower.includes('.gov') || urlLower.includes('federalregister') || urlLower.includes('europa.eu')) {
+    return { type: 'government', name: extractDomain(url) };
+  }
+
+  // Market Report
+  if (urlLower.includes('gartner') || urlLower.includes('forrester') || urlLower.includes('mckinsey') ||
+      urlLower.includes('idc') || urlLower.includes('forbes') || urlLower.includes('business')) {
+    return { type: 'market_report', name: extractDomain(url) };
+  }
+
+  // Corporate
+  if (urlLower.includes('press') || urlLower.includes('investor') || urlLower.includes('announcement')) {
+    return { type: 'corporate', name: extractDomain(url) };
+  }
+
+  return { type: 'news', name: extractDomain(url) };
+}
+
+function extractDomain(url: string): string {
+  try {
+    const hostname = new URL(url).hostname;
+    return hostname.replace('www.', '').split('.')[0] || hostname;
+  } catch {
+    return 'Unknown';
+  }
+}
 
 async function performWebSearch(query: string): Promise<SearchResult[]> {
   const tavilyKey = process.env.TAVILY_API_KEY;
@@ -70,16 +145,18 @@ async function performWebSearch(query: string): Promise<SearchResult[]> {
   }
 
   const allResults: SearchResult[] = [];
+  const currentYear = new Date().getFullYear();
+  const searchYear = currentYear; // Always search current year
 
   try {
-    // Search each category in parallel
+    // Search each category in parallel - ALWAYS FRESH FROM WEB
     const searchPromises = Object.entries(searchQueries).map(async ([category, searchModifier]) => {
-      const searchQuery = `${query} ${searchModifier} 2025 2026`;
+      const searchQuery = `${query} ${searchModifier} ${searchYear}`;
       console.log(`[Sensing] Searching ${category}...`);
 
       try {
         const response = await fetch(
-          `https://api.tavily.com/search?q=${encodeURIComponent(searchQuery)}&api_key=${tavilyKey}&max_results=8&include_answer=true&include_raw_content=true`,
+          `https://api.tavily.com/search?q=${encodeURIComponent(searchQuery)}&api_key=${tavilyKey}&max_results=10&include_answer=true&include_raw_content=true`,
           { method: 'GET', headers: { 'Content-Type': 'application/json' } }
         );
 
@@ -89,14 +166,17 @@ async function performWebSearch(query: string): Promise<SearchResult[]> {
         }
 
         const data = await response.json();
-        const results: SearchResult[] = (data.results || []).map((r: any) => ({
-          title: r.title || "",
-          url: r.url || "",
-          content: r.content || "",
-          published_date: r.published_date || "",
-          source_type: category as SourceCategory,
-          source_name: extractSourceName(r.url || "")
-        }));
+        const results: SearchResult[] = (data.results || []).map((r: any) => {
+          const categorization = categorizeUrl(r.url || "");
+          return {
+            title: r.title || "",
+            url: r.url || "",
+            content: r.content || "",
+            published_date: r.published_date || "",
+            source_type: categorization.type,
+            source_name: categorization.name
+          };
+        });
 
         console.log(`[Sensing] ${category}: ${results.length} results`);
         return results;
@@ -109,8 +189,13 @@ async function performWebSearch(query: string): Promise<SearchResult[]> {
     const categoryResults = await Promise.all(searchPromises);
     categoryResults.forEach(results => allResults.push(...results));
 
-    console.log(`[Sensing] Total web search results: ${allResults.length}`);
-    return allResults;
+    // Remove duplicates based on URL
+    const uniqueResults = allResults.filter((result, index, self) =>
+      index === self.findIndex((r) => r.url === result.url)
+    );
+
+    console.log(`[Sensing] Total unique web search results: ${uniqueResults.length}`);
+    return uniqueResults;
   } catch (error) {
     console.error("[Sensing] Web search error:", error);
     return [];
@@ -287,7 +372,7 @@ export async function researchTopic(query: string): Promise<{
     description: string;
     source: string;
     source_url?: string;
-    source_type: 'social' | 'news' | 'research' | 'community' | 'corporate_market' | 'general_web';
+    source_type: 'social' | 'news' | 'research' | 'community' | 'corporate' | 'blog' | 'video' | 'forum' | 'government' | 'market_report';
     date?: string;
     relevance: 'high' | 'medium' | 'low';
   }>;
@@ -337,12 +422,14 @@ Research the topic below and conduct a thorough, expert-level analysis to identi
 ## CRITICAL REQUIREMENTS
 
 ### For SIGNALS (minimum 15):
-- Must be SPECIFIC and VERIFIABLE
-- Must have clear DATES (2025-2026 preferred, 2024 acceptable)
-- Must cite SOURCE (publication, company, research institution)
-- Each signal must be a distinct, non-overlapping data point
-- Prioritize RECENT signals (2025-2026)
-- source_type MUST be one of: social, news, research, community, corporate_market, general_web
+- MUST come from the WEB SEARCH RESULTS provided below
+- Must be SPECIFIC and VERIFIABLE with a SOURCE URL
+- Must have clear DATES (2025-2026 preferred)
+- source field: use the exact source name from the search results
+- source_url field: use the exact URL from the search results
+- source_type field: categorize based on the source (social, news, research, community, corporate, blog, video, forum, government, market_report)
+- Each signal must be a distinct, non-overlapping data point from the search results
+- DO NOT use knowledge from your training data - only use the search results provided
 
 ### For WEAK SIGNALS (minimum 10):
 - These are early indicators, not yet proven
@@ -373,7 +460,7 @@ Output format:
       "description": "detailed explanation of what this signal is and why it matters",
       "source": "publication name, company, or institution",
       "source_url": "url if available",
-      "source_type": "social|news|research|community|corporate_market|general_web",
+      "source_type": "social|news|research|community|corporate|blog|video|forum|government|market_report",
       "date": "YYYY-MM-DD or just year if unknown",
       "relevance": "high|medium|low"
     }
