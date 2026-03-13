@@ -223,150 +223,101 @@ Now produce the analysis:
 
 ## MISSION
 
-You are revising a theme-analysis that has important gaps and taxonomy problems.
+You are producing a complete, decision-grade theme analysis.
 
-Your job is to improve it into a complete, decision-grade analysis.
+Every signal must be accounted for. No drops. No duplicates.
 
-## EXPECTED CHANGES
+## CORE REQUIREMENTS
 
-### 1. Fix full signal accounting
-- Every input signal must be represented exactly once in the primary output layer.
-- Every signal must end up in one of:
-  - top-level theme
-  - strength
-  - isolated issue
-  - unassigned / ambiguous
-- No signal may disappear.
-- No signal may be counted twice across top-level themes.
+### 1. Full Signal Accounting (MANDATORY)
+Before writing any themes, create a hidden ledger:
+- List EVERY input signal (by ID)
+- Assign EACH signal to exactly ONE bucket
+- Buckets: top-level theme, strength, isolated issue, or unassigned/ambiguous
 
-### 2. Restore the missing signals explicitly
-The revised output must account for all currently missing signals, including:
-- reliability / processing failure signals
-- positive strength signals
-- mobile usability issues
-- pricing for experimentation concerns
-- role differences between managers and individual contributors
+COVERAGE AUDIT (must pass before output):
+- total_input_signals = signals_in_themes + signals_in_strengths + signals_in_isolated + signals_unassigned
+- If ANY signal is missing or duplicated, FIX THE TAXONOMY first
 
-### 3. Do not let deep themes rescue top-level omissions
-- If an issue appears in a deep theme but not in the product-level output, move it into the correct top-level layer.
-- Deep themes must synthesize across top-level themes.
-- Deep themes must not compensate for incomplete product-level coverage.
+### 2. Restore Missing Signal Types
+These are commonly dropped - ensure they appear if present in data:
+- Processing reliability (uploads stuck, failed syncs, data loss)
+- Positive strengths (search valued, specific features loved)
+- Notification overload / alert fatigue
+- Mobile usability issues
+- Pricing concerns (cost for experimentation, tier limitations)
 
-### 4. Improve theme boundaries
-Review the current top-level themes and tighten any that are still over-merged.
-Pay special attention to these possible problems:
-- "Workflow and IA Ambiguity" may be mixing onboarding, conceptual confusion, and ongoing usability
-- "Permissions and Governance" may be mixing privacy/data governance with access/permission friction
-- "Actionability and Output Utility" may need clearer boundaries from prioritization and role-based reporting needs
+### 3. Don't Inflate Weak Signals
+- One-signal themes: ONLY if clearly consequential
+- Otherwise: move to "Isolated Issues"
+- Better to have an isolated issue than an inflated theme
+- Low frequency doesn't mean the signal is invalid
 
-### 5. Preserve good distinctions already found
-Keep these distinctions visible when supported by the data:
-- actionability vs prioritization
-- trust/traceability vs analyst control
-- permissions/access vs privacy/governance
-- integration/ingestion vs cross-source analysis
+### 4. Tighten Theme Boundaries
+Split themes when they mix different product problems:
+
+SEPARATE (if data supports):
+- role-based personalization vs segmentation/filtering needs
+- privacy/governance vs permissions/access (SOVEREIGNTY vs CONTROL)
+- actionability vs prioritization (WHAT to do vs WHAT to do FIRST)
 - onboarding/IA confusion vs general usability
-- automation needs vs manual-control needs
-- role-based needs vs general workflow friction
+- integration friction vs cross-source deduplication
+- mobile usability vs desktop usability
 
-### 6. Preserve positive evidence
-- If users explicitly value something, it must appear in a Strengths section unless there is a strong reason not to.
-- Do not output a pain-only report.
+### 5. Preserve Strengths Explicitly
+- If users explicitly value something, it goes in STRENGTHS
+- Do NOT produce a pain-only analysis
+- Search, export, specific features - if valued, show as strength
 
-### 7. Use plain product language
-- Keep top-level theme names simple and roadmap-usable.
-- Avoid theatrical, philosophical, or consultant-style wording.
-- Deep themes may be somewhat interpretive, but still should remain clear and useful.
+## OUTPUT STRUCTURE
 
-### 8. Keep singleton issues visible
-- If a signal does not belong in a broader theme, keep it as an isolated issue.
-- Do not erase a valid signal just because it has low frequency.
+A. Dataset accounting (MUST BALANCE)
+- Total input signals: X
+- Signals in top-level themes: X
+- Signals in strengths: X
+- Signals in isolated issues: X
+- Signals unassigned/ambiguous: X
+- Missing signals: none (or list)
+- Duplicate signals: none (or list)
 
-### 9. Recommendations must map to evidence
-For each top-level theme, give a recommendation that fits the evidence and label it as one of:
-- UX fix
-- IA/content fix
-- model/AI improvement
-- integration/platform fix
-- trust/governance fix
-- pricing/packaging fix
-- workflow/process fix
+B. Top-level product themes (only if 2+ signals with shared product root cause)
+For each:
+- Name (plain product language)
+- Definition (one sentence)
+- Signal IDs (all assigned)
+- Why together (shared product problem)
+- Representative evidence (1-2 quotes)
+- Product implication
+- Recommendation
+- Recommendation type: UX fix | IA/content fix | model/AI improvement | integration/platform fix | trust/governance fix | pricing/packaging fix | workflow/process fix
+- Confidence: high | medium | low
 
-## MANDATORY WORKFLOW
+C. Strengths (explicit section)
+For each:
+- Name (what users value)
+- Signal IDs
+- Why it matters
+- How to preserve/expand
 
-### STEP 1: Build a signal ledger
-Create a hidden ledger with one row per input signal:
-- signal_id
-- short paraphrase
-- current theme assignment if any
-- revised primary bucket
-- optional secondary tag
-- notes on why it belongs there
+D. Isolated Issues (signals with weak theme support)
+For each:
+- Name
+- Signal ID
+- Why not elevated (insufficient signals OR not consequential enough)
+- Monitoring note
 
-### STEP 2: Run a coverage audit before rewriting
-Silently verify:
-- total input signals
-- represented signals
-- missing signals
-- duplicate signals
+E. Unassigned / Ambiguous
+- Signal IDs
+- Why unresolved
 
-If missing signals > 0, revise before finalizing.
+## QUALITY GATE
 
-### STEP 3: Revise the product-level layer
-- Keep strong existing themes where they are valid.
-- Split themes only where boundaries are unclear or multiple product problems are being mixed.
-- Add a Strengths section if positive evidence exists.
-- Add an Isolated Issues section if some signals should not be forced into broader themes.
-
-### STEP 4: Revise the deep themes
-- Make deep themes synthesize across the corrected top-level structure.
-- Remove any deep theme content that is only compensating for top-level gaps.
-- Use clearer, less theatrical names.
-
-## ISSUE TYPES TO TRACK EXPLICITLY
-
-Make sure the analysis preserves these as distinct concerns when supported by data:
-
-- reliability / processing bugs
-- integration friction
-- privacy / data governance concerns
-- notification overload
-- pricing for experimentation
-- positive strengths
-- analyst control features like rename / merge / split
-- actionability gaps
-- trust / traceability
-- permissions / access issues
-- role-based needs
-- cross-source deduplication
-- regional filtering / segmentation
-- mobile usability
-- onboarding friction
-- conceptual/IA confusion
-- prioritization needs
-- manual control vs automation needs
-
-## SPLIT TRIGGERS
-
-Do not hide different problems inside vague themes. Split when:
-- "usability and onboarding" contains both onboarding-specific AND ongoing usability issues
-- "permissions and governance" mixes privacy concerns with access friction
-- "actionability" blends output utility with prioritization needs
-- A theme implies different product fixes for different signal subgroups
-
-## OUTPUT FORMAT
-
-A. Dataset accounting
-- Total signals
-- Represented signals
-- Signals in top-level themes
-- Signals in strengths
-- Signals in isolated issues
-- Signals in unassigned / ambiguous
-- Missing signals: none or list
-- Duplicate signals: none or list
-
-B. Revised product themes
+Before final output, verify:
+- [ ] Every signal appears exactly once
+- [ ] Missing signal types are not silently dropped
+- [ ] Strengths section exists if positive data exists
+- [ ] Weak signals are isolated, not inflated
+- [ ] Theme boundaries are clean (no mixed concerns)
 For each theme:
 - Name
 - Definition
