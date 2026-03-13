@@ -120,7 +120,7 @@ export function SourcesPanel({ channelId }: SourcesPanelProps) {
             Sources
           </Button>
         </SheetTrigger>
-        <SheetContent className="w-[400px]">
+        <SheetContent className="w-full sm:w-[400px]">
           <SheetHeader className="pb-6 border-b">
             <SheetTitle>Data Sources</SheetTitle>
             <SheetDescription>

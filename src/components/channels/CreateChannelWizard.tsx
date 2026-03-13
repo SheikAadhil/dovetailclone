@@ -127,17 +127,17 @@ export function CreateChannelWizard() {
   };
 
   return (
-    <div className="max-w-2xl mx-auto py-8">
+    <div className="max-w-2xl mx-auto py-4 sm:py-8 px-3 sm:px-4">
       {/* Steps Indicator */}
-      <div className="flex items-center justify-center mb-8 space-x-4">
+      <div className="flex items-center justify-center mb-6 sm:mb-8 space-x-2 sm:space-x-4">
         <div className={`flex items-center space-x-2 ${step >= 1 ? 'text-indigo-600' : 'text-gray-400'}`}>
-          <div className={`w-8 h-8 rounded-full flex items-center justify-center border-2 ${step >= 1 ? 'border-indigo-600 bg-indigo-50' : 'border-gray-300'}`}>1</div>
-          <span className="font-medium">Details</span>
+          <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center border-2 text-sm sm:text-base ${step >= 1 ? 'border-indigo-600 bg-indigo-50' : 'border-gray-300'}`}>1</div>
+          <span className="font-medium text-sm sm:text-base">Details</span>
         </div>
-        <div className="w-16 h-0.5 bg-gray-200" />
+        <div className="w-10 sm:w-16 h-0.5 bg-gray-200" />
         <div className={`flex items-center space-x-2 ${step >= 2 ? 'text-indigo-600' : 'text-gray-400'}`}>
-          <div className={`w-8 h-8 rounded-full flex items-center justify-center border-2 ${step >= 2 ? 'border-indigo-600 bg-indigo-50' : 'border-gray-300'}`}>2</div>
-          <span className="font-medium">Connect Source</span>
+          <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center border-2 text-sm sm:text-base ${step >= 2 ? 'border-indigo-600 bg-indigo-50' : 'border-gray-300'}`}>2</div>
+          <span className="font-medium text-sm sm:text-base">Connect Source</span>
         </div>
       </div>
 
@@ -175,7 +175,7 @@ export function CreateChannelWizard() {
           {step === 2 && (
             <div className="space-y-6">
               {/* Source Options */}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className={`border-2 rounded-lg p-4 cursor-pointer transition-colors ${true ? 'border-indigo-600 bg-indigo-50' : 'border-gray-200'}`}>
                   <div className="flex items-center justify-between mb-2">
                     <SlackIcon className="w-6 h-6 text-[#4A154B]" />
@@ -198,9 +198,9 @@ export function CreateChannelWizard() {
               <div className="border-t pt-6">
                 {!slackConnected ? (
                   <div className="text-center py-4">
-                    <Button 
+                    <Button
                       onClick={handleConnectSlack}
-                      className="bg-[#4A154B] hover:bg-[#361038] text-white"
+                      className="bg-[#4A154B] hover:bg-[#361038] text-white w-full sm:w-auto"
                     >
                       <SlackIcon className="mr-2 h-4 w-4" />
                       Connect Slack Workspace
@@ -209,8 +209,8 @@ export function CreateChannelWizard() {
                 ) : (
                   <div className="space-y-6">
                     <div className="bg-green-50 border border-green-200 rounded-md p-3 flex items-center text-green-700 text-sm">
-                      <Check className="w-4 h-4 mr-2" />
-                      Connected to <strong>{slackTeamName}</strong>
+                      <Check className="w-4 h-4 mr-2 flex-shrink-0" />
+                      <span>Connected to <strong>{slackTeamName}</strong></span>
                     </div>
 
                     <div className="space-y-2">
@@ -227,14 +227,14 @@ export function CreateChannelWizard() {
                       </Select>
                     </div>
 
-                    <div className="flex items-center justify-between space-x-2 border rounded-lg p-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border rounded-lg p-4">
                       <div className="space-y-0.5">
                         <Label className="text-base">Import historical messages?</Label>
                         <p className="text-sm text-gray-500">
                           Backfill data to jumpstart AI themes.
                         </p>
                       </div>
-                      <Switch 
+                      <Switch
                         checked={importHistory}
                         onCheckedChange={setImportHistory}
                       />

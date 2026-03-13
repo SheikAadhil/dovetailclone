@@ -238,15 +238,15 @@ export default function SensingPage() {
   }
 
   return (
-    <div className="flex h-full gap-6">
+    <div className="flex h-full flex-col md:flex-row gap-4 md:gap-6">
       {/* Left Panel - Query List */}
-      <div className="w-80 flex-shrink-0 flex flex-col">
+      <div className="w-full md:w-80 flex-shrink-0 flex flex-col">
         {/* Search Input */}
         <Card className="mb-4 border-0 shadow-sm bg-gradient-to-br from-indigo-50 to-white">
           <CardContent className="p-4">
             <form onSubmit={handleSubmit} className="space-y-3">
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <Search className="absolute left-3 top-3 md:top-1/2 md:-translate-y-1/2 w-4 h-4 text-gray-400" />
                 <Textarea
                   placeholder="What do you want to sense?"
                   value={newQuery}
@@ -257,7 +257,7 @@ export default function SensingPage() {
               <Button
                 type="submit"
                 disabled={submitting || !newQuery.trim()}
-                className="w-full bg-indigo-600 hover:bg-indigo-700"
+                className="w-full bg-indigo-600 hover:bg-indigo-700 text-sm sm:text-base"
               >
                 {submitting ? (
                   <>
@@ -313,7 +313,7 @@ export default function SensingPage() {
       </div>
 
       {/* Right Panel - Results */}
-      <div className="flex-1 overflow-auto">
+      <div className="flex-1 overflow-auto min-w-0">
         {!selectedQuery ? (
           <div className="flex flex-col items-center justify-center h-full text-center">
             <div className="w-20 h-20 bg-gradient-to-br from-indigo-100 to-purple-100 rounded-2xl flex items-center justify-center mb-4">
@@ -346,14 +346,14 @@ export default function SensingPage() {
         ) : (
           <div className="space-y-6 pb-8">
             {/* Header */}
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
               <div>
                 <h2 className="text-xl font-bold text-gray-900">{selectedQuery.query}</h2>
                 <p className="text-sm text-gray-500 mt-1">
                   Completed {new Date(selectedQuery.completed_at || selectedQuery.created_at).toLocaleString()}
                 </p>
               </div>
-              <Button onClick={() => openCopyDialog(selectedQuery)} className="bg-indigo-600 hover:bg-indigo-700">
+              <Button onClick={() => openCopyDialog(selectedQuery)} className="bg-indigo-600 hover:bg-indigo-700 text-sm">
                 <Copy className="w-4 h-4 mr-2" />
                 Copy to Channel
               </Button>
@@ -578,7 +578,7 @@ export default function SensingPage() {
                 </button>
 
                 {expandedSections.drivers && (
-                  <div className="grid grid-cols-2 gap-3 pl-7">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pl-7">
                     {selectedQuery.results.drivers.map((driver, i) => (
                       <Card
                         key={i}

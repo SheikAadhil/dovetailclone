@@ -11,11 +11,11 @@ import { NodeImportDialog } from "./NodeImportDialog";
 import { SourcesPanel } from "./SourcesPanel";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { 
-  Brain, RefreshCcw, LayoutPanelLeft, MessageSquare, 
-  Settings as SettingsIcon, History, Plus, MoreVertical, 
-  FolderOpen, Merge, Clock, TrendingUp, 
-  Filter, BarChart3, ChevronRight, Search, Activity, Layers, Sparkles, X, Check, Loader2, FileCode, Zap, Lightbulb
+import {
+  Brain, RefreshCcw, LayoutPanelLeft, MessageSquare,
+  Settings as SettingsIcon, History, Plus, MoreVertical,
+  FolderOpen, Merge, Clock, TrendingUp,
+  Filter, BarChart3, ChevronRight, Search, Activity, Layers, Sparkles, X, Check, Loader2, FileCode, Zap, Lightbulb, Menu, PanelLeftClose
 } from "lucide-react";
 import { formatDistanceToNow, format, parseISO, subDays } from "date-fns";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -114,6 +114,7 @@ export function ChannelDetailTabs({ channel }: ChannelDetailTabsProps) {
   const [newTopicName, setNewTopicName] = useState("");
   const [newTopicDesc, setNewTopicDesc] = useState("");
   const [creatingTopic, setCreatingTopic] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const fetchChannelAlerts = useCallback(async () => {
     try {
@@ -422,40 +423,61 @@ export function ChannelDetailTabs({ channel }: ChannelDetailTabsProps) {
 
   return (
     <div className="flex h-[calc(100vh-64px)] -m-4 overflow-hidden bg-white">
+      {/* Mobile Overlay */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 z-40 md:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
       {/* 1. CHANNEL SIDEBAR */}
-      <aside className="w-60 border-r border-gray-100 flex flex-col bg-gray-50/30 overflow-hidden shrink-0">
+      <aside className={`
+        fixed md:relative z-50 h-full border-r border-gray-100 flex flex-col bg-gray-50/30 overflow-hidden shrink-0
+        transition-transform duration-300 ease-in-out
+        w-60 md:w-60
+        ${sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
+      `}>
         <div className="p-4 pb-3 shrink-0">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center text-white shadow-lg shadow-indigo-200">
-              <Activity className="w-4 h-4" />
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center text-white shadow-lg shadow-indigo-200">
+                <Activity className="w-4 h-4" />
+              </div>
+              <div className="min-w-0">
+                <h1 className="text-sm font-bold text-gray-900 truncate">{channel.name}</h1>
+                <p className="text-[10px] font-medium text-indigo-600 uppercase tracking-wider">#{channel.slack_channel_name}</p>
+              </div>
             </div>
-            <div className="min-w-0">
-              <h1 className="text-sm font-bold text-gray-900 truncate">{channel.name}</h1>
-              <p className="text-[10px] font-medium text-indigo-600 uppercase tracking-wider">#{channel.slack_channel_name}</p>
-            </div>
+            <button
+              onClick={() => setSidebarOpen(false)}
+              className="md:hidden p-1.5 rounded-md hover:bg-gray-100"
+            >
+              <X className="w-5 h-5 text-gray-500" />
+            </button>
           </div>
 
           <nav className="space-y-0.5">
-            <button 
-              onClick={() => setActiveView("overview")}
+            <button
+              onClick={() => { setActiveView("overview"); setSidebarOpen(false); }}
               className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all ${activeView === "overview" ? 'bg-white shadow-sm text-indigo-600 ring-1 ring-gray-100' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100/50'}`}
             >
               <Sparkles className="w-4 h-4" /> Overview
             </button>
-            <button 
-              onClick={() => setActiveView("themes")}
+            <button
+              onClick={() => { setActiveView("themes"); setSidebarOpen(false); }}
               className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all ${activeView === "themes" ? 'bg-white shadow-sm text-indigo-600 ring-1 ring-gray-100' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100/50'}`}
             >
               <Layers className="w-4 h-4" /> Themes
             </button>
-            <button 
-              onClick={() => setActiveView("messages")}
+            <button
+              onClick={() => { setActiveView("messages"); setSidebarOpen(false); }}
               className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all ${activeView === "messages" ? 'bg-white shadow-sm text-indigo-600 ring-1 ring-gray-100' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100/50'}`}
             >
               <MessageSquare className="w-4 h-4" /> Signal
             </button>
-            <button 
-              onClick={() => setActiveView("settings")}
+            <button
+              onClick={() => { setActiveView("settings"); setSidebarOpen(false); }}
               className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all ${activeView === "settings" ? 'bg-white shadow-sm text-indigo-600 ring-1 ring-gray-100' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100/50'}`}
             >
               <SettingsIcon className="w-4 h-4" /> Config
@@ -515,8 +537,15 @@ export function ChannelDetailTabs({ channel }: ChannelDetailTabsProps) {
       {/* 2. MAIN CONTENT AREA */}
       <main className="flex-1 flex flex-col min-w-0 bg-white relative overflow-hidden">
         {/* Header */}
-        <header className="h-12 border-b border-gray-100 flex items-center justify-between px-4 bg-white/80 backdrop-blur-md sticky top-0 z-20 shrink-0">
-          <div className="flex items-center gap-3">
+        <header className="h-12 border-b border-gray-100 flex items-center justify-between px-3 sm:px-4 bg-white/80 backdrop-blur-md sticky top-0 z-20 shrink-0">
+          <div className="flex items-center gap-2 sm:gap-3">
+            {/* Mobile menu toggle */}
+            <button
+              onClick={() => setSidebarOpen(true)}
+              className="md:hidden p-2 hover:bg-gray-100 rounded-lg -ml-1"
+            >
+              <Menu className="w-5 h-5 text-gray-600" />
+            </button>
             <h2 className="text-sm font-semibold text-gray-900 uppercase tracking-wider">
               {activeView === "overview" && "Dashboard"}
               {activeView === "themes" && "Themes"}
