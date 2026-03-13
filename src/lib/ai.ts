@@ -505,10 +505,11 @@ async function performAnalysis(prompt: string, idMap: Map<string, string>, model
     const parsed = extractJson(text);
     console.log(`Parsed JSON keys: ${Object.keys(parsed).join(', ')}`);
 
-    // Handle two-stage workflow format with top_level_themes
-    if (parsed.top_level_themes && Array.isArray(parsed.top_level_themes)) {
-      console.log(`Found ${parsed.top_level_themes.length} top-level themes`);
-      const finalThemes = parsed.top_level_themes.map((theme: any) => ({
+    // Handle two-stage workflow format with top_level_themes or revised_product_themes
+    const themesArray = parsed.top_level_themes || parsed.revised_product_themes;
+    if (themesArray && Array.isArray(themesArray)) {
+      console.log(`Found ${themesArray.length} top-level themes`);
+      const finalThemes = themesArray.map((theme: any) => ({
         name: theme.name,
         summary: theme.definition || theme.summary || "",
         deep_analysis: theme.implication || theme.product_implication || theme.recommendation || "",
@@ -532,21 +533,21 @@ async function performAnalysis(prompt: string, idMap: Map<string, string>, model
         first_cycle_coding: parsed.first_cycle_coding,
         categories: parsed.categories,
         reviewer_handoff: parsed.reviewer_handoff,
-        // Coverage reports
+        // Coverage reports - handle both old and new field names
         coverage_report: parsed.dataset_accounting ? {
           total_signals: parsed.dataset_accounting.total_signals,
           signals_in_top_level_themes: parsed.dataset_accounting.signals_in_top_level_themes,
           signals_in_isolated_issues: parsed.dataset_accounting.signals_in_isolated_issues,
           signals_in_strengths: parsed.dataset_accounting.signals_in_strengths,
-          signals_in_unrepresented: parsed.dataset_accounting.signals_in_unassigned,
+          signals_in_unrepresented: parsed.dataset_accounting.signals_in_unassigned || parsed.dataset_accounting.signals_in_unassigned_ambiguous,
           missing_signals: parsed.dataset_accounting.missing_signals,
           duplicated_signals: parsed.dataset_accounting.duplicated_signals,
         } : (parsed.coverage_report || parsed.coverage_check),
-        // Additional sections
-        latent_tensions: parsed.latent_tensions,
+        // Additional sections - handle both old and new field names
+        latent_tensions: parsed.latent_tensions || parsed.revised_deep_themes,
         strengths: parsed.strengths,
         isolated_issues: parsed.isolated_issues,
-        unassigned_ambiguous: parsed.unassigned_ambiguous,
+        unassigned_ambiguous: parsed.unassigned_ambiguous || parsed.unassigned,
         unrepresented_needs_review: parsed.unrepresented_needs_review
       }));
       return finalThemes;
