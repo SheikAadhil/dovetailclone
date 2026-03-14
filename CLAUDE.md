@@ -11,7 +11,7 @@ This is a **Pulse Dovetail Clone** - a feedback analysis platform that aggregate
 - **Framework:** Next.js 14 (App Router)
 - **Authentication:** Clerk (middleware protects `/channels` routes)
 - **Database:** Supabase (PostgreSQL + pgvector)
-- **AI/LLM:** OpenRouter via `src/lib/ai.ts` (multi-model fallback: Gemini 2.0 Flash, Llama 3.3 70B, Mistral 7B)
+- **AI/LLM:** Gemini via Google AI (primary), OpenRouter for fallback (google/gemini-2.0-flash-lite-preview-02-05:free)
 - **Styling:** Tailwind CSS + Shadcn UI components
 - **Visualization:** Recharts
 - **Email:** Resend (weekly digest)

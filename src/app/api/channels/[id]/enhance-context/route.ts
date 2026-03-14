@@ -29,8 +29,8 @@ export async function POST(
 
   const client = getOpenRouterClient();
   const MODELS_TO_TRY = [
+    "google/gemini-2.0-flash-lite-preview-02-05:free",
     "meta-llama/llama-3.3-70b-instruct:free",
-    "google/gemini-2.0-flash:free",
     "deepseek/deepseek-r1:free"
   ];
 
