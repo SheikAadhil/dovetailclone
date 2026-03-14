@@ -1,6 +1,16 @@
 import OpenAI from "openai";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
+// Get the primary AI provider from environment
+const getPrimaryProvider = (): 'mistral' | 'gemini' => {
+  const provider = process.env.AI_PROVIDER?.toLowerCase();
+  if (provider === 'mistral') return 'mistral';
+  if (provider === 'gemini') return 'gemini';
+  // Default to mistral if MISTRAL_API_KEY is set
+  if (process.env.MISTRAL_API_KEY) return 'mistral';
+  return 'gemini';
+};
+
 // Google Gemini client for Sensing
 const getGeminiClient = () => {
   if (!process.env.GEMINI_API_KEY) {
@@ -10,8 +20,24 @@ const getGeminiClient = () => {
 };
 
 // Get the Gemini model name from env or use default
-const getSensingModel = (): string => {
+const getSensingGeminiModel = (): string => {
   return process.env.GEMINI_MODEL || "gemini-3-flash-preview";
+};
+
+// Mistral client for Sensing
+const getMistralClient = () => {
+  if (!process.env.MISTRAL_API_KEY) {
+    throw new Error("MISTRAL_API_KEY is missing");
+  }
+  return new OpenAI({
+    apiKey: process.env.MISTRAL_API_KEY,
+    baseURL: "https://api.mistral.ai/v1"
+  });
+};
+
+// Get the Mistral model name from env or use default
+const getSensingMistralModel = (): string => {
+  return process.env.MISTRAL_MODEL || "mistral-large-latest";
 };
 
 // OpenRouter client for fallback (if Gemini fails)
@@ -26,12 +52,12 @@ const getOpenRouterClient = () => {
   });
 };
 
-// Fallback models for Sensing - use valid OpenRouter models
+// Fallback models for Sensing - use Mistral models from OpenRouter
 const getFallbackModels = (): string[] => {
   const envModel = process.env.FALLBACK_MODEL;
   const fallbacks = [
-    "qwen/qwen3-8b-instruct:free",
-    "deepseek/deepseek-chat:free"
+    "mistralai/mistral-7b-instruct:free",
+    "qwen/qwen3-next-80b-a3b-instruct:free"
   ];
   if (envModel) return [envModel, ...fallbacks];
   return fallbacks;
@@ -137,31 +163,43 @@ function extractDomain(url: string): string {
 }
 
 async function performWebSearch(query: string): Promise<SearchResult[]> {
-  const tavilyKey = process.env.TAVILY_API_KEY;
+  const exaKey = process.env.EXA_API_KEY;
 
-  if (!tavilyKey) {
-    console.log("[Sensing] No Tavily API key, using AI-only mode");
+  if (!exaKey) {
+    console.log("[Sensing] No Exa API key, using AI-only mode");
     return [];
   }
 
-  const allResults: SearchResult[] = [];
   const currentYear = new Date().getFullYear();
-  const searchYear = currentYear; // Always search current year
 
   try {
-    // Search each category in parallel - ALWAYS FRESH FROM WEB
+    console.log(`[Sensing] Searching Exa for: ${query} ${currentYear}`);
+
+    // Exa search request - search multiple categories in parallel
     const searchPromises = Object.entries(searchQueries).map(async ([category, searchModifier]) => {
-      const searchQuery = `${query} ${searchModifier} ${searchYear}`;
-      console.log(`[Sensing] Searching ${category}...`);
+      const searchQuery = `${query} ${searchModifier} ${currentYear}`;
 
       try {
-        const response = await fetch(
-          `https://api.tavily.com/search?q=${encodeURIComponent(searchQuery)}&api_key=${tavilyKey}&max_results=10&include_answer=true&include_raw_content=true`,
-          { method: 'GET', headers: { 'Content-Type': 'application/json' } }
-        );
+        const response = await fetch('https://api.exa.ai/search', {
+          method: 'POST',
+          headers: {
+            'x-api-key': exaKey,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            query: searchQuery,
+            type: "auto",
+            num_results: 10,
+            contents: {
+              highlights: {
+                max_characters: 4000
+              }
+            }
+          })
+        });
 
         if (!response.ok) {
-          console.error(`[Sensing] Tavily search failed for ${category}:`, response.status);
+          console.error(`[Sensing] Exa search failed for ${category}:`, response.status);
           return [];
         }
 
@@ -171,10 +209,10 @@ async function performWebSearch(query: string): Promise<SearchResult[]> {
           return {
             title: r.title || "",
             url: r.url || "",
-            content: r.content || "",
+            content: r.highlight || r.text || "",
             published_date: r.published_date || "",
             source_type: categorization.type,
-            source_name: categorization.name
+            source_name: r.source?.domain || categorization.name
           };
         });
 
@@ -187,6 +225,7 @@ async function performWebSearch(query: string): Promise<SearchResult[]> {
     });
 
     const categoryResults = await Promise.all(searchPromises);
+    const allResults: SearchResult[] = [];
     categoryResults.forEach(results => allResults.push(...results));
 
     // Remove duplicates based on URL
@@ -225,7 +264,7 @@ async function getSearchResultsSummary(query: string, searchResults: SearchResul
 Source: ${r.title}
 URL: ${r.url}
 Date: ${r.published_date || 'Unknown'}
-Content: ${r.content.substring(0, 800)}
+Content: ${r.content.substring(0, 8000)}
 `).join('\n---\n');
 
   const summaryPrompt = `You are a research assistant. Summarize the key information from these search results about "${query}". Focus on:
@@ -239,9 +278,27 @@ ${context}
 
 Provide a comprehensive summary (3-4 paragraphs) of the most important recent information.`;
 
+  const provider = getPrimaryProvider();
+
+  // Try Mistral first
+  if (provider === 'mistral') {
+    try {
+      const client = getMistralClient();
+      const modelName = getSensingMistralModel();
+      const result = await client.chat.completions.create({
+        model: modelName,
+        messages: [{ role: "user", content: summaryPrompt }],
+      });
+      return result.choices[0]?.message?.content || "";
+    } catch (error) {
+      console.error("[Sensing] Mistral summary failed:", error);
+    }
+  }
+
+  // Fall back to Gemini
   try {
     const genAI = getGeminiClient();
-    const model = genAI.getGenerativeModel({ model: getSensingModel() });
+    const model = genAI.getGenerativeModel({ model: getSensingGeminiModel() });
     const result = await model.generateContent(summaryPrompt);
     return result.response.text();
   } catch (error) {
@@ -253,10 +310,48 @@ Provide a comprehensive summary (3-4 paragraphs) of the most important recent in
 // ======== AI COMPLETION ========
 
 async function getCompletion(prompt: string) {
-  // Try Gemini first for Sensing
+  const provider = getPrimaryProvider();
+
+  // Try Mistral first if configured as primary
+  if (provider === 'mistral') {
+    try {
+      const client = getMistralClient();
+      const modelName = getSensingMistralModel();
+      console.log(`[Sensing] Using Mistral: ${modelName}`);
+
+      // Timeout for Mistral request (3 minutes)
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 180000);
+
+      try {
+        const result = await client.chat.completions.create({
+          model: modelName,
+          messages: [{ role: "user", content: prompt }],
+        }, { signal: controller.signal });
+        clearTimeout(timeoutId);
+
+        console.log(`[Sensing] Mistral response: ${result.choices[0]?.message?.content?.length || 0} chars`);
+        return {
+          choices: [{
+            message: {
+              content: result.choices[0]?.message?.content || "",
+              role: "assistant" as const
+            }
+          }]
+        };
+      } finally {
+        clearTimeout(timeoutId);
+      }
+    } catch (error: any) {
+      console.warn(`[Sensing] Mistral failed: ${error.message}`);
+      // Fall through to try Gemini
+    }
+  }
+
+  // Try Gemini
   try {
     const genAI = getGeminiClient();
-    const modelName = getSensingModel();
+    const modelName = getSensingGeminiModel();
     console.log(`[Sensing] Using Gemini: ${modelName}`);
 
     const model = genAI.getGenerativeModel({ model: modelName });
@@ -336,33 +431,41 @@ function extractJson(text: string) {
   try {
     return JSON.parse(trimmed);
   } catch (e) {
-    const start = trimmed.indexOf('{');
-    const end = trimmed.lastIndexOf('}');
-    if (start !== -1 && end !== -1 && end > start) {
-      try {
-        return JSON.parse(trimmed.substring(start, end + 1));
-      } catch (e2) {
-        // Try markdown code blocks
-        const withoutMarkdown = trimmed
-          .replace(/```json\n?/gi, '')
-          .replace(/```\n?/g, '');
+    // Try markdown code blocks first
+    const withoutMarkdown = trimmed
+      .replace(/```json\n?/gi, '')
+      .replace(/```\n?/g, '');
+    try {
+      return JSON.parse(withoutMarkdown);
+    } catch (e2) {
+      // Find JSON object in text
+      const start = trimmed.indexOf('{');
+      const end = trimmed.lastIndexOf('}');
+      if (start !== -1 && end !== -1 && end > start) {
         try {
-          return JSON.parse(withoutMarkdown);
+          return JSON.parse(trimmed.substring(start, end + 1));
         } catch (e3) {
-          // Try finding any JSON
-          const jsonMatch = trimmed.match(/\{[\s\S]*\}/);
-          if (jsonMatch) {
-            try {
-              return JSON.parse(jsonMatch[0]);
-            } catch (e4) {
-              // Ignore
+          // Try with markdown removal on extracted part
+          const extracted = trimmed.substring(start, end + 1);
+          const cleaned = extracted.replace(/```json\n?/gi, '').replace(/```\n?/g, '');
+          try {
+            return JSON.parse(cleaned);
+          } catch (e4) {
+            // Try finding any JSON-like object with brackets
+            const jsonMatch = trimmed.match(/\[[\s\S]*\]/);
+            if (jsonMatch) {
+              try {
+                return JSON.parse(jsonMatch[0]);
+              } catch (e5) {
+                // Ignore
+              }
             }
           }
         }
       }
     }
-    throw new Error("Could not find valid JSON in AI response");
   }
+  throw new Error("Could not find valid JSON in AI response");
 }
 
 // The main research function - expert-level strategic foresight
@@ -372,12 +475,15 @@ export async function researchTopic(query: string): Promise<{
     description: string;
     source: string;
     source_url?: string;
-    source_type: 'social' | 'news' | 'research' | 'community' | 'corporate' | 'blog' | 'video' | 'forum' | 'government' | 'market_report';
+    source_type: 'social' | 'news' | 'research' | 'community' | 'corporate_market' | 'general_web';
     date?: string;
     relevance: 'high' | 'medium' | 'low';
   }>;
   weak_signals: Array<{
     description: string;
+    source?: string;
+    source_url?: string;
+    source_type: 'social' | 'news' | 'research' | 'community' | 'corporate_market' | 'general_web';
     potential_impact: string;
     uncertainty_level: 'high' | 'medium' | 'low';
   }>;
@@ -427,7 +533,7 @@ Research the topic below and conduct a thorough, expert-level analysis to identi
 - Must have clear DATES (2025-2026 preferred)
 - source field: use the exact source name from the search results
 - source_url field: use the exact URL from the search results
-- source_type field: categorize based on the source (social, news, research, community, corporate, blog, video, forum, government, market_report)
+- source_type field: MUST be one of: social, news, research, community, corporate_market, general_web
 - Each signal must be a distinct, non-overlapping data point from the search results
 - DO NOT use knowledge from your training data - only use the search results provided
 
@@ -435,6 +541,9 @@ Research the topic below and conduct a thorough, expert-level analysis to identi
 - These are early indicators, not yet proven
 - Focus on emerging technologies, shifting consumer behaviors, regulatory discussions
 - Explain WHY they might matter in 3-5 years
+- source field: indicate where this weak signal was observed (e.g., social media discussions, research papers, industry forums, corporate announcements, news articles, general web)
+- source_url field: provide a URL if available where this weak signal was observed
+- source_type field: MUST be one of: social, news, research, community, corporate_market, general_web
 
 ### For TRENDS (minimum 8):
 - Must have clear DIRECTION (rising/falling/stable)
@@ -460,7 +569,7 @@ Output format:
       "description": "detailed explanation of what this signal is and why it matters",
       "source": "publication name, company, or institution",
       "source_url": "url if available",
-      "source_type": "social|news|research|community|corporate|blog|video|forum|government|market_report",
+      "source_type": "social|news|research|community|corporate_market|general_web",
       "date": "YYYY-MM-DD or just year if unknown",
       "relevance": "high|medium|low"
     }
@@ -468,6 +577,9 @@ Output format:
   "weak_signals": [
     {
       "description": "description of the weak signal",
+      "source": "where this weak signal was observed (e.g., social media discussions, research papers, industry forums)",
+      "source_url": "url if available",
+      "source_type": "social|news|research|community|corporate_market|general_web",
       "potential_impact": "how this could impact the industry/market in 3-5 years",
       "uncertainty_level": "high|medium|low"
     }

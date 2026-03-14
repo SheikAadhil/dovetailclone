@@ -2,6 +2,16 @@ import { auth } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
 import OpenAI from "openai";
 
+const getMistralClient = () => {
+  if (!process.env.MISTRAL_API_KEY) {
+    throw new Error("MISTRAL_API_KEY is missing");
+  }
+  return new OpenAI({
+    apiKey: process.env.MISTRAL_API_KEY,
+    baseURL: "https://api.mistral.ai/v1"
+  });
+};
+
 const getOpenRouterClient = () => {
   return new OpenAI({
     baseURL: "https://openrouter.ai/api/v1",
@@ -27,19 +37,40 @@ export async function POST(
     return new NextResponse('Context is required', { status: 400 });
   }
 
-  const client = getOpenRouterClient();
-  const MODELS_TO_TRY = [
-    "meta-llama/llama-3.3-70b-instruct:free",
-    "google/gemini-2.0-flash:free",
-    "deepseek/deepseek-r1:free"
-  ];
-
-  const systemPrompt = `You are an expert at writing AI analysis instructions. 
-You rewrite vague context prompts into precise, structured instructions that help AI identify the most relevant themes from user feedback. 
-Keep the result under 400 characters. 
+  const systemPrompt = `You are an expert at writing AI analysis instructions.
+You rewrite vague context prompts into precise, structured instructions that help AI identify the most relevant themes from user feedback.
+Keep the result under 400 characters.
 Return only the enhanced text, no explanation.`;
 
   const userPrompt = `Rewrite this context to be more precise and actionable: "${context}"`;
+
+  // Try Mistral first
+  if (process.env.MISTRAL_API_KEY) {
+    try {
+      const client = getMistralClient();
+      const model = process.env.MISTRAL_MODEL || "mistral-large-latest";
+      const response = await client.chat.completions.create({
+        model: model,
+        messages: [
+          { role: "user", content: `INSTRUCTIONS: ${systemPrompt}\n\nINPUT: ${userPrompt}` },
+        ],
+      });
+      const enhanced = response.choices[0].message.content?.trim();
+      if (enhanced) {
+        return NextResponse.json({ enhanced });
+      }
+    } catch (error: any) {
+      console.warn("[Enhance] Mistral failed:", error.message);
+    }
+  }
+
+  // Fallback to OpenRouter
+  const client = getOpenRouterClient();
+  const MODELS_TO_TRY = [
+    "mistralai/mistral-7b-instruct:free",
+    "meta-llama/llama-3.3-70b-instruct:free",
+    "deepseek/deepseek-r1:free"
+  ];
 
   let enhanced = context;
   let lastError: any;
@@ -53,7 +84,7 @@ Return only the enhanced text, no explanation.`;
         ],
       });
       enhanced = response.choices[0].message.content?.trim() || context;
-      break; 
+      break;
     } catch (error: any) {
       lastError = error;
       continue;

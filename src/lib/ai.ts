@@ -15,6 +15,16 @@ function sendProgress(progress: string) {
   }
 }
 
+// Get the primary AI provider from environment
+const getPrimaryProvider = (): 'mistral' | 'gemini' => {
+  const provider = process.env.AI_PROVIDER?.toLowerCase();
+  if (provider === 'mistral') return 'mistral';
+  if (provider === 'gemini') return 'gemini';
+  // Default to mistral if MISTRAL_API_KEY is set
+  if (process.env.MISTRAL_API_KEY) return 'mistral';
+  return 'gemini';
+};
+
 // Google Gemini client
 const getGeminiClient = () => {
   if (!process.env.GEMINI_API_KEY) {
@@ -26,6 +36,22 @@ const getGeminiClient = () => {
 // Get the Gemini model name from env or use default
 const getGeminiModel = (): string => {
   return process.env.GEMINI_MODEL || "gemini-3-flash-preview";
+};
+
+// Mistral client
+const getMistralClient = () => {
+  if (!process.env.MISTRAL_API_KEY) {
+    throw new Error("MISTRAL_API_KEY is missing");
+  }
+  return new OpenAI({
+    apiKey: process.env.MISTRAL_API_KEY,
+    baseURL: "https://api.mistral.ai/v1"
+  });
+};
+
+// Get the Mistral model name from env or use default
+const getMistralModel = (): string => {
+  return process.env.MISTRAL_MODEL || "mistral-large-latest";
 };
 
 // OpenRouter client for fallback models
@@ -44,6 +70,7 @@ const getOpenRouterClient = () => {
 const getFallbackModels = (): string[] => {
   const envModel = process.env.FALLBACK_MODEL;
   const fallbacks = [
+    "mistralai/mistral-7b-instruct:free",
     "qwen/qwen3-8b-instruct:free",
     "deepseek/deepseek-chat:free"
   ];
@@ -52,8 +79,54 @@ const getFallbackModels = (): string[] => {
 };
 
 async function getCompletion(prompt: string, modelSet: 'primary' | 'reviewer' | 'fallback' = 'primary') {
-  // Primary and Reviewer models use Gemini directly
+  // Primary and Reviewer models - use Mistral by default, fallback to Gemini
   if (modelSet === 'primary' || modelSet === 'reviewer') {
+    const provider = getPrimaryProvider();
+
+    // Try Mistral first if configured
+    if (provider === 'mistral') {
+      try {
+        const client = getMistralClient();
+        const modelName = getMistralModel();
+        console.log(`Using Mistral: ${modelName} (${modelSet} set)`);
+        sendProgress(`Calling Mistral ${modelName}...`);
+
+        // Timeout for Mistral request (2 minutes)
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 120000);
+
+        try {
+          sendProgress("Waiting for AI response...");
+          const result = await client.chat.completions.create({
+            model: modelName,
+            messages: [{ role: "user", content: prompt }],
+          }, {
+            signal: controller.signal
+          });
+          clearTimeout(timeoutId);
+
+          console.log(`AI response received: ${result.choices[0].message.content?.length || 0} chars`);
+          sendProgress(`Response received, parsing...`);
+
+          return {
+            choices: [{
+              message: {
+                content: result.choices[0].message.content || "",
+                role: "assistant" as const
+              }
+            }]
+          };
+        } finally {
+          clearTimeout(timeoutId);
+        }
+      } catch (error: any) {
+        console.warn(`Mistral failed for ${modelSet}: ${error.message}`);
+        sendProgress(`Mistral error: ${error.message}`);
+        // Fall through to try Gemini
+      }
+    }
+
+    // Try Gemini
     try {
       const genAI = getGeminiClient();
       const modelName = getGeminiModel();

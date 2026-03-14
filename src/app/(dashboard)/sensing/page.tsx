@@ -57,11 +57,15 @@ interface SensingQuery {
       description: string;
       source: string;
       source_url?: string;
+      source_type?: string;
       date?: string;
       relevance: string;
     }>;
     weak_signals?: Array<{
       description: string;
+      source?: string;
+      source_url?: string;
+      source_type?: string;
       potential_impact: string;
       uncertainty_level: string;
     }>;
@@ -141,8 +145,10 @@ export default function SensingPage() {
         setSelectedQueryId(data.id);
 
         const poll = setInterval(async () => {
-          await fetchQueries();
-          const updated = queries.find(q => q.id === data.id);
+          const res = await fetch('/api/sensing');
+          const updatedQueries = await res.json();
+          setQueries(updatedQueries);
+          const updated = updatedQueries.find((q: SensingQuery) => q.id === data.id);
           if (updated?.status === 'completed' || updated?.status === 'failed') {
             clearInterval(poll);
           }
@@ -224,6 +230,18 @@ export default function SensingPage() {
       ethical: 'bg-indigo-100 text-indigo-700 border-indigo-200',
     };
     return colors[category.toLowerCase()] || 'bg-gray-100 text-gray-700 border-gray-200';
+  };
+
+  const getSourceTypeColor = (sourceType: string) => {
+    const colors: Record<string, string> = {
+      social: 'bg-pink-100 text-pink-700 border-pink-200',
+      news: 'bg-blue-100 text-blue-700 border-blue-200',
+      research: 'bg-purple-100 text-purple-700 border-purple-200',
+      community: 'bg-green-100 text-green-700 border-green-200',
+      corporate_market: 'bg-amber-100 text-amber-700 border-amber-200',
+      general_web: 'bg-gray-100 text-gray-700 border-gray-200',
+    };
+    return colors[sourceType.toLowerCase()] || 'bg-gray-100 text-gray-700 border-gray-200';
   };
 
   if (loading) {
@@ -387,8 +405,13 @@ export default function SensingPage() {
                         <CardContent className="p-4">
                           <div className="flex items-start justify-between gap-4">
                             <div className="flex-1">
-                              <div className="flex items-center gap-2 mb-2">
+                              <div className="flex items-center gap-2 mb-2 flex-wrap">
                                 <h4 className="font-medium text-gray-900">{signal.title}</h4>
+                                {signal.source_type && (
+                                  <Badge className={`text-xs border ${getSourceTypeColor(signal.source_type)}`}>
+                                    {signal.source_type.replace('_', ' ')}
+                                  </Badge>
+                                )}
                                 <Badge
                                   variant="outline"
                                   className={`text-xs ${
@@ -457,15 +480,16 @@ export default function SensingPage() {
                 {expandedSections.weakSignals && (
                   <div className="grid grid-cols-1 gap-3 pl-7">
                     {selectedQuery.results.weak_signals.map((signal, i) => (
-                      <Card key={i} className="border-amber-100 bg-gradient-to-r from-amber-50/50 to-white hover:shadow-md transition-all">
+                      <Card key={i} className="border-amber-100 bg-gradient-to-r from-amber-50/50 to-white hover:shadow-md transition-all group">
                         <CardContent className="p-4">
-                          <div className="flex items-start justify-between">
+                          <div className="flex items-start justify-between gap-4">
                             <div className="flex-1">
-                              <p className="text-sm text-gray-800 font-medium">{signal.description}</p>
-                              <div className="mt-2 flex items-center gap-4">
-                                <span className="text-xs text-gray-500">
-                                  <span className="font-medium">Impact:</span> {signal.potential_impact}
-                                </span>
+                              <div className="flex items-center gap-2 mb-2 flex-wrap">
+                                {signal.source_type && (
+                                  <Badge className={`text-xs border ${getSourceTypeColor(signal.source_type)}`}>
+                                    {signal.source_type.replace('_', ' ')}
+                                  </Badge>
+                                )}
                                 <Badge
                                   variant="outline"
                                   className={`text-xs ${
@@ -477,7 +501,29 @@ export default function SensingPage() {
                                   {signal.uncertainty_level} uncertainty
                                 </Badge>
                               </div>
+                              <p className="text-sm text-gray-800 font-medium">{signal.description}</p>
+                              {signal.source && (
+                                <div className="mt-2 flex items-center gap-1 text-xs text-gray-500">
+                                  <Globe className="w-3 h-3" />
+                                  <span>{signal.source}</span>
+                                </div>
+                              )}
+                              <div className="mt-2 flex items-center gap-4">
+                                <span className="text-xs text-gray-500">
+                                  <span className="font-medium">Impact:</span> {signal.potential_impact}
+                                </span>
+                              </div>
                             </div>
+                            {signal.source_url && (
+                              <a
+                                href={signal.source_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="opacity-0 group-hover:opacity-100 p-2 hover:bg-amber-50 rounded-lg transition-all"
+                              >
+                                <ExternalLink className="w-4 h-4 text-amber-600" />
+                              </a>
+                            )}
                           </div>
                         </CardContent>
                       </Card>
