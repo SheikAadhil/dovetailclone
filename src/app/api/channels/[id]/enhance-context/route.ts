@@ -55,7 +55,7 @@ Return only the enhanced text, no explanation.`;
           { role: "user", content: `INSTRUCTIONS: ${systemPrompt}\n\nINPUT: ${userPrompt}` },
         ],
       });
-      const enhanced = response.choices[0].message.content?.trim();
+      const enhanced = response.choices[0]?.message?.content?.trim();
       if (enhanced) {
         return NextResponse.json({ enhanced });
       }
@@ -83,7 +83,7 @@ Return only the enhanced text, no explanation.`;
           { role: "user", content: `INSTRUCTIONS: ${systemPrompt}\n\nINPUT: ${userPrompt}` },
         ],
       });
-      enhanced = response.choices[0].message.content?.trim() || context;
+      enhanced = response.choices[0]?.message?.content?.trim() || context;
       break;
     } catch (error: any) {
       lastError = error;
