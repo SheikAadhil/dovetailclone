@@ -37,6 +37,14 @@ Then run a single test: `npx vitest run src/path/to/test.test.ts`
 
 Run tests in watch mode: `npx vitest`
 
+### Database
+```bash
+# Supabase CLI commands
+npx supabase db push    # Push local schema to remote
+npx supabase db pull    # Pull remote schema to local
+npx supabase migration up  # Apply migrations
+```
+
 ---
 
 ## Code Style Guidelines
@@ -121,22 +129,69 @@ try {
 - Use the Supabase client from `@/lib/supabase`
 - Handle null values appropriately
 - Use TypeScript types from `@/types`
+- For server components, use `createSupabaseServerClient` from `@/lib/supabase-server`
 
 ### API Routes
 - Place in `src/app/api/` directory
 - Use Next.js App Router route handlers (route.ts)
 - Return proper HTTP status codes
 - Validate inputs using Zod
+- For POST/PUT/PATCH, always validate request body
+- Use proper error handling with try/catch
+
+```typescript
+import { z } from 'zod'
+import { NextResponse } from 'next/server'
+
+const schema = z.object({
+  name: z.string().min(1),
+  email: z.string().email()
+})
+
+export async function POST(request: Request) {
+  try {
+    const body = await request.json()
+    const result = schema.safeParse(body)
+    
+    if (!result.success) {
+      return NextResponse.json(
+        { error: 'Invalid input', details: result.error.format() },
+        { status: 400 }
+      )
+    }
+    
+    // Process valid data
+    return NextResponse.json({ success: true })
+  } catch (error) {
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    )
+  }
+}
+```
 
 ### Tailwind CSS
 - Use shadcn/ui components when available
 - Use `cn()` utility from `@/lib/utils` for conditional classes
 - Follow mobile-first responsive design
+- Avoid arbitrary values when possible (use theme extensions instead)
+- Use semantic class ordering (flex -> layout -> spacing -> typography -> visual)
 
----
+```typescript
+// Good
+<div className="flex flex-col items-center p-4 bg-white rounded-lg shadow-md">
+  <h2 className="text-xl font-bold text-gray-800 mb-2">Title</h2>
+  <p className="text-gray-600">Description</p>
+</div>
 
-## File Organization
+// Avoid
+<div className="p-4 bg-white rounded-lg shadow-md flex flex-col items-center">
+  <!-- ... -->
+</div>
+```
 
+### File Organization
 ```
 src/
 ├── app/           # Next.js App Router pages and API routes
@@ -147,9 +202,7 @@ src/
 └── middleware.ts  # Clerk auth middleware
 ```
 
----
-
-## Key Dependencies
+### Key Dependencies
 
 | Package | Purpose |
 |---------|---------|
@@ -158,6 +211,14 @@ src/
 | `recharts` | Data visualization |
 | `lucide-react` | Icons |
 | `date-fns` | Date utilities |
+| `@google/generative-ai` | Google Gemini AI |
+| `@anthropic-ai/sdk` | Anthropic Claude AI |
+| `openai` | OpenAI API |
+| `@slack/web-api` | Slack API |
+| `@react-email/components` | Email components |
+| `resend` | Email sending service |
+| `papaparse` | CSV parsing |
+| `remark-*` | Markdown processing |
 
 ---
 
@@ -167,3 +228,39 @@ src/
 2. Copy `.env.example` to `.env.local` and configure env vars
 3. Run `npm run dev` to start development server
 4. Access at http://localhost:3000
+
+### Environment Variables
+Required variables in `.env.local`:
+- `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`
+- `CLERK_SECRET_KEY`
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `GOOGLE_API_KEY` (for Gemini)
+- `ANTHROPIC_API_KEY` (for Claude)
+- `OPENAI_API_KEY` (for OpenAI)
+- `SLACK_BOT_TOKEN`
+- `SLACK_SIGNING_SECRET`
+- `RESEND_API_KEY`
+- `EMAIL_FROM`
+
+---
+
+## Best Practices
+
+### AI/LLM Integration
+- Always handle API errors gracefully with fallback mechanisms
+- Rate limit AI API calls to prevent abuse
+- Cache embeddings and analysis results when possible
+- Validate AI-generated content before displaying to users
+
+### Performance
+- Use `next/image` for optimized image loading
+- Implement proper loading states for async operations
+- Use React.memo for expensive components that render frequently
+- Implement pagination for large datasets
+
+### Security
+- Always validate and sanitize user inputs
+- Use Supabase row-level security (RLS) for data protection
+- Never expose API keys in client-side code
+- Implement proper authentication checks on all API routes

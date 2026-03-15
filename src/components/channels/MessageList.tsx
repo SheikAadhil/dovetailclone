@@ -33,9 +33,9 @@ export function MessageList({ channelId }: MessageListProps) {
   const [loading, setLoading] = useState(true);
   const [mounted, setMounted] = useState(false);
   
-  const [search, setSearch] = useState("");
-  const [sentiment, setSentiment] = useState<string>("all");
-  const [metadataFilters, setMetadataFilters] = useState<Record<string, string>>({});
+   const [search, setSearch] = useState("");
+   const [sentiment, setSentiment] = useState<string>("all");
+   const [metadataFilters, setMetadataFilters] = useState<Record<string, string>>({});
   
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
@@ -284,7 +284,7 @@ export function MessageList({ channelId }: MessageListProps) {
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
             <Input placeholder="Search messages..." className="pl-9 bg-white" value={search} onChange={(e) => setSearch(e.target.value)} />
           </div>
-          <Select value={sentiment} onValueChange={setSentiment}>
+           <Select value={sentiment} onValueChange={(value) => setSentiment(value ?? "all")}>
             <SelectTrigger className="w-[160px] bg-white border-gray-200">
               <SelectValue placeholder="All Sentiments" />
             </SelectTrigger>
@@ -302,8 +302,8 @@ export function MessageList({ channelId }: MessageListProps) {
             <div className="flex items-center gap-2 text-xs font-bold text-gray-400 uppercase tracking-wider mr-2"><Filter className="w-3 h-3" /> Segment by:</div>
             {fields.map(field => (
               <div key={field.id} className="flex flex-col gap-1.5">
-                {field.field_type === 'select' && (
-                  <Select value={metadataFilters[field.source_column] || "all"} onValueChange={(val) => updateMetadataFilter(field.source_column, val)}>
+                 {field.field_type === 'select' && (
+                   <Select value={metadataFilters[field.source_column] || "all"} onValueChange={(val) => updateMetadataFilter(field.source_column, val ?? "all")}>
                     <SelectTrigger className="h-8 text-xs bg-white min-w-[120px]"><span className="text-gray-400 mr-1">{field.display_name}:</span><SelectValue placeholder="All" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All</SelectItem>
@@ -361,8 +361,8 @@ export function MessageList({ channelId }: MessageListProps) {
         </div>
       )}
 
-      {/* Tag Selection Dialog */}
-      <Dialog open={isTagDialogOpen} onOpenChange={setIsTagDialogOpen}>
+       {/* Tag Selection Dialog */}
+       <Dialog open={isTagDialogOpen ?? false} onOpenChange={setIsTagDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Tag Messages</DialogTitle>
@@ -457,32 +457,67 @@ export function MessageList({ channelId }: MessageListProps) {
               </div>
             </div>
 
-            {/* Progress Log - Scrollable */}
-            <div className="bg-gray-900 rounded-lg p-3 max-h-64 overflow-y-auto">
-              <div className="space-y-1.5">
-                {progressLogs.map((log, index) => (
-                  <div key={index} className="flex items-start gap-2 text-xs font-mono">
-                    <span className="text-gray-500 shrink-0">[{log.time}]</span>
-                    {log.type === 'error' && <span className="text-red-400">✗</span>}
-                    {log.type === 'success' && <span className="text-green-400">✓</span>}
-                    {log.type === 'info' && <span className="text-blue-400">›</span>}
-                    <span className={
-                      log.type === 'error' ? 'text-red-300' :
-                      log.type === 'success' ? 'text-green-300' :
-                      'text-gray-300'
-                    }>
-                      {log.message}
-                    </span>
-                  </div>
-                ))}
-                {analyzingBatch && (
-                  <div className="flex items-center gap-2 text-xs font-mono text-gray-500">
-                    <Loader2 className="w-3 h-3 animate-spin" />
-                    <span>Waiting for response...</span>
-                  </div>
-                )}
+              {/* Progress Log - Scrollable */}
+              <div className="bg-gray-900 rounded-lg p-3 max-h-64 overflow-y-auto">
+                <div className="space-y-1.5">
+                  {progressLogs.map((log, index) => {
+                    // Parse detailed progress information for better display
+                    const progressMatch = log.message.match(/\[([^\]]+)\]\s+GOAL:\s*([^|]+)\s*\|\s*DOING:\s*([^|]+)\s*\|\s*OBSERVATIONS:\s*([^|]+)\s*\|\s*DECISIONS:\s*([^|]+)\s*\|\s*QUESTIONS:\s*([^|]+)\s*\|\s*PROGRESS:\s*(.+)/);
+                    
+                    return (
+                      <div key={index} className="flex items-start gap-2 text-xs font-mono">
+                        <span className="text-gray-500 shrink-0">[{log.time}]</span>
+                        {log.type === 'error' && <span className="text-red-400">✗</span>}
+                        {log.type === 'success' && <span className="text-green-400">✓</span>}
+                        {log.type === 'info' && <span className="text-blue-400">›</span>}
+                        <div className="flex-1">
+                          {progressMatch ? (
+                            <div className="space-y-0.5">
+                              <span className="font-semibold text-indigo-600">{progressMatch[1].trim()}</span>
+                              <div className="grid grid-cols-2 gap-2 text-xs">
+                                <div>
+                                  <span className="text-gray-400">GOAL:</span> <span className="text-gray-200">{progressMatch[2].trim()}</span>
+                                </div>
+                                <div>
+                                  <span className="text-gray-400">DOING:</span> <span className="text-gray-200">{progressMatch[3].trim()}</span>
+                                </div>
+                                <div>
+                                  <span className="text-gray-400">OBSERVATIONS:</span> <span className="text-gray-200">{progressMatch[4].trim()}</span>
+                                </div>
+                                <div>
+                                  <span className="text-gray-400">DECISIONS:</span> <span className="text-gray-200">{progressMatch[5].trim()}</span>
+                                </div>
+                                <div>
+                                  <span className="text-gray-400">QUESTIONS:</span> <span className="text-gray-200">{progressMatch[6].trim()}</span>
+                                </div>
+                                <div>
+                                  <span className="text-gray-400">PROGRESS:</span> <span className="text-gray-200">{progressMatch[7].trim()}</span>
+                                </div>
+                              </div>
+                            </div>
+                          ) : (
+                            <span className={
+                              log.type === 'error' ? 'text-red-300' :
+                              log.type === 'success' ? 'text-green-300' :
+                              'text-gray-300'
+                            }>
+                              {log.message}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
-            </div>
+            {analyzingBatch && (
+                   <div className="flex items-center gap-2 text-xs font-mono text-gray-500">
+                     <Loader2 className="w-3 h-3 animate-spin" />
+                     <span>Waiting for response...</span>
+                   </div>
+                 )}
+               </div>
+             </div>
 
             {/* Error Display */}
             {analysisError && (
