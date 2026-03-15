@@ -228,15 +228,28 @@ async function handleAnalysis(
 
       let themeId = existing?.id;
 
+      const themeData = {
+        name: theme.name,
+        summary: theme.summary,
+        description: theme.deep_analysis, // Map deep_analysis to description
+        data_point_count: validMessageIds.length,
+        sentiment_breakdown: breakdown,
+        topic_id: topic.id,
+        // New fields
+        scope: theme.scope,
+        confidence: theme.confidence,
+        product_implication: theme.product_implication,
+        recommendation_direction: theme.recommendation_direction,
+        recommendation_type: theme.recommendation_type,
+        user_need: theme.user_need,
+        representative_evidence: theme.representative_evidence || [],
+        last_updated_at: new Date().toISOString()
+      };
+
       if (themeId) {
         await supabase
           .from('themes')
-          .update({
-            summary: theme.summary,
-            description: theme.deep_analysis,
-            sentiment_breakdown: breakdown,
-            last_updated_at: new Date().toISOString()
-          })
+          .update(themeData)
           .eq('id', themeId);
       } else {
         const { data: newTheme } = await supabase
@@ -244,13 +257,8 @@ async function handleAnalysis(
           .insert({
             channel_id: channelId,
             workspace_id: dataPoints[0].workspace_id,
-            name: theme.name,
-            summary: theme.summary,
-            description: theme.deep_analysis,
-            data_point_count: validMessageIds.length,
-            sentiment_breakdown: breakdown,
-            topic_id: topic.id,
-            is_pinned: false
+            is_pinned: false,
+            ...themeData
           })
           .select('id')
           .single();
@@ -267,23 +275,40 @@ async function handleAnalysis(
           theme_id: themeId,
           relevance_score: 1.0
         }));
-        await supabase.from('data_point_themes').insert(relations);
+        if (relations.length > 0) {
+          await supabase.from('data_point_themes').insert(relations);
+        }
       }
     }
   };
 
-  sendProgress?.(`[SAVING] GOAL: Persist analysis results | DOING: Saving themes to database | OBSERVATIONS: Writing ${layer1Themes?.length || 0} themes to database | DECISIONS: Creating topic category for organization | QUESTIONS: | PROGRESS: Saving themes...`, 2);
+  sendProgress?.(`[SAVING] GOAL: Persist analysis results | DOING: Saving themes and strategic insights | OBSERVATIONS: Writing ${layer1Themes?.length || 0} themes to database | DECISIONS: Creating topic category for organization | QUESTIONS: | PROGRESS: Saving themes...`, 2);
+  
   try {
+    // Save global analysis artifacts to Channel
+    if (layer1Themes.length > 0) {
+      const globalData = layer1Themes[0];
+      await supabase
+        .from('channels')
+        .update({
+          latent_tensions: globalData.latent_tensions || [],
+          strengths: globalData.strengths || [],
+          isolated_issues: globalData.isolated_issues || [],
+          last_analyzed_at: new Date().toISOString()
+        })
+        .eq('id', channelId);
+    } else {
+       // Just update timestamp if no themes
+       await supabase
+        .from('channels')
+        .update({ last_analyzed_at: new Date().toISOString() })
+        .eq('id', channelId);
+    }
+
     await processLayer(layer1Themes, TOPIC_NAME);
   } catch (e) {
     console.error("Error processing themes:", e);
   }
-
-  // 4. Update channel timestamp
-  await supabase
-    .from('channels')
-    .update({ last_analyzed_at: new Date().toISOString() })
-    .eq('id', channelId);
 
   // 6. Create theme snapshots
   const today = new Date().toISOString().split('T')[0];

@@ -27,6 +27,10 @@ export interface Channel {
   // Feature 9
   digest_slack_webhook_url: string | null;
   digest_slack_enabled: boolean;
+  // Feature: Advanced Analysis
+  latent_tensions?: any[] | null;
+  strengths?: any[] | null;
+  isolated_issues?: any[] | null;
 }
 
 export interface SlackConnection {
@@ -85,6 +89,14 @@ export interface Theme {
   trend_data?: { date: string; count: number }[];
   trend_direction?: 'rising' | 'falling' | 'stable';
   trend_percent_change?: number;
+  // Feature: Advanced Analysis
+  scope?: string | null;
+  confidence?: 'High' | 'Medium' | 'Low' | null;
+  product_implication?: string | null;
+  recommendation_direction?: string | null;
+  recommendation_type?: 'UX fix' | 'IA/content fix' | 'model/AI improvement' | 'integration/platform fix' | 'trust/governance fix' | 'pricing/packaging fix' | 'workflow/process fix' | null;
+  user_need?: string | null;
+  representative_evidence?: string[] | null;
 }
 
 export interface DataPointTheme {

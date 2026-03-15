@@ -295,10 +295,12 @@ You MUST respond with ONLY valid JSON. No conversational text. No markdown. No e
 
 Output format must be:
 {
+  "worklog": [ ... ],
   "dataset_accounting": { ... },
   "signal_ledger": [ ... ],
   "categories": [ ... ],
   "top_level_themes": [ ... ],
+  "latent_tensions": [ ... ],
   "strengths": [ ... ],
   "isolated_issues": [ ... ],
   "unassigned_ambiguous": [ ... ]
@@ -343,14 +345,6 @@ Your worklog entries should appear AFTER you complete each stage:
 Do not reveal hidden private chain-of-thought.
 Do show professional research trace: what stage, what you're doing, what patterns you notice, what decisions you make, what remains uncertain.
 
-Sound like a senior UX researcher:
-- "I'm seeing repeated evidence that..."
-- "These imply different product responses, so I'm keeping them separate"
-- "This appears once, so I'm holding as isolated issue"
-- "This cluster is too broad, hiding different friction types"
-
-Do NOT use vague filler like "Analyzing..." or "Processing..."
-
 --------------------------------------------------
 1. WHAT A THEME IS (CRITICAL)
 --------------------------------------------------
@@ -372,9 +366,6 @@ A good theme:
 - is supported by multiple relevant signals or by strategically weighty evidence
 - is distinct from neighboring themes
 - implies a reasonably coherent product response
-
-Theme test: If the label only tells you what people talked about, it is probably too shallow.
-If the label tells you what product pattern is happening and why it matters, it is closer to a real theme.
 
 --------------------------------------------------
 2. NON-NEGOTIABLE RULES (VIOLATIONS MAKE OUTPUT INVALID)
@@ -398,224 +389,46 @@ If the label tells you what product pattern is happening and why it matters, it 
 If any of these rules are violated, the analysis is invalid.
 
 --------------------------------------------------
-3. UNITS OF ANALYSIS
+3. ANALYSIS STAGES (FOLLOW EXACTLY)
 --------------------------------------------------
 
-Signal: A raw observation, quote, complaint, request, or note.
-Code: A short label attached to a meaningful data segment.
-Category: A grouping of related codes.
-Theme: A broader pattern of shared meaning built from categories and codes.
-Strength: A repeated or strategically important positive pattern worth preserving.
-Isolated issue: A meaningful but low-frequency issue that should remain visible without being inflated into a full theme.
-Unassigned / ambiguous: A signal that cannot yet be placed confidently.
+STAGE 1: Dataset familiarization
+- Read the full dataset
+- Note signal types, sources, repeated ideas, contradictions, standout quotes
+- Print what patterns you are noticing
+
+STAGE 2: Signal ledger creation
+- Create one row per signal
+- Classify: pain point, request, workaround, concern, strength, ambiguity
+
+STAGE 3: First-pass coding
+- Create concise primary codes for each signal
+- Show examples of code families emerging
+
+STAGE 4: Code clustering
+- Group related codes into categories
+- Call out weak or tentative categories
+
+STAGE 5: Candidate theme generation
+- Build themes from categories
+- Explain central organizing idea for each
+
+STAGE 6: Theme boundary audit
+- Compare themes for overlap
+- Merge if same evidence/same intervention
+- Split if different interventions needed
+- Show what changed
+
+STAGE 7: Strengths / isolated issues / ambiguous
+- Create explicit buckets
+- Explain why items not in full themes
+
+STAGE 8: Final coverage audit
+- Verify every signal has exactly one home
+- Print final audit result
 
 --------------------------------------------------
-4. PHASE 1: SIGNAL LEDGER
---------------------------------------------------
-
-Create a ledger with one row per signal.
-
-For each signal record:
-- signal_id
-- raw text (use the content provided)
-- short paraphrase of what the signal says
-- source type (slack, csv, markdown, etc. - infer if not provided)
-- provisional signal type: pain point, request, workaround, concern, strength, ambiguity
-- first-pass primary code
-- optional secondary code
-- any notes
-
-This ensures no signal is dropped and supports later auditing.
-
---------------------------------------------------
-5. PHASE 2: FIRST-CYCLE CODING
---------------------------------------------------
-
-Code the full dataset. For each signal, ask "What is this about?" and produce concise codes.
-
-Good code examples:
-- cannot verify summary
-- blank state blocks setup
-- model grouping too broad
-- needs region filtering
-- sharing permissions confusing
-- export used for external presentation
-- mobile review experience broken
-- search feels fast and useful
-
-Weak code examples:
-- issue
-- problem
-- feedback
-- user comment
-- general frustration
-
-Distinguish when useful:
-- descriptive code: what the signal says
-- interpretive code: what the signal suggests (be conservative early)
-
---------------------------------------------------
-6. PHASE 3: SECOND-CYCLE CODING
---------------------------------------------------
-
-After first-cycle coding, review and clean up codes:
-- merge duplicate codes
-- separate similar-looking codes with different meanings
-- rename unclear codes
-- identify positive codes
-- identify singleton codes
-
---------------------------------------------------
-7. PHASE 4: CATEGORY BUILDING
---------------------------------------------------
-
-Group related codes into categories.
-
-For each category capture:
-- category name
-- included codes
-- signal IDs
-- why the grouping makes sense
-- evidence strength: strong, moderate, weak, emerging
-
---------------------------------------------------
-8. PHASE 5: THEME GENERATION
---------------------------------------------------
-
-Generate candidate themes from categories.
-
-For each candidate theme ask:
-- What shared meaning links these categories?
-- What is the central organizing concept?
-- What user problem, need, or experience does this pattern reveal?
-- Why do these signals belong together?
-- What makes this more than a topic bucket?
-- Why would this matter to a product team?
-
-A candidate theme becomes a final theme only if:
-- it is supported by enough relevant evidence
-- it has a clear central concept
-- it is coherent internally
-- it is distinct from other themes
-- it implies a meaningful product response
-
---------------------------------------------------
-9. PHASE 6: THEME BOUNDARY AUDIT (CRITICAL)
---------------------------------------------------
-
-SPLITTING RULE: If one theme contains signals that would lead to DIFFERENT roadmap actions, you MUST split it.
-
-For every theme, ask:
-- What specific product intervention would this theme lead to?
-- If I had to prioritize this vs another item, would they compete for the same team/resources?
-- Are the same signals doing too much work in multiple themes?
-- Is one theme hiding multiple sub-problems that need different solutions?
-
-For every pair of nearby themes ask:
-- Are these actually different product problems?
-- Do they have different causes?
-- Do they imply different interventions?
-- Would a PM need to make different roadmap decisions for these?
-- Would merging reduce decision quality?
-- Would splitting increase clarity?
-
-Boundary decisions:
-- keep separate if causes, needs, or interventions differ
-- merge if evidence and intervention are mostly the same
-- SPLIT if a theme mixes issue types needing different actions
-- DO NOT merge just to reduce theme count
-
-Judge boundaries by product usefulness, not wording elegance.
-COMPLETENESS IS MORE IMPORTANT THAN ELEGANCE.
-
---------------------------------------------------
-10. PHASE 7: THEME REVIEW
---------------------------------------------------
-
-Review each theme:
-- Is the theme well supported?
-- Does the evidence genuinely fit the claimed pattern?
-- Are there counterexamples?
-- Is the theme too broad?
-- Is it duplicating another theme?
-- Is it actually a category, not a theme?
-- Is it just a product area label?
-- Would a PM or designer know why it matters?
-
-If a theme fails review: split it, merge it, re-scope it, downgrade it, or discard it.
-
---------------------------------------------------
-11. STRENGTHS & ISOLATED ISSUES (MANDATORY SECTIONS)
---------------------------------------------------
-
-You MUST include both a Strengths section and an Isolated Issues section. Do not skip these.
-
-STRENGTHS: Actively look for repeated positive patterns or strategically important capabilities.
-For each strength include:
-- name (plain, product-language)
-- signal_ids (all positive signals)
-- what users value
-- why it matters
-- what should be preserved or expanded
-
-ISOLATED ISSUES: Use when the issue is important but low-frequency.
-For each isolated issue include:
-- name (plain, product-language)
-- signal_ids
-- short explanation
-- why it is not elevated (low frequency but worth monitoring)
-- what to monitor
-
-UNASSIGNED / AMBIGUOUS: Keep signals that cannot be placed confidently.
-For each include:
-- signal_id
-- reason why it cannot be placed
-
-NOTE: It is better to have a strength or isolated issue with 1-2 signals than to force-fit them into a theme.
-
---------------------------------------------------
-12. NAMING THEMES
---------------------------------------------------
-
-Good theme names are:
-- plain
-- specific
-- product-usable
-- meaningful without extra drama
-
-Good pattern:
-- Trust depends on visible source evidence
-- New users struggle to get started without guided structure
-- Teams need different levels of detail and control
-- AI grouping creates manual cleanup work
-
-Bad pattern:
-- The epistemic rupture of interpretation
-- Workflow issues
-- User feedback problems
-- Platform friction
-
---------------------------------------------------
-13. PRODUCT IMPLICATIONS
---------------------------------------------------
-
-Every theme must include product meaning:
-
-- user_need or user_friction: What is the user experiencing?
-- product_implication: Why does this matter for the product?
-- recommendation_direction: What should the team do?
-- recommendation_type: One of:
-  - UX fix
-  - IA/content fix
-  - model/AI improvement
-  - integration/platform fix
-  - trust/governance fix
-  - pricing/packaging fix
-  - workflow/process fix
-- confidence: high, medium, or low
-
---------------------------------------------------
-14. OUTPUT STRUCTURE
+4. OUTPUT STRUCTURE
 --------------------------------------------------
 
 Return:
@@ -649,18 +462,27 @@ D. Top-level product themes
 For each:
 - name
 - definition (what the theme is and why signals belong together)
+- scope (what is included and excluded)
 - signal_ids
 - message_count
 - supporting_categories
 - why_this_is_one_theme
-- representative_evidence (1-2 quotes)
+- representative_evidence (JSON array of strings)
 - user_need / user_friction
 - product_implication
 - recommendation_direction
-- recommendation_type
-- confidence
+- recommendation_type (UX fix, IA/content fix, model/AI improvement, integration/platform fix, trust/governance fix, pricing/packaging fix, workflow/process fix)
+- confidence (High, Medium, Low)
 
-E. Strengths (MUST include - array can be empty if no strengths found)
+E. Latent Tensions (Section D in documentation)
+For each:
+- name
+- deeper_pattern
+- connected_themes (list of theme names)
+- strategic_importance
+- confidence (High, Medium, Low)
+
+F. Strengths (MUST include - array can be empty if no strengths found)
 For each:
 - name
 - signal_ids
@@ -668,7 +490,7 @@ For each:
 - why_it_matters
 - how_to_preserve
 
-F. Isolated issues (MUST include - array can be empty if no isolated issues)
+G. Isolated issues (MUST include - array can be empty if no isolated issues)
 For each:
 - name
 - signal_ids
@@ -676,13 +498,13 @@ For each:
 - why_not_elevated (low frequency but worth monitoring)
 - what_to_monitor
 
-G. Unassigned / ambiguous (MUST include - array can be empty if all assigned)
+H. Unassigned / ambiguous (MUST include - array can be empty if all assigned)
 For each:
 - signal_id
 - reason (why cannot be confidently placed)
 
 --------------------------------------------------
-15. FINAL SELF-CHECK (MANDATORY)
+5. FINAL SELF-CHECK (MANDATORY)
 --------------------------------------------------
 
 CRITICAL: Before finalizing, you MUST verify the following:
@@ -707,62 +529,8 @@ CRITICAL: Before finalizing, you MUST verify the following:
    - Use plain, product-language names
    - Names should tell a PM what to do, not just what users talked about
 
-5. REVIEW:
-   - Are theme boundaries clean?
-   - Did I preserve strengths explicitly?
-   - Did I preserve isolated issues explicitly?
-   - Did I keep ambiguity visible?
-
 If ANY of these fail, REVISE before output.
 
-Your final dataset_accounting MUST show:
-- missing_signals: []
-- duplicate_assignments: []
-
---------------------------------------------------
-ANALYSIS STAGES
---------------------------------------------------
-
-Work through these stages, outputting a worklog entry after each:
-
-STAGE 1: Dataset familiarization
-- Read the full dataset
-- Note signal types, sources, repeated ideas, contradictions, standout quotes
-- Print what patterns you are noticing
-- Output worklog: stage, goal, doing, observations, decisions, open_questions, progress
-
-STAGE 2: Signal ledger creation
-- Create one row per signal
-- Classify: pain point, request, workaround, concern, strength, ambiguity
-- Show progress as you classify
-
-STAGE 3: First-pass coding
-- Create concise primary codes for each signal
-- Show examples of code families emerging
-
-STAGE 4: Code clustering
-- Group related codes into categories
-- Call out weak or tentative categories
-
-STAGE 5: Candidate theme generation
-- Build themes from categories
-- Explain central organizing idea for each
-
-STAGE 6: Theme boundary audit
-- Compare themes for overlap
-- Merge if same evidence/same intervention
-- Split if different interventions needed
-- Show what changed
-
-STAGE 7: Strengths / isolated issues / ambiguous
-- Create explicit buckets
-- Explain why items not in full themes
-
-STAGE 8: Final coverage audit
-- Verify every signal has exactly one home
-- Print final audit result
-
---------------------------------------------------
 DATASET (MESSAGES):
 ${JSON.stringify(simplifiedMessages)}`;
 
@@ -770,9 +538,13 @@ ${JSON.stringify(simplifiedMessages)}`;
 }
 
 export async function analyzeThemesLayer2(messages: { id: string; content: string }[], aiContext?: string | null): Promise<ThemeResult[]> {
+  // Layer 2 is now integrated into Layer 1 as "Latent Tensions", but we keep this function 
+  // if a dedicated deep dive is explicitly requested or for legacy support.
+  // It effectively acts as a "Reviewer" pass now.
+  
   if (messages.length === 0) return [];
 
-  sendProgress(`Preparing ${messages.length} signals for Layer 2 deep analysis...`);
+  sendProgress(`Preparing ${messages.length} signals for Deep Strategic Review...`);
 
   const idMap = new Map<string, string>();
   const simplifiedMessages = messages.map((m, index) => {
@@ -781,59 +553,41 @@ export async function analyzeThemesLayer2(messages: { id: string; content: strin
     return { id: simpleId, content: m.content };
   });
 
-  sendProgress("Building Layer 2 deep analysis prompt...");
+  sendProgress("Building Strategic Review prompt...");
 
   const contextPart = aiContext ? `\nUSER-PROVIDED CONTEXT:\n${aiContext}\n` : '';
 
-  const prompt = `You are an expert Qualitative Researcher specializing in Reflexive Thematic Analysis (Braun & Clarke).
+  const prompt = `You are an expert Strategic Product Analyst.
 
-STRICT OUTPUT REQUIREMENT: You MUST respond with ONLY valid JSON. No conversational text. No markdown. No explanations. No introductions. Just pure JSON.
+STRICT OUTPUT REQUIREMENT: You MUST respond with ONLY valid JSON.
 
 Output format must be:
 {
-  "deep_themes": [ { "name": "...", ... } ]
+  "latent_tensions": [ { "name": "...", ... } ]
 }
 
 ## MISSION
 
 Your goal is to synthesize DEEP, LATENT, and INTERPRETIVE patterns that connect the top-level themes.
 
-## CRITICAL CONSTRAINT
-
-Deep themes must SYNTHESIZE across top-level themes, not RESCUE them.
-
-- If a deep theme would contain signals that are missing from top-level, that's a TOP-LEVEL problem - fix the top-level layer first.
-- Deep themes explain PATTERNS across themes, they do not fill coverage gaps.
-- If you find signals that should be in top-level but aren't, note them but do not elevate them to deep themes.
-
-## ANALYSIS PRINCIPLES (LAYER 2 - DEEP ANALYSIS)
+## ANALYSIS PRINCIPLES
 
 1. INTERPRETIVE DEPTH: Go beyond the surface. Identify underlying assumptions, organizational dynamics, and systemic issues.
-
-2. DEVELOPED THEMES: Themes must represent a pattern of shared meaning united by a central organizing concept that spans multiple top-level themes.
-
-3. CROSS-THEME SYNTHESIS: A deep theme should connect insights from at least 2 different top-level themes. If it only explains one theme, it's not deep - it's just elaboration.
-
-4. NO COVERAGE RESCUE: Do not let deep themes compensate for incomplete top-level coverage. If signals are missing from top-level, flag them separately.
+2. CROSS-THEME SYNTHESIS: A deep tension should connect insights from multiple areas.
 
 ${contextPart}
 
 ### FORMAT:
 Respond ONLY with a JSON object. No other text.
 JSON SCHEMA: {
-  "deep_themes": [
+  "latent_tensions": [
     {
-      "name": "Deep Theme Title",
-      "summary": "Central Organizing Concept: 1-2 sentences on the underlying interpretive pattern.",
-      "deep_analysis": "Latent Analysis: 1-2 paragraphs exploring conceptual significance, assumptions, and systemic dynamics.",
-      "connected_top_level_themes": ["theme1", "theme2"],
-      "message_ids": ["1", "2"],
-      "sentiment": "mixed",
-      "why_synthesizes": "How this connects across multiple top-level themes"
+      "name": "Tension Title",
+      "deeper_pattern": "Latent Analysis: 1-2 paragraphs exploring conceptual significance.",
+      "connected_themes": ["theme1", "theme2"],
+      "strategic_importance": "Why this matters strategically",
+      "confidence": "High"
     }
-  ],
-  "signals_that_need_top_level_coverage": [
-    { "signal_id": "1", "why_missing": "explanation" }
   ]
 }
 
@@ -867,14 +621,14 @@ async function performAnalysis(prompt: string, idMap: Map<string, string>, model
       }
     }
 
-    // Handle two-stage workflow format with top_level_themes or revised_product_themes (Layer 1)
-    const themesArray = parsed.top_level_themes || parsed.revised_product_themes;
+    // Handle standard format with top_level_themes (Layer 1)
+    const themesArray = parsed.top_level_themes;
     if (themesArray && Array.isArray(themesArray)) {
       console.log(`Found ${themesArray.length} top-level themes`);
       const finalThemes = themesArray.map((theme: any) => ({
         name: theme.name,
         summary: theme.definition || theme.summary || "",
-        deep_analysis: theme.implication || theme.product_implication || theme.recommendation || "",
+        deep_analysis: theme.implication || theme.product_implication || theme.recommendation || "", // Map to description in DB
         message_ids: (theme.signal_ids || theme.message_ids || [])
           .map((sid: any) => idMap.get(sid.toString()))
           .filter((realId: any) => !!realId),
@@ -882,68 +636,47 @@ async function performAnalysis(prompt: string, idMap: Map<string, string>, model
         message_count: theme.message_count,
         why_together: theme.why_this_is_one_theme || theme.why_together,
         evidence: theme.representative_evidence || theme.evidence,
-        user_need: theme.user_team_need || theme.user_need,
+        user_need: theme.user_team_need || theme.user_need || theme.user_friction,
         product_implication: theme.implication || theme.product_implication,
         implication: theme.implication,
         recommendation: theme.recommendation,
+        recommendation_direction: theme.recommendation_direction,
         recommendation_type: theme.recommendation_type,
         confidence: theme.confidence,
+        scope: theme.scope,
         supporting_categories: theme.supporting_categories,
-        representative_evidence: theme.representative_evidence,
-        // Two-stage workflow fields
+        representative_evidence: theme.representative_evidence, // New field mapping
+        
+        // Global analysis fields attached to every theme (filtered at save time)
         dataset_accounting: parsed.dataset_accounting,
-        first_cycle_coding: parsed.first_cycle_coding,
+        signal_ledger: parsed.signal_ledger,
         categories: parsed.categories,
-        reviewer_handoff: parsed.reviewer_handoff,
-        // Coverage reports - handle both old and new field names
-        coverage_report: parsed.dataset_accounting ? {
-          total_signals: parsed.dataset_accounting.total_signals,
-          signals_in_top_level_themes: parsed.dataset_accounting.signals_in_top_level_themes,
-          signals_in_isolated_issues: parsed.dataset_accounting.signals_in_isolated_issues,
-          signals_in_strengths: parsed.dataset_accounting.signals_in_strengths,
-          signals_in_unrepresented: parsed.dataset_accounting.signals_in_unassigned || parsed.dataset_accounting.signals_in_unassigned_ambiguous,
-          missing_signals: parsed.dataset_accounting.missing_signals,
-          duplicated_signals: parsed.dataset_accounting.duplicated_signals,
-        } : (parsed.coverage_report || parsed.coverage_check),
-        // Additional sections - handle both old and new field names
-        latent_tensions: parsed.latent_tensions || parsed.revised_deep_themes,
+        latent_tensions: parsed.latent_tensions,
         strengths: parsed.strengths,
         isolated_issues: parsed.isolated_issues,
-        unassigned_ambiguous: parsed.unassigned_ambiguous || parsed.unassigned,
-        unrepresented_needs_review: parsed.unrepresented_needs_review
+        unassigned_ambiguous: parsed.unassigned_ambiguous
       }));
       return finalThemes;
     }
 
-    // Handle Layer 2 deep themes format (revised_deep_themes or deep_themes)
-    const deepThemesArray = parsed.revised_deep_themes || parsed.deep_themes;
-    if (deepThemesArray && Array.isArray(deepThemesArray)) {
-      console.log(`Found ${deepThemesArray.length} deep themes`);
-      return deepThemesArray.map((theme: any) => ({
-        name: theme.name,
-        summary: theme.summary || "",
-        deep_analysis: theme.deep_analysis || "",
-        message_ids: (theme.message_ids || [])
-          .map((sid: any) => idMap.get(sid.toString()))
-          .filter((realId: any) => !!realId),
-        sentiment: theme.sentiment || 'mixed',
-        why_together: theme.why_synthesizes,
-        connected_top_level_themes: theme.connected_top_level_themes
+    // Handle Layer 2 latent tensions format
+    const latentTensionsArray = parsed.latent_tensions;
+    if (latentTensionsArray && Array.isArray(latentTensionsArray)) {
+      console.log(`Found ${latentTensionsArray.length} latent tensions`);
+      return latentTensionsArray.map((tension: any) => ({
+        name: tension.name,
+        summary: tension.deeper_pattern || "",
+        deep_analysis: tension.strategic_importance || "",
+        message_ids: [], // Tensions connect themes, not usually direct signals in this format
+        sentiment: 'mixed',
+        confidence: tension.confidence,
+        // Mark as tension for DB saving
+        is_latent_tension: true,
+        connected_themes: tension.connected_themes
       }));
     }
 
-    // Legacy format handling
-    const rawThemes = Array.isArray(parsed) ? parsed : (parsed.themes || []);
-
-    const finalThemes = rawThemes.map((theme: any) => ({
-      ...theme,
-      deep_analysis: theme.deep_analysis || theme.analysis || "",
-      message_ids: (theme.message_ids || [])
-        .map((sid: any) => idMap.get(sid.toString()))
-        .filter((realId: any) => !!realId)
-    }));
-
-    return finalThemes;
+    return [];
   } catch (error) {
     console.error('AI Theme Analysis failed:', error);
     return [];
@@ -1024,109 +757,34 @@ export interface ThemeResult {
     progress: string;
   }>;
 
-  // Two-stage workflow fields
-  dataset_accounting?: {
-    total_signals: number;
-    represented_signals: number;
-    signals_in_top_level_themes: number;
-    signals_in_strengths: number;
-    signals_in_isolated_issues: number;
-    signals_in_unassigned: number;
-    duplicated_signals: string | string[];
-    missing_signals: string | string[];
-  };
-  first_cycle_coding?: Array<{
-    signal_id: string;
-    paraphrase: string;
-    source: string;
-    primary_code: string;
-    secondary_codes?: string[];
-    notes?: string;
-  }>;
-  categories?: Array<{
-    name: string;
-    signal_ids: string[];
-    codes: string[];
-    why_grouped: string;
-    evidence_strength: 'strong' | 'moderate' | 'weak';
-  }>;
-  reviewer_handoff?: {
-    likely_weak_spots?: string[];
-    possible_over_merges?: string[];
-    signals_needing_challenge?: string[];
-    rival_interpretations?: string[];
-    confidence_risks?: string[];
-  };
-  // Coverage report (new format)
-  coverage_report?: {
-    total_signals: number;
-    signals_in_top_level_themes: number;
-    signals_in_isolated_issues: number;
-    signals_in_strengths: number;
-    signals_in_unrepresented: number;
-    missing_signals: string | string[];
-    duplicated_signals: string | string[];
-  };
-  // Legacy coverage check
-  coverage_check?: {
-    total_signals: number;
-    signals_in_top_level_themes: number;
-    signals_in_strengths: number;
-    signals_in_isolated_issues: number;
-    unrepresented_signals: string | string[];
-    duplicate_signals: string | string[];
-  };
-  // Theme-specific fields
+  // New fields
+  scope?: string;
+  confidence?: 'High' | 'Medium' | 'Low';
+  product_implication?: string;
+  recommendation_direction?: string;
+  recommendation_type?: 'UX fix' | 'IA/content fix' | 'model/AI improvement' | 'integration/platform fix' | 'trust/governance fix' | 'pricing/packaging fix' | 'workflow/process fix';
+  user_need?: string;
+  representative_evidence?: string[];
+  
+  // Global analysis fields attached to theme result
+  dataset_accounting?: any;
+  signal_ledger?: any[];
+  categories?: any[];
+  latent_tensions?: any[];
+  strengths?: any[];
+  isolated_issues?: any[];
+  unassigned_ambiguous?: any[];
+  
+  // Internal flags
+  is_latent_tension?: boolean;
+  connected_themes?: string[];
+
+  // Legacy fields kept for compatibility
   message_count?: number;
   why_together?: string;
   evidence?: string[];
-  user_need?: string;
   user_team_need?: string;
-  product_implication?: string;
   implication?: string;
   recommendation?: string;
-  recommendation_type?: 'UX fix' | 'IA/content fix' | 'model/AI improvement' | 'integration/platform fix' | 'trust/governance fix' | 'pricing/packaging fix';
-  confidence?: 'High' | 'Medium' | 'Low';
   supporting_categories?: string[];
-  representative_evidence?: string[];
-  // Additional sections
-  latent_tensions?: Array<{
-    name: string;
-    deeper_pattern?: string;
-    connected_themes: string[];
-    strategic_importance?: string;
-    strategic_implication?: string;
-    strategic_meaning?: string;
-    confidence: 'High' | 'Medium' | 'Low';
-  }>;
-  strengths?: Array<{
-    name?: string;
-    signal_ids?: string[];
-    description?: string;
-    what_users_value?: string;
-    why_it_matters?: string;
-    evidence?: string;
-    how_to_preserve?: string;
-    preserve_expand_note?: string;
-  }>;
-  isolated_issues?: Array<{
-    name?: string;
-    signal_ids?: string[];
-    issue?: string;
-    why_not_grouped?: string;
-    why_not_elevated?: string;
-    what_to_monitor?: string;
-    monitoring_note?: string;
-    reason_not_elevated?: string;
-    signal_id?: string;
-  }>;
-  unassigned_ambiguous?: Array<{
-    signal_id: string;
-    reason: string;
-  }>;
-  unrepresented_needs_review?: Array<{
-    signal_id: string;
-    signal_content: string;
-    reason: string;
-  }>;
 }
