@@ -377,11 +377,11 @@ Theme test: If the label only tells you what people talked about, it is probably
 If the label tells you what product pattern is happening and why it matters, it is closer to a real theme.
 
 --------------------------------------------------
-2. NON-NEGOTIABLE RULES
+2. NON-NEGOTIABLE RULES (VIOLATIONS MAKE OUTPUT INVALID)
 --------------------------------------------------
 
 1. Every signal must be accounted for exactly once in the primary layer.
-2. No signal may disappear.
+2. No signal may disappear - ALL signals must appear in output.
 3. No signal may belong to multiple top-level themes.
 4. You must code before building themes.
 5. You must not jump directly from raw data to polished themes.
@@ -392,6 +392,8 @@ If the label tells you what product pattern is happening and why it matters, it 
 10. You must prefer completeness over elegance.
 11. You must use plain, product-usable theme names.
 12. You must not use deep analysis to compensate for weak product-level synthesis.
+13. DO NOT drop signals to make themes cleaner - every signal needs a home.
+14. COMPLETENESS IS MORE IMPORTANT THAN ELEGANCE.
 
 If any of these rules are violated, the analysis is invalid.
 
@@ -498,25 +500,33 @@ A candidate theme becomes a final theme only if:
 - it implies a meaningful product response
 
 --------------------------------------------------
-9. PHASE 6: THEME BOUNDARY AUDIT
+9. PHASE 6: THEME BOUNDARY AUDIT (CRITICAL)
 --------------------------------------------------
+
+SPLITTING RULE: If one theme contains signals that would lead to DIFFERENT roadmap actions, you MUST split it.
+
+For every theme, ask:
+- What specific product intervention would this theme lead to?
+- If I had to prioritize this vs another item, would they compete for the same team/resources?
+- Are the same signals doing too much work in multiple themes?
+- Is one theme hiding multiple sub-problems that need different solutions?
 
 For every pair of nearby themes ask:
 - Are these actually different product problems?
 - Do they have different causes?
 - Do they imply different interventions?
-- Are the same signals doing too much work in both themes?
-- Is one just a subset of the other?
-- Is one theme hiding multiple sub-problems?
+- Would a PM need to make different roadmap decisions for these?
 - Would merging reduce decision quality?
 - Would splitting increase clarity?
 
 Boundary decisions:
 - keep separate if causes, needs, or interventions differ
 - merge if evidence and intervention are mostly the same
-- split if a theme mixes issue types needing different actions
+- SPLIT if a theme mixes issue types needing different actions
+- DO NOT merge just to reduce theme count
 
 Judge boundaries by product usefulness, not wording elegance.
+COMPLETENESS IS MORE IMPORTANT THAN ELEGANCE.
 
 --------------------------------------------------
 10. PHASE 7: THEME REVIEW
@@ -535,26 +545,33 @@ Review each theme:
 If a theme fails review: split it, merge it, re-scope it, downgrade it, or discard it.
 
 --------------------------------------------------
-11. STRENGTHS & ISOLATED ISSUES
+11. STRENGTHS & ISOLATED ISSUES (MANDATORY SECTIONS)
 --------------------------------------------------
+
+You MUST include both a Strengths section and an Isolated Issues section. Do not skip these.
 
 STRENGTHS: Actively look for repeated positive patterns or strategically important capabilities.
 For each strength include:
-- name
-- signal IDs
+- name (plain, product-language)
+- signal_ids (all positive signals)
 - what users value
 - why it matters
 - what should be preserved or expanded
 
 ISOLATED ISSUES: Use when the issue is important but low-frequency.
 For each isolated issue include:
-- name
-- signal IDs
+- name (plain, product-language)
+- signal_ids
 - short explanation
-- why it is not elevated
+- why it is not elevated (low frequency but worth monitoring)
 - what to monitor
 
-UNASSIGNED: Keep ambiguous signals visible with explanation.
+UNASSIGNED / AMBIGUOUS: Keep signals that cannot be placed confidently.
+For each include:
+- signal_id
+- reason why it cannot be placed
+
+NOTE: It is better to have a strength or isolated issue with 1-2 signals than to force-fit them into a theme.
 
 --------------------------------------------------
 12. NAMING THEMES
@@ -603,15 +620,15 @@ Every theme must include product meaning:
 
 Return:
 
-A. Dataset accounting
-- total_signals: number
-- represented_signals: number
+A. Dataset accounting (MUST be complete - no missing signals)
+- total_signals: number (must match input)
+- represented_signals: number (signals in themes + strengths + isolated + ambiguous)
 - signals_in_top_level_themes: number
 - signals_in_strengths: number
 - signals_in_isolated_issues: number
 - signals_in_unassigned_ambiguous: number
-- missing_signals: [] or list
-- duplicate_assignments: [] or list
+- missing_signals: [] (MUST be empty - every signal accounted for)
+- duplicate_assignments: [] (MUST be empty - no signal in multiple places)
 
 B. Signal ledger (summary - key fields only)
 - signal_id
@@ -643,27 +660,64 @@ For each:
 - recommendation_type
 - confidence
 
-E. Strengths
-F. Isolated issues
-G. Unassigned / ambiguous
+E. Strengths (MUST include - array can be empty if no strengths found)
+For each:
+- name
+- signal_ids
+- what_users_value
+- why_it_matters
+- how_to_preserve
+
+F. Isolated issues (MUST include - array can be empty if no isolated issues)
+For each:
+- name
+- signal_ids
+- issue_description
+- why_not_elevated (low frequency but worth monitoring)
+- what_to_monitor
+
+G. Unassigned / ambiguous (MUST include - array can be empty if all assigned)
+For each:
+- signal_id
+- reason (why cannot be confidently placed)
 
 --------------------------------------------------
-15. FINAL SELF-CHECK
+15. FINAL SELF-CHECK (MANDATORY)
 --------------------------------------------------
 
-Before finalizing, verify:
-- Did I account for every signal exactly once?
-- Did I code before theming?
-- Are these themes, not topic buckets?
-- Does each theme have a central organizing concept?
-- Are theme boundaries clean?
-- Did I preserve strengths?
-- Did I preserve isolated issues?
-- Did I keep ambiguity visible?
-- Are the names plain and product-usable?
-- Would this help a product team decide what to improve?
+CRITICAL: Before finalizing, you MUST verify the following:
 
-If any answer is no, revise before output.
+1. SIGNAL ACCOUNTING:
+   - Every input signal must appear EXACTLY once in the output
+   - signals_in_top_level_themes + signals_in_strengths + signals_in_isolated_issues + signals_in_unassigned_ambiguous MUST equal total_signals
+   - missing_signals MUST be an empty array (0 missing)
+   - duplicate_assignments MUST be an empty array (0 duplicates)
+
+2. THEME INTEGRITY:
+   - If one theme contains signals that would lead to DIFFERENT roadmap actions, SPLIT it
+   - Decision rule: Different product interventions = different themes
+   - Do not optimize for fewer themes if it causes signal loss
+
+3. COVERAGE REQUIREMENTS:
+   - Do NOT drop any signals to make themes cleaner
+   - Every signal must have a home: theme, strength, isolated issue, or ambiguous
+   - Prefer completeness over elegance
+
+4. NAMING:
+   - Use plain, product-language names
+   - Names should tell a PM what to do, not just what users talked about
+
+5. REVIEW:
+   - Are theme boundaries clean?
+   - Did I preserve strengths explicitly?
+   - Did I preserve isolated issues explicitly?
+   - Did I keep ambiguity visible?
+
+If ANY of these fail, REVISE before output.
+
+Your final dataset_accounting MUST show:
+- missing_signals: []
+- duplicate_assignments: []
 
 --------------------------------------------------
 ANALYSIS STAGES
