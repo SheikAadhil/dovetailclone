@@ -15,7 +15,8 @@ import {
   Brain, RefreshCcw, LayoutPanelLeft, MessageSquare,
   Settings as SettingsIcon, History, Plus, MoreVertical,
   FolderOpen, Merge, Clock, TrendingUp,
-  Filter, BarChart3, ChevronRight, Search, Activity, Layers, Sparkles, X, Check, Loader2, FileCode, Zap, Lightbulb, Menu, PanelLeftClose
+  Filter, BarChart3, ChevronRight, Search, Activity, Layers, Sparkles, X, Check, Loader2, FileCode, Zap, Lightbulb, Menu, PanelLeftClose,
+  ShieldCheck, AlertTriangle, GitPullRequest, Info
 } from "lucide-react";
 import { formatDistanceToNow, format, parseISO, subDays } from "date-fns";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -80,6 +81,11 @@ export function ChannelDetailTabs({ channel }: ChannelDetailTabsProps) {
   const [selectedTopicId, setSelectedTopicId] = useState<string>("all");
   const [period, setPeriod] = useState<string>("30");
   const [analysisLayer, setAnalysisLayer] = useState<"product" | "deep">("product");
+  
+  // Global Analysis Results
+  const [latentTensions, setLatentTensions] = useState<any[]>([]);
+  const [strengths, setStrengths] = useState<any[]>([]);
+  const [isolatedIssues, setIsolatedIssues] = useState<any[]>([]);
   
   // Chart Selection State
   const [visibleThemeIds, setVisibleThemeIds] = useState<string[]>([]);
@@ -155,6 +161,9 @@ export function ChannelDetailTabs({ channel }: ChannelDetailTabsProps) {
       const res = await fetch(url);
       const data = await res.json();
       setThemes(data.themes);
+      setLatentTensions(data.latent_tensions || []);
+      setStrengths(data.strengths || []);
+      setIsolatedIssues(data.isolated_issues || []);
       
       // Initialize visible themes for chart if not set (top 8)
       if (visibleThemeIds.length === 0 && data.themes.length > 0) {
@@ -226,7 +235,6 @@ export function ChannelDetailTabs({ channel }: ChannelDetailTabsProps) {
                   if (parsed.step) setAnalysisStep(parsed.step);
 
                   // Try to parse worklog entry from progress message
-                  // New format: [STAGE] GOAL: goal | DOING: doing | OBSERVATIONS: obs | DECISIONS: dec | QUESTIONS: qs | PROGRESS: prog
                   const worklogMatch = parsed.progress.match(/\[([^\]]+)\]\s*GOAL:\s*([^|]+)\s*\|\s*DOING:\s*([^|]+)\s*\|\s*OBSERVATIONS:\s*([^|]*)\s*\|\s*DECISIONS:\s*([^|]*)\s*\|\s*QUESTIONS:\s*([^|]*)\s*\|\s*PROGRESS:\s*(.*)/);
                   if (worklogMatch) {
                     const [, stage, goal, doing, observations, decisions, questions, progressStr] = worklogMatch;
@@ -243,7 +251,6 @@ export function ChannelDetailTabs({ channel }: ChannelDetailTabsProps) {
                   }
                 }
               } catch (e) {
-                // Try to show raw progress message
                 setAnalysisProgress(data);
               }
             }
@@ -393,14 +400,22 @@ export function ChannelDetailTabs({ channel }: ChannelDetailTabsProps) {
       return themes.filter(t => t.topic_id === selectedTopicId);
     }
     
-    // System filtering logic
-    const productTopic = topics.find(t => t.name.includes("Product Insights"));
-    const deepTopic = topics.find(t => t.name.includes("Deep Analysis"));
+    // Better filtering for Product vs Deep analysis
+    // Product Insights is usually the first generated topic
+    const productKeywords = ["product", "insight", "feedback"];
+    const deepKeywords = ["deep", "strategic", "latent", "tension"];
+    
+    const productTopic = topics.find(t => productKeywords.some(k => t.name.toLowerCase().includes(k)));
+    const deepTopic = topics.find(t => deepKeywords.some(k => t.name.toLowerCase().includes(k)));
     
     if (analysisLayer === "product") {
-      return themes.filter(t => t.topic_id === productTopic?.id || !t.topic_id);
+      // If we found a product topic, filter by it. Otherwise show themes with NO topic or first available
+      if (productTopic) return themes.filter(t => t.topic_id === productTopic.id);
+      return themes.filter(t => !t.topic_id || t.topic_id === topics[0]?.id);
     } else {
-      return themes.filter(t => t.topic_id === deepTopic?.id);
+      // If we found a deep topic, filter by it.
+      if (deepTopic) return themes.filter(t => t.topic_id === deepTopic.id);
+      return themes.filter(t => t.topic_id === topics[1]?.id);
     }
   }, [themes, selectedTopicId, analysisLayer, topics]);
 
@@ -415,14 +430,13 @@ export function ChannelDetailTabs({ channel }: ChannelDetailTabsProps) {
     
     if (chartThemes.length === 0) return [];
 
-    // 1. Generate all dates in the period to ensure X-axis scale is consistent
+    // 1. Generate all dates in the period
     const days = period === 'all' ? 365 : parseInt(period);
     
     for (let i = days - 1; i >= 0; i--) {
       const dateStr = format(subDays(new Date(), i), "yyyy-MM-dd");
       dateMap[dateStr] = { date: dateStr };
       
-      // Initialize each theme with 0 for this date
       chartThemes.forEach(t => {
         dateMap[dateStr][t.name] = 0;
       });
@@ -567,7 +581,6 @@ export function ChannelDetailTabs({ channel }: ChannelDetailTabsProps) {
         {/* Header */}
         <header className="h-12 border-b border-gray-100 flex items-center justify-between px-3 sm:px-4 bg-white/80 backdrop-blur-md sticky top-0 z-20 shrink-0">
           <div className="flex items-center gap-2 sm:gap-3">
-            {/* Mobile menu toggle */}
             <button
               onClick={() => setSidebarOpen(true)}
               className="md:hidden p-2 hover:bg-gray-100 rounded-lg -ml-1"
@@ -668,92 +681,19 @@ export function ChannelDetailTabs({ channel }: ChannelDetailTabsProps) {
                   <h3 className="text-sm font-semibold text-indigo-900">Analyzing Signals</h3>
                   <p className="text-xs text-indigo-700">{analysisProgress || "Initializing..."}</p>
                 </div>
-                <div className="ml-auto flex items-center gap-2">
-                  <div className={`w-2 h-2 rounded-full ${analysisStep >= 1 ? 'bg-green-500' : 'bg-yellow-500 animate-pulse'}`} />
-                  <span className="text-xs text-gray-600">Analyzing</span>
-                </div>
               </div>
 
-              {/* Worklog Entries */}
               {worklogEntries.length > 0 && (
                 <div className="mt-3 space-y-2 max-h-64 overflow-y-auto">
                   {worklogEntries.map((entry, idx) => (
                     <div key={idx} className="bg-white/80 rounded-lg p-3 border border-indigo-100 shadow-sm">
                       <div className="flex items-center gap-2 mb-1">
-                        <span className="text-xs font-bold text-indigo-600 uppercase tracking-wide">
-                          {entry.stage}
-                        </span>
-                        {entry.progress && (
-                          <span className="text-xs text-gray-500">• {entry.progress}</span>
-                        )}
+                        <span className="text-xs font-bold text-indigo-600 uppercase tracking-wide">{entry.stage}</span>
+                        {entry.progress && <span className="text-xs text-gray-500">• {entry.progress}</span>}
                       </div>
-                      {entry.goal && (
-                        <div className="mt-1">
-                          <span className="text-[10px] font-medium text-purple-600 uppercase">Goal:</span>
-                          <span className="text-xs text-purple-700 ml-1">{entry.goal}</span>
-                        </div>
-                      )}
-                      {entry.doing.length > 0 && (
-                        <div className="mt-2">
-                          <span className="text-[10px] font-medium text-gray-400 uppercase">What I'm doing:</span>
-                          <ul className="mt-1 space-y-0.5">
-                            {entry.doing.map((item, i) => (
-                              <li key={i} className="text-xs text-gray-700 flex items-start gap-1.5">
-                                <span className="text-indigo-400 mt-0.5">→</span>
-                                {item}
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-                      {entry.observations.length > 0 && (
-                        <div className="mt-2">
-                          <span className="text-[10px] font-medium text-gray-400 uppercase">Observations:</span>
-                          <ul className="mt-1 space-y-0.5">
-                            {entry.observations.map((item, i) => (
-                              <li key={i} className="text-xs text-gray-600 flex items-start gap-1.5">
-                                <span className="text-amber-500 mt-0.5">•</span>
-                                {item}
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-                      {entry.decisions.length > 0 && (
-                        <div className="mt-2">
-                          <span className="text-[10px] font-medium text-gray-400 uppercase">Decisions:</span>
-                          <ul className="mt-1 space-y-0.5">
-                            {entry.decisions.map((item, i) => (
-                              <li key={i} className="text-xs text-emerald-700 flex items-start gap-1.5">
-                                <Check className="w-3 h-3 mt-0.5 text-emerald-500" />
-                                {item}
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-                      {entry.open_questions.length > 0 && (
-                        <div className="mt-2">
-                          <span className="text-[10px] font-medium text-gray-400 uppercase">Open Questions:</span>
-                          <ul className="mt-1 space-y-0.5">
-                            {entry.open_questions.map((item, i) => (
-                              <li key={i} className="text-xs text-rose-600 flex items-start gap-1.5">
-                                <span className="text-rose-400 mt-0.5">?</span>
-                                {item}
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
+                      <div className="text-xs text-gray-700">{entry.goal}</div>
                     </div>
                   ))}
-                </div>
-              )}
-
-              {worklogEntries.length === 0 && (
-                <div className="flex items-center gap-2 text-xs text-indigo-600">
-                  <Loader2 className="w-3 h-3 animate-spin" />
-                  <span>Processing signals through AI analysis pipeline...</span>
                 </div>
               )}
             </div>
@@ -763,138 +703,139 @@ export function ChannelDetailTabs({ channel }: ChannelDetailTabsProps) {
         <ScrollArea className="flex-1 min-h-0">
           <div className="p-4 max-w-7xl mx-auto w-full pb-16">
             {activeView === "overview" && (
-              <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
                 {/* Stats Grid */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="bg-white border border-gray-100 rounded-xl p-4 shadow-sm group hover:border-indigo-100 transition-colors">
+                  <div className="bg-white border border-gray-100 rounded-xl p-4 shadow-sm">
                     <div className="flex items-center gap-2.5 mb-3">
-                      <div className="p-1.5 bg-indigo-50 rounded-lg text-indigo-600 group-hover:scale-110 transition-transform">
-                        <MessageSquare className="w-4 h-4" />
-                      </div>
+                      <div className="p-1.5 bg-indigo-50 rounded-lg text-indigo-600"><MessageSquare className="w-4 h-4" /></div>
                       <span className="text-[10px] font-medium text-gray-400 uppercase tracking-wider">Total Signal</span>
                     </div>
                     <div className="text-2xl font-bold text-gray-900 tracking-tight">{stats.total_data_points}</div>
-                    <p className="text-[10px] font-medium text-gray-400 mt-0.5">Messages this period</p>
                   </div>
-                  <div className="bg-white border border-gray-100 rounded-xl p-4 shadow-sm group hover:border-emerald-100 transition-colors">
+                  <div className="bg-white border border-gray-100 rounded-xl p-4 shadow-sm">
                     <div className="flex items-center gap-2.5 mb-3">
-                      <div className="p-1.5 bg-emerald-50 rounded-lg text-emerald-600 group-hover:scale-110 transition-transform">
-                        <Layers className="w-4 h-4" />
-                      </div>
+                      <div className="p-1.5 bg-emerald-50 rounded-lg text-emerald-600"><Layers className="w-4 h-4" /></div>
                       <span className="text-[10px] font-medium text-gray-400 uppercase tracking-wider">Themes</span>
                     </div>
                     <div className="text-2xl font-bold text-gray-900 tracking-tight">{themes.length}</div>
-                    <p className="text-[10px] font-medium text-gray-400 mt-0.5">Semantic clusters</p>
                   </div>
-                  <div className="bg-white border border-gray-100 rounded-xl p-4 shadow-sm group hover:border-amber-100 transition-colors">
+                  <div className="bg-white border border-gray-100 rounded-xl p-4 shadow-sm">
                     <div className="flex items-center gap-2.5 mb-3">
-                      <div className="p-1.5 bg-amber-50 rounded-lg text-amber-600 group-hover:scale-110 transition-transform">
-                        <TrendingUp className="w-4 h-4" />
-                      </div>
+                      <div className="p-1.5 bg-amber-50 rounded-lg text-amber-600"><TrendingUp className="w-4 h-4" /></div>
                       <span className="text-[10px] font-medium text-gray-400 uppercase tracking-wider">Velocity</span>
                     </div>
                     <div className="text-2xl font-bold text-gray-900 tracking-tight">+{Math.round(Math.random()*20)}%</div>
-                    <p className="text-[10px] font-medium text-gray-400 mt-0.5">Week growth</p>
                   </div>
                 </div>
 
                 {/* Main Dashboard Chart */}
-                <div className="bg-white border border-gray-100 rounded-xl p-4 shadow-sm relative group/chart">
-                  <div className="flex flex-col md:flex-row md:items-center justify-between mb-4 gap-3">
-                    <div>
-                      <h3 className="text-base font-semibold text-gray-900 tracking-tight flex items-center gap-2">
-                        Theme Dynamics
-                        <Badge className="bg-indigo-50 text-indigo-600 border-none font-medium text-[9px] uppercase px-1.5 py-0">Stacked</Badge>
-                      </h3>
-                      <p className="text-xs font-medium text-gray-400 mt-0.5">Volume distribution over time</p>
-                    </div>
-                    
-                    <div className="flex items-center gap-2">
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <Button variant="outline" size="sm" className="rounded-lg border-gray-100 text-[10px] font-medium uppercase tracking-wider h-8 px-3 gap-1.5 bg-gray-50 hover:bg-white transition-all">
-                            <Filter className="w-3.5 h-3.5" />
-                            Filter ({visibleThemeIds.length})
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-64 p-0 rounded-xl border-gray-100 shadow-xl overflow-hidden" align="end">
-                          <div className="p-3 bg-gray-50/50 border-b border-gray-100 flex items-center justify-between">
-                            <span className="text-[10px] font-medium text-gray-400 uppercase tracking-wider">Select Themes</span>
-                            <button 
-                              onClick={() => setVisibleThemeIds(visibleThemeIds.length === themes.length ? [] : themes.map(t => t.id))}
-                              className="text-[10px] font-medium text-indigo-600 hover:underline"
-                            >
-                              {visibleThemeIds.length === themes.length ? "Clear" : "All"}
-                            </button>
-                          </div>
-                          <ScrollArea className="h-56">
-                            <div className="p-1.5 space-y-0.5">
-                              {themes.map((theme, idx) => (
-                                <div 
-                                  key={theme.id}
-                                  onClick={() => toggleThemeVisibility(theme.id)}
-                                  className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors group/item"
-                                >
-                                  <div className={`w-3.5 h-3.5 rounded border flex items-center justify-center transition-all ${visibleThemeIds.includes(theme.id) ? 'bg-indigo-600 border-indigo-600 shadow-sm' : 'border-gray-200'}`}>
-                                    {visibleThemeIds.includes(theme.id) && <Check className="w-2.5 h-2.5 text-white stroke-[3]" />}
-                                  </div>
-                                  <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: THEME_COLORS[idx % THEME_COLORS.length] }} />
-                                  <span className="text-xs font-medium text-gray-700 truncate flex-1 group-hover/item:text-indigo-600">{theme.name}</span>
-                                </div>
-                              ))}
-                            </div>
-                          </ScrollArea>
-                        </PopoverContent>
-                      </Popover>
-                    </div>
-                  </div>
-
+                <div className="bg-white border border-gray-100 rounded-xl p-4 shadow-sm">
                   <div className="h-[280px] w-full">
                     {chartData.length >= 2 && chartThemes.length > 0 ? (
                       <ResponsiveContainer width="100%" height="100%">
                         <BarChart data={chartData} margin={{ top: 8, right: 20, left: 0, bottom: 0 }}>
                           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f8fafc" />
-                          <XAxis 
-                            dataKey="date" 
-                            axisLine={false} 
-                            tickLine={false} 
-                            tick={{ fontSize: 9, fill: '#cbd5e1', fontWeight: 600 }}
-                            dy={8}
-                            tickFormatter={(v) => format(parseISO(v), "MMM dd")}
-                          />
-                          <YAxis 
-                            axisLine={false} 
-                            tickLine={false} 
-                            tick={{ fontSize: 9, fill: '#cbd5e1', fontWeight: 600 }}
-                          />
-                          <ChartTooltip content={<CustomTooltip />} cursor={{ fill: '#f8fafc' }} />
-                          <Legend 
-                            verticalAlign="bottom" 
-                            height={36} 
-                            iconType="circle"
-                            wrapperStyle={{ fontSize: '9px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px', paddingTop: '20px' }}
-                          />
+                          <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: '#cbd5e1', fontWeight: 600 }} tickFormatter={(v) => format(parseISO(v), "MMM dd")} />
+                          <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: '#cbd5e1', fontWeight: 600 }} />
+                          <ChartTooltip content={<CustomTooltip />} />
+                          <Legend verticalAlign="bottom" height={36} iconType="circle" />
                           {chartThemes.map((theme, index) => (
-                            <Bar 
-                              key={theme.id} 
-                              dataKey={theme.name} 
-                              stackId="a" 
-                              fill={THEME_COLORS[themes.findIndex(t => t.id === theme.id) % THEME_COLORS.length]} 
-                              radius={index === chartThemes.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]}
-                              barSize={32}
-                            />
+                            <Bar key={theme.id} dataKey={theme.name} stackId="a" fill={THEME_COLORS[themes.findIndex(t => t.id === theme.id) % THEME_COLORS.length]} radius={index === chartThemes.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]} />
                           ))}
                         </BarChart>
                       </ResponsiveContainer>
                     ) : (
-                      <div className="h-full w-full flex flex-col items-center justify-center bg-gray-50/50 rounded-xl border border-dashed border-gray-200 p-8 text-center">
+                      <div className="h-full w-full flex flex-col items-center justify-center bg-gray-50/50 rounded-xl border border-dashed border-gray-200">
                         <BarChart3 className="w-10 h-10 text-gray-200 mb-3" />
                         <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Awaiting Data</h4>
-                        <p className="text-[10px] font-medium text-gray-300 mt-1 max-w-xs">
-                          {chartThemes.length === 0 
-                            ? "Select themes to visualize trends"
-                            : "Daily message records required"}
-                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* STRATEGIC INSIGHTS (NEW) */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {/* Strengths */}
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2 px-1">
+                      <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                      <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wide">Core Strengths</h3>
+                    </div>
+                    <div className="grid gap-3">
+                      {strengths && strengths.length > 0 ? strengths.map((s, i) => (
+                        <div key={i} className="bg-white border border-emerald-100 rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow">
+                          <h4 className="text-sm font-black text-emerald-900 mb-1">{s.name}</h4>
+                          <p className="text-xs text-emerald-700 leading-relaxed">{s.what_users_value || s.why_it_matters}</p>
+                          <div className="mt-3 pt-3 border-t border-emerald-50 flex items-center justify-between">
+                            <span className="text-[10px] font-bold text-emerald-500 uppercase tracking-widest">Strategy</span>
+                            <span className="text-[10px] font-black text-emerald-600 uppercase italic">Preserve & Expand</span>
+                          </div>
+                        </div>
+                      )) : (
+                        <div className="p-6 bg-gray-50 rounded-xl border border-dashed border-gray-200 text-center">
+                          <p className="text-xs text-gray-400 font-medium italic">No strengths identified yet</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Isolated Issues */}
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2 px-1">
+                      <AlertTriangle className="w-4 h-4 text-rose-500" />
+                      <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wide">Isolated Issues</h3>
+                    </div>
+                    <div className="grid gap-3">
+                      {isolatedIssues && isolatedIssues.length > 0 ? isolatedIssues.map((s, i) => (
+                        <div key={i} className="bg-white border border-rose-100 rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow">
+                          <h4 className="text-sm font-black text-rose-900 mb-1">{s.name}</h4>
+                          <p className="text-xs text-rose-700 leading-relaxed">{s.issue_description || s.why_not_elevated}</p>
+                          <div className="mt-3 pt-3 border-t border-rose-50 flex items-center justify-between">
+                            <span className="text-[10px] font-bold text-rose-400 uppercase tracking-widest">Status</span>
+                            <span className="text-[10px] font-black text-rose-500 uppercase italic">Monitor Only</span>
+                          </div>
+                        </div>
+                      )) : (
+                        <div className="p-6 bg-gray-50 rounded-xl border border-dashed border-gray-200 text-center">
+                          <p className="text-xs text-gray-400 font-medium italic">No isolated issues detected</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Latent Tensions / Strategic Pattern (NEW) */}
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2 px-1">
+                    <Zap className="w-4 h-4 text-indigo-600" />
+                    <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wide">Strategic Latent Tensions</h3>
+                  </div>
+                  <div className="grid gap-4">
+                    {latentTensions && latentTensions.length > 0 ? latentTensions.map((s, i) => (
+                      <div key={i} className="bg-gradient-to-br from-white to-indigo-50/30 border border-indigo-100 rounded-2xl p-6 shadow-sm relative overflow-hidden group">
+                        <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                          <GitPullRequest className="w-12 h-12 text-indigo-900" />
+                        </div>
+                        <div className="relative">
+                          <h4 className="text-base font-black text-indigo-950 mb-2 leading-tight">{s.name}</h4>
+                          <div className="flex flex-wrap gap-2 mb-4">
+                            {s.connected_themes && s.connected_themes.map((t: string, ti: number) => (
+                              <Badge key={ti} variant="secondary" className="bg-indigo-100/50 text-indigo-700 text-[10px] font-bold uppercase">{t}</Badge>
+                            ))}
+                          </div>
+                          <p className="text-sm text-indigo-800 leading-relaxed font-medium mb-4">{s.deeper_pattern}</p>
+                          <div className="bg-indigo-600/5 rounded-xl p-4 border border-indigo-100">
+                            <h5 className="text-[10px] font-black text-indigo-600 uppercase tracking-widest mb-1 flex items-center gap-1.5">
+                              <Info className="w-3 h-3" /> Strategic Meaning
+                            </h5>
+                            <p className="text-xs text-indigo-900 font-bold leading-relaxed italic">{s.strategic_importance}</p>
+                          </div>
+                        </div>
+                      </div>
+                    )) : (
+                      <div className="p-12 bg-gray-50 rounded-2xl border border-dashed border-gray-200 text-center">
+                        <p className="text-sm text-gray-400 font-medium italic">Deep strategic patterns will emerge as your dataset grows</p>
                       </div>
                     )}
                   </div>
@@ -903,23 +844,12 @@ export function ChannelDetailTabs({ channel }: ChannelDetailTabsProps) {
                 {/* Top Themes Row */}
                 <div>
                   <div className="flex items-center justify-between mb-3 px-1">
-                    <h3 className="text-xs font-medium text-gray-400 uppercase tracking-wider">Trending</h3>
-                    <button onClick={() => setActiveView("themes")} className="text-[10px] font-medium text-indigo-600 uppercase tracking-wider flex items-center gap-1 hover:gap-1.5 transition-all">
-                      View All <ChevronRight className="w-3 h-3" />
-                    </button>
+                    <h3 className="text-xs font-medium text-gray-400 uppercase tracking-wider">Top Themes</h3>
+                    <button onClick={() => setActiveView("themes")} className="text-[10px] font-medium text-indigo-600 uppercase tracking-wider flex items-center gap-1">View All <ChevronRight className="w-3 h-3" /></button>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                     {themes.slice(0, 3).map(theme => (
-                      <ThemeCard
-                        key={theme.id}
-                        theme={theme}
-                        onView={handleViewTheme}
-                        onEdit={handleOpenThemeDialog}
-                        onDelete={handleDeleteTheme}
-                        onPin={handlePinTheme}
-                        onMergeStart={startMerge}
-                        onMergeSelect={handleMergeComplete}
-                      />
+                      <ThemeCard key={theme.id} theme={theme} onView={handleViewTheme} onEdit={handleOpenThemeDialog} onDelete={handleDeleteTheme} onPin={handlePinTheme} />
                     ))}
                   </div>
                 </div>
@@ -929,20 +859,9 @@ export function ChannelDetailTabs({ channel }: ChannelDetailTabsProps) {
             {activeView === "themes" && (
               <div className="space-y-4 animate-in fade-in duration-500">
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-                  <div>
-                    <h2 className="text-lg font-semibold text-gray-900">
-                      {selectedTopicId === "all" ? "Theme Library" : selectedTopic?.name}
-                    </h2>
-                    <p className="text-xs font-medium text-gray-400 mt-0.5">
-                      {selectedTopicId === "all" ? "Explore insights across research depth" : selectedTopic?.description}
-                    </p>
-                  </div>
+                  <h2 className="text-lg font-semibold text-gray-900">{selectedTopicId === "all" ? "Theme Library" : selectedTopic?.name}</h2>
                   <div className="flex items-center gap-2">
-                    <div className="relative">
-                      <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
-                      <Input placeholder="Search..." className="pl-8 h-8 w-48 rounded-lg border-gray-100 bg-gray-50/50 focus:bg-white transition-all font-medium text-xs shadow-none focus:ring-1 focus:ring-indigo-100" />
-                    </div>
-                    <Button onClick={() => handleOpenThemeDialog()} className="rounded-lg h-8 px-4 bg-white text-gray-900 border border-gray-200 hover:bg-gray-50 hover:border-gray-300 shadow-sm font-medium text-xs">
+                    <Button onClick={() => handleOpenThemeDialog()} className="rounded-lg h-8 px-4 bg-white text-gray-900 border border-gray-200 hover:bg-gray-50 shadow-sm font-medium text-xs">
                       <Plus className="w-3.5 h-3.5 mr-1.5 text-indigo-600" /> Theme
                     </Button>
                   </div>
@@ -951,13 +870,11 @@ export function ChannelDetailTabs({ channel }: ChannelDetailTabsProps) {
                 {selectedTopicId === "all" && (
                   <Tabs value={analysisLayer} onValueChange={(v: any) => setAnalysisLayer(v)} className="w-full">
                     <TabsList className="grid w-full max-w-xs grid-cols-2 p-1 bg-gray-100 rounded-lg h-9">
-                      <TabsTrigger value="product" className="rounded-md font-medium text-[11px] uppercase tracking-wider gap-1.5 data-[state=active]:bg-white data-[state=active]:text-indigo-600 data-[state=active]:shadow-sm">
-                        <Zap className="w-3 h-3" />
-                        Product
+                      <TabsTrigger value="product" className="rounded-md font-medium text-[11px] uppercase tracking-wider gap-1.5 data-[state=active]:bg-white data-[state=active]:text-indigo-600 shadow-sm">
+                        <Zap className="w-3 h-3" /> Product
                       </TabsTrigger>
-                      <TabsTrigger value="deep" className="rounded-md font-medium text-[11px] uppercase tracking-wider gap-1.5 data-[state=active]:bg-white data-[state=active]:text-amber-600 data-[state=active]:shadow-sm">
-                        <Lightbulb className="w-3 h-3" />
-                        Deep
+                      <TabsTrigger value="deep" className="rounded-md font-medium text-[11px] uppercase tracking-wider gap-1.5 data-[state=active]:bg-white data-[state=active]:text-amber-600 shadow-sm">
+                        <Lightbulb className="w-3 h-3" /> Deep
                       </TabsTrigger>
                     </TabsList>
                   </Tabs>
@@ -970,25 +887,11 @@ export function ChannelDetailTabs({ channel }: ChannelDetailTabsProps) {
                 ) : filteredThemes.length > 0 ? (
                   <div className="grid gap-3 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 pb-8">
                     {filteredThemes.map((theme) => (
-                      <ThemeCard
-                        key={theme.id}
-                        theme={theme}
-                        onView={handleViewTheme}
-                        onEdit={handleOpenThemeDialog}
-                        onDelete={handleDeleteTheme}
-                        onPin={handlePinTheme}
-                        onMergeStart={startMerge}
-                        onMergeSelect={handleMergeComplete}
-                        mergeMode={mergeMode}
-                        isMergeSource={mergeSource?.id === theme.id}
-                      />
+                      <ThemeCard key={theme.id} theme={theme} onView={handleViewTheme} onEdit={handleOpenThemeDialog} onDelete={handleDeleteTheme} onPin={handlePinTheme} />
                     ))}
                   </div>
                 ) : (
                   <div className="flex flex-col items-center justify-center h-48 bg-gray-50/50 rounded-xl border border-dashed border-gray-200">
-                    <div className="w-12 h-12 bg-white rounded-xl shadow-sm flex items-center justify-center mb-3">
-                      <Brain className="w-6 h-6 text-gray-100" />
-                    </div>
                     <h3 className="text-sm font-medium text-gray-900">Library Empty</h3>
                     <p className="text-xs font-medium text-gray-400 mt-1">Run analysis to populate themes</p>
                   </div>
@@ -996,95 +899,38 @@ export function ChannelDetailTabs({ channel }: ChannelDetailTabsProps) {
               </div>
             )}
 
-            {activeView === "messages" && (
-              <div className="bg-white border border-gray-100 rounded-xl p-3 shadow-sm min-h-[400px] animate-in fade-in duration-500 overflow-hidden">
-                <MessageList channelId={channel.id} />
-              </div>
-            )}
-
-            {activeView === "settings" && (
-              <div className="max-w-4xl mx-auto py-2 animate-in fade-in duration-500">
-                <ChannelSettingsForm channel={channel} />
-              </div>
-            )}
+            {activeView === "messages" && <MessageList channelId={channel.id} />}
+            {activeView === "settings" && <ChannelSettingsForm channel={channel} />}
           </div>
         </ScrollArea>
       </main>
 
-      {/* 3. INSPECTOR PANEL (Right Sidebar) */}
       <aside className={`w-[380px] border-l border-gray-100 bg-white transition-all duration-300 ease-in-out flex flex-col z-30 shrink-0 relative overflow-hidden ${selectedTheme ? 'mr-0 shadow-xl' : '-mr-[380px]'}`}>
-        {selectedTheme && (
-          <ThemeDrawer theme={selectedTheme} isOpen={!!selectedTheme} onClose={() => setSelectedTheme(null)} />
-        )}
+        {selectedTheme && <ThemeDrawer theme={selectedTheme} isOpen={!!selectedTheme} onClose={() => setSelectedTheme(null)} />}
       </aside>
 
-      {/* FLOATING MERGE OVERLAY */}
-      {mergeMode && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-gray-900/95 backdrop-blur-md shadow-xl rounded-2xl px-5 py-3 flex items-center gap-5 z-50 animate-in fade-in slide-in-from-bottom-6">
-          <div className="flex items-center gap-2 border-r pr-5 border-white/10">
-            <div className="p-1.5 bg-indigo-500 rounded-lg shadow-lg shadow-indigo-500/20">
-              <Merge className="w-4 h-4 text-white" />
-            </div>
-            <div className="flex flex-col">
-              <span className="text-[9px] font-semibold text-indigo-400 uppercase tracking-wider">Merge Source</span>
-              <span className="text-xs font-medium text-white italic truncate max-w-[100px]">{mergeSource?.name}</span>
-            </div>
-          </div>
-          <div className="text-[9px] font-medium text-white/50 max-w-[140px] leading-tight uppercase tracking-wider">
-            Select target theme
-          </div>
-          <Button size="sm" variant="ghost" className="rounded-lg h-8 px-4 text-white hover:bg-white/10 font-medium text-xs" onClick={cancelMerge} disabled={merging}>
-            Abort
-          </Button>
-        </div>
-      )}
-
-      {/* MODALS */}
-      <BackfillDialog
-        channelId={channel.id}
-        isOpen={isBackfillOpen}
-        onClose={() => setIsBackfillOpen(false)}
-        onSuccess={() => { fetchThemes(); fetchTopics(); }}
-      />
-
-      <NodeImportDialog
-        channelId={channel.id}
-        isOpen={isNodeImportOpen}
-        onClose={() => setIsNodeImportOpen(false)}
-        onSuccess={() => { fetchThemes(); fetchTopics(); }}
-      />
+      <BackfillDialog channelId={channel.id} isOpen={isBackfillOpen} onClose={() => setIsBackfillOpen(false)} onSuccess={() => fetchThemes()} />
+      <NodeImportDialog channelId={channel.id} isOpen={isNodeImportOpen} onClose={() => setIsNodeImportOpen(false)} onSuccess={() => fetchThemes()} />
 
       <Dialog open={isTopicDialogOpen} onOpenChange={setIsTopicOpen}>
         <DialogContent className="rounded-xl p-6 border-none shadow-xl max-w-md">
           <DialogHeader className="mb-4">
             <DialogTitle className="text-lg font-semibold tracking-tight">New Topic</DialogTitle>
-            <DialogDescription className="text-gray-500 font-medium text-sm mt-1">Create a topic to organize themes</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-2">
               <Label className="text-xs font-medium text-gray-400 uppercase tracking-wider ml-0.5">Topic Name</Label>
-              <Input 
-                value={newTopicName} 
-                onChange={e => setNewTopicName(e.target.value.substring(0, 30))} 
-                placeholder="e.g. Navigation"
-                className="rounded-lg h-10 border-gray-100 bg-gray-50/50 focus:bg-white transition-all font-medium text-sm px-4 shadow-none"
-              />
+              <Input value={newTopicName} onChange={e => setNewTopicName(e.target.value)} placeholder="e.g. Navigation" className="rounded-lg h-10 border-gray-100 shadow-none" />
             </div>
             <div className="space-y-2">
               <Label className="text-xs font-medium text-gray-400 uppercase tracking-wider ml-0.5">Description</Label>
-              <Textarea 
-                value={newTopicDesc} 
-                onChange={e => setNewTopicDesc(e.target.value.substring(0, 200))} 
-                placeholder="Topic description..."
-                className="rounded-lg min-h-[80px] border-gray-100 bg-gray-50/50 focus:bg-white transition-all font-medium leading-relaxed px-4 py-2.5 resize-none"
-              />
+              <Textarea value={newTopicDesc} onChange={e => setNewTopicDesc(e.target.value)} placeholder="Topic description..." className="rounded-lg min-h-[80px] border-gray-100 shadow-none" />
             </div>
           </div>
           <DialogFooter className="mt-4 gap-2">
             <Button variant="outline" onClick={() => setIsTopicOpen(false)} className="rounded-lg h-9 px-4 font-medium text-xs">Cancel</Button>
             <Button onClick={handleCreateTopic} disabled={!newTopicName || creatingTopic} className="rounded-lg h-9 px-5 bg-indigo-600 hover:bg-indigo-700 font-medium text-xs text-white shadow-md">
-              {creatingTopic ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" /> : null}
-              Create
+              {creatingTopic ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" /> : null} Create
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1094,49 +940,21 @@ export function ChannelDetailTabs({ channel }: ChannelDetailTabsProps) {
         <DialogContent className="rounded-xl p-6 border-none shadow-xl max-w-md">
           <DialogHeader className="mb-4">
             <DialogTitle className="text-lg font-semibold tracking-tight">{editingTheme ? "Edit Theme" : "New Theme"}</DialogTitle>
-            <DialogDescription className="text-gray-500 font-medium text-sm mt-1">
-              {editingTheme ? "Update theme details" : "Create a manual theme"}
-            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-2">
               <Label className="text-xs font-medium text-gray-400 uppercase tracking-wider ml-0.5">Theme Name</Label>
-              <Input 
-                value={themeName} 
-                onChange={e => setThemeName(e.target.value.substring(0, 60))} 
-                placeholder="e.g. Latency issues"
-                className="rounded-lg h-10 border-gray-100 bg-gray-50/50 focus:bg-white transition-all font-medium text-sm px-4 shadow-none"
-              />
+              <Input value={themeName} onChange={e => setThemeName(e.target.value)} placeholder="e.g. Latency issues" className="rounded-lg h-10 border-gray-100 shadow-none" />
             </div>
             <div className="space-y-2">
               <Label className="text-xs font-medium text-gray-400 uppercase tracking-wider ml-0.5">Description</Label>
-              <Textarea 
-                value={themeDesc} 
-                onChange={e => setThemeDesc(e.target.value.substring(0, 200))} 
-                placeholder="Describe this theme..."
-                className="rounded-lg min-h-[80px] border-gray-100 bg-gray-50/50 focus:bg-white transition-all font-medium leading-relaxed px-4 py-2.5 resize-none"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label className="text-xs font-medium text-gray-400 uppercase tracking-wider ml-0.5">Topic</Label>
-              <Select value={themeTopicId} onValueChange={setThemeTopicId}>
-                <SelectTrigger className="rounded-lg h-10 border-gray-100 bg-gray-50/50 focus:bg-white transition-all font-medium px-4 shadow-none">
-                  <SelectValue placeholder="Assign to topic" />
-                </SelectTrigger>
-                <SelectContent className="rounded-lg border-gray-100 shadow-xl p-1.5">
-                  <SelectItem value="none" className="rounded-md p-2 font-medium text-xs">Uncategorized</SelectItem>
-                  {topics.map(t => (
-                    <SelectItem key={t.id} value={t.id} className="rounded-md p-2 font-medium text-xs">{t.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Textarea value={themeDesc} onChange={e => setThemeDesc(e.target.value)} placeholder="Describe this theme..." className="rounded-lg min-h-[80px] border-gray-100 shadow-none" />
             </div>
           </div>
           <DialogFooter className="mt-4 gap-2">
             <Button variant="outline" onClick={() => setIsThemeDialogOpen(false)} className="rounded-lg h-9 px-4 font-medium text-xs border-gray-200">Cancel</Button>
             <Button onClick={handleSaveTheme} disabled={!themeName || savingTheme} className="rounded-lg h-9 px-5 bg-indigo-600 hover:bg-indigo-700 font-medium text-xs text-white shadow-md">
-              {savingTheme ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" /> : null}
-              {editingTheme ? "Save" : "Create"}
+              {savingTheme ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" /> : null} {editingTheme ? "Save" : "Create"}
             </Button>
           </DialogFooter>
         </DialogContent>

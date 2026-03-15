@@ -17,7 +17,7 @@ export async function GET(
 
   const { data: channel } = await supabase
     .from('channels')
-    .select('last_analyzed_at')
+    .select('last_analyzed_at, latent_tensions, strengths, isolated_issues')
     .eq('id', params.id)
     .single();
 
@@ -30,6 +30,7 @@ export async function GET(
     .from('themes')
     .select(`
       id, name, summary, data_point_count, sentiment_breakdown, is_pinned, created_at, last_updated_at, topic_id, description, is_manual,
+      scope, confidence, product_implication, recommendation_direction, recommendation_type, user_need, representative_evidence,
       topics (
         name
       ),
@@ -123,7 +124,10 @@ export async function GET(
   return NextResponse.json({
     themes,
     total_data_points: totalDataPoints || 0,
-    last_analyzed_at: channel?.last_analyzed_at
+    last_analyzed_at: channel?.last_analyzed_at,
+    latent_tensions: channel?.latent_tensions || [],
+    strengths: channel?.strengths || [],
+    isolated_issues: channel?.isolated_issues || []
   });
 }
 
