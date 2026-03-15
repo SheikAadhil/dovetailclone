@@ -279,169 +279,349 @@ export async function analyzeThemesLayer1(messages: { id: string; content: strin
 
   sendProgress("Building Layer 1 analysis prompt...");
 
-  const prompt = `You are a rigorous qualitative analysis engine.
+  const contextPart = aiContext ? `\nUSER-PROVIDED CONTEXT:\n${aiContext}\n` : '';
 
-STRICT OUTPUT REQUIREMENT: You MUST respond with ONLY valid JSON. No conversational text. No markdown. No explanations. No introductions. Just pure JSON.
+  const prompt = `You are the Layer 1 analysis engine for product-level qualitative synthesis.
+
+Your job is to transform raw user signals into evidence-backed product themes that help a team improve its product or service.
+
+You are NOT a summarizer. You are NOT a quote collector. You are NOT a topic bucketer.
+You are acting like a skilled senior UX researcher.
+
+${contextPart}
+
+## STRICT OUTPUT REQUIREMENT
+You MUST respond with ONLY valid JSON. No conversational text. No markdown. No explanations. No introductions. Just pure JSON.
 
 Output format must be:
 {
   "dataset_accounting": { ... },
+  "signal_ledger": [ ... ],
+  "categories": [ ... ],
   "top_level_themes": [ ... ],
-  ...
+  "strengths": [ ... ],
+  "isolated_issues": [ ... ],
+  "unassigned_ambiguous": [ ... ]
 }
 
 If you cannot produce valid JSON for any reason, output: {"error": "reason"}
 
-Now produce the analysis:
+--------------------------------------------------
+1. WHAT A THEME IS (CRITICAL)
+--------------------------------------------------
 
-## MISSION
+A theme is a pattern of shared meaning organized by a central concept.
 
-You are producing a complete, decision-grade theme analysis.
+A theme is NOT:
+- a product area label
+- a list of quotes
+- a cluster of similar words
+- a summary of one screen or feature
+- a catch-all topic bucket
+- a clever phrase with weak evidence
 
-Every signal must be accounted for. No drops. No duplicates.
+A good theme:
+- explains what pattern is occurring
+- explains why the included signals belong together
+- explains why the pattern matters for the product
+- is supported by multiple relevant signals or by strategically weighty evidence
+- is distinct from neighboring themes
+- implies a reasonably coherent product response
 
-## CORE REQUIREMENTS
+Theme test: If the label only tells you what people talked about, it is probably too shallow.
+If the label tells you what product pattern is happening and why it matters, it is closer to a real theme.
 
-### 1. Full Signal Accounting (MANDATORY)
-Before writing any themes, create a hidden ledger:
-- List EVERY input signal (by ID)
-- Assign EACH signal to exactly ONE bucket
-- Buckets: top-level theme, strength, isolated issue, or unassigned/ambiguous
+--------------------------------------------------
+2. NON-NEGOTIABLE RULES
+--------------------------------------------------
 
-COVERAGE AUDIT (must pass before output):
-- total_input_signals = signals_in_themes + signals_in_strengths + signals_in_isolated + signals_unassigned
-- If ANY signal is missing or duplicated, FIX THE TAXONOMY first
+1. Every signal must be accounted for exactly once in the primary layer.
+2. No signal may disappear.
+3. No signal may belong to multiple top-level themes.
+4. You must code before building themes.
+5. You must not jump directly from raw data to polished themes.
+6. You must not force all valid signals into full themes.
+7. You must preserve strengths explicitly.
+8. You must preserve important isolated issues explicitly.
+9. You must keep ambiguous signals visible instead of hiding them.
+10. You must prefer completeness over elegance.
+11. You must use plain, product-usable theme names.
+12. You must not use deep analysis to compensate for weak product-level synthesis.
 
-### 2. Restore Missing Signal Types
-These are commonly dropped - ensure they appear if present in data:
-- Processing reliability (uploads stuck, failed syncs, data loss)
-- Positive strengths (search valued, specific features loved)
-- Notification overload / alert fatigue
-- Mobile usability issues
-- Pricing concerns (cost for experimentation, tier limitations)
+If any of these rules are violated, the analysis is invalid.
 
-### 3. Don't Inflate Weak Signals
-- One-signal themes: ONLY if clearly consequential
-- Otherwise: move to "Isolated Issues"
-- Better to have an isolated issue than an inflated theme
-- Low frequency doesn't mean the signal is invalid
+--------------------------------------------------
+3. UNITS OF ANALYSIS
+--------------------------------------------------
 
-### 4. Tighten Theme Boundaries
-Split themes when they mix different product problems:
+Signal: A raw observation, quote, complaint, request, or note.
+Code: A short label attached to a meaningful data segment.
+Category: A grouping of related codes.
+Theme: A broader pattern of shared meaning built from categories and codes.
+Strength: A repeated or strategically important positive pattern worth preserving.
+Isolated issue: A meaningful but low-frequency issue that should remain visible without being inflated into a full theme.
+Unassigned / ambiguous: A signal that cannot yet be placed confidently.
 
-SEPARATE (if data supports):
-- role-based personalization vs segmentation/filtering needs
-- privacy/governance vs permissions/access (SOVEREIGNTY vs CONTROL)
-- actionability vs prioritization (WHAT to do vs WHAT to do FIRST)
-- onboarding/IA confusion vs general usability
-- integration friction vs cross-source deduplication
-- mobile usability vs desktop usability
+--------------------------------------------------
+4. PHASE 1: SIGNAL LEDGER
+--------------------------------------------------
 
-### 5. Preserve Strengths Explicitly
-- If users explicitly value something, it goes in STRENGTHS
-- Do NOT produce a pain-only analysis
-- Search, export, specific features - if valued, show as strength
+Create a ledger with one row per signal.
 
-## OUTPUT STRUCTURE
+For each signal record:
+- signal_id
+- raw text (use the content provided)
+- short paraphrase of what the signal says
+- source type (slack, csv, markdown, etc. - infer if not provided)
+- provisional signal type: pain point, request, workaround, concern, strength, ambiguity
+- first-pass primary code
+- optional secondary code
+- any notes
 
-A. Dataset accounting (MUST BALANCE)
-- Total input signals: X
-- Signals in top-level themes: X
-- Signals in strengths: X
-- Signals in isolated issues: X
-- Signals unassigned/ambiguous: X
-- Missing signals: none (or list)
-- Duplicate signals: none (or list)
+This ensures no signal is dropped and supports later auditing.
 
-B. Top-level product themes (only if 2+ signals with shared product root cause)
+--------------------------------------------------
+5. PHASE 2: FIRST-CYCLE CODING
+--------------------------------------------------
+
+Code the full dataset. For each signal, ask "What is this about?" and produce concise codes.
+
+Good code examples:
+- cannot verify summary
+- blank state blocks setup
+- model grouping too broad
+- needs region filtering
+- sharing permissions confusing
+- export used for external presentation
+- mobile review experience broken
+- search feels fast and useful
+
+Weak code examples:
+- issue
+- problem
+- feedback
+- user comment
+- general frustration
+
+Distinguish when useful:
+- descriptive code: what the signal says
+- interpretive code: what the signal suggests (be conservative early)
+
+--------------------------------------------------
+6. PHASE 3: SECOND-CYCLE CODING
+--------------------------------------------------
+
+After first-cycle coding, review and clean up codes:
+- merge duplicate codes
+- separate similar-looking codes with different meanings
+- rename unclear codes
+- identify positive codes
+- identify singleton codes
+
+--------------------------------------------------
+7. PHASE 4: CATEGORY BUILDING
+--------------------------------------------------
+
+Group related codes into categories.
+
+For each category capture:
+- category name
+- included codes
+- signal IDs
+- why the grouping makes sense
+- evidence strength: strong, moderate, weak, emerging
+
+--------------------------------------------------
+8. PHASE 5: THEME GENERATION
+--------------------------------------------------
+
+Generate candidate themes from categories.
+
+For each candidate theme ask:
+- What shared meaning links these categories?
+- What is the central organizing concept?
+- What user problem, need, or experience does this pattern reveal?
+- Why do these signals belong together?
+- What makes this more than a topic bucket?
+- Why would this matter to a product team?
+
+A candidate theme becomes a final theme only if:
+- it is supported by enough relevant evidence
+- it has a clear central concept
+- it is coherent internally
+- it is distinct from other themes
+- it implies a meaningful product response
+
+--------------------------------------------------
+9. PHASE 6: THEME BOUNDARY AUDIT
+--------------------------------------------------
+
+For every pair of nearby themes ask:
+- Are these actually different product problems?
+- Do they have different causes?
+- Do they imply different interventions?
+- Are the same signals doing too much work in both themes?
+- Is one just a subset of the other?
+- Is one theme hiding multiple sub-problems?
+- Would merging reduce decision quality?
+- Would splitting increase clarity?
+
+Boundary decisions:
+- keep separate if causes, needs, or interventions differ
+- merge if evidence and intervention are mostly the same
+- split if a theme mixes issue types needing different actions
+
+Judge boundaries by product usefulness, not wording elegance.
+
+--------------------------------------------------
+10. PHASE 7: THEME REVIEW
+--------------------------------------------------
+
+Review each theme:
+- Is the theme well supported?
+- Does the evidence genuinely fit the claimed pattern?
+- Are there counterexamples?
+- Is the theme too broad?
+- Is it duplicating another theme?
+- Is it actually a category, not a theme?
+- Is it just a product area label?
+- Would a PM or designer know why it matters?
+
+If a theme fails review: split it, merge it, re-scope it, downgrade it, or discard it.
+
+--------------------------------------------------
+11. STRENGTHS & ISOLATED ISSUES
+--------------------------------------------------
+
+STRENGTHS: Actively look for repeated positive patterns or strategically important capabilities.
+For each strength include:
+- name
+- signal IDs
+- what users value
+- why it matters
+- what should be preserved or expanded
+
+ISOLATED ISSUES: Use when the issue is important but low-frequency.
+For each isolated issue include:
+- name
+- signal IDs
+- short explanation
+- why it is not elevated
+- what to monitor
+
+UNASSIGNED: Keep ambiguous signals visible with explanation.
+
+--------------------------------------------------
+12. NAMING THEMES
+--------------------------------------------------
+
+Good theme names are:
+- plain
+- specific
+- product-usable
+- meaningful without extra drama
+
+Good pattern:
+- Trust depends on visible source evidence
+- New users struggle to get started without guided structure
+- Teams need different levels of detail and control
+- AI grouping creates manual cleanup work
+
+Bad pattern:
+- The epistemic rupture of interpretation
+- Workflow issues
+- User feedback problems
+- Platform friction
+
+--------------------------------------------------
+13. PRODUCT IMPLICATIONS
+--------------------------------------------------
+
+Every theme must include product meaning:
+
+- user_need or user_friction: What is the user experiencing?
+- product_implication: Why does this matter for the product?
+- recommendation_direction: What should the team do?
+- recommendation_type: One of:
+  - UX fix
+  - IA/content fix
+  - model/AI improvement
+  - integration/platform fix
+  - trust/governance fix
+  - pricing/packaging fix
+  - workflow/process fix
+- confidence: high, medium, or low
+
+--------------------------------------------------
+14. OUTPUT STRUCTURE
+--------------------------------------------------
+
+Return:
+
+A. Dataset accounting
+- total_signals: number
+- represented_signals: number
+- signals_in_top_level_themes: number
+- signals_in_strengths: number
+- signals_in_isolated_issues: number
+- signals_in_unassigned_ambiguous: number
+- missing_signals: [] or list
+- duplicate_assignments: [] or list
+
+B. Signal ledger (summary - key fields only)
+- signal_id
+- paraphrase
+- source_type
+- primary_code
+- secondary_codes
+- signal_type
+
+C. Category map
+- category_name
+- codes
+- signal_ids
+- why_grouped
+- evidence_strength
+
+D. Top-level product themes
 For each:
-- Name (plain product language)
-- Definition (one sentence)
-- Signal IDs (all assigned)
-- Why together (shared product problem)
-- Representative evidence (1-2 quotes)
-- Product implication
-- Recommendation
-- Recommendation type: UX fix | IA/content fix | model/AI improvement | integration/platform fix | trust/governance fix | pricing/packaging fix | workflow/process fix
-- Confidence: high | medium | low
+- name
+- definition (what the theme is and why signals belong together)
+- signal_ids
+- message_count
+- supporting_categories
+- why_this_is_one_theme
+- representative_evidence (1-2 quotes)
+- user_need / user_friction
+- product_implication
+- recommendation_direction
+- recommendation_type
+- confidence
 
-C. Strengths (explicit section)
-For each:
-- Name (what users value)
-- Signal IDs
-- Why it matters
-- How to preserve/expand
+E. Strengths
+F. Isolated issues
+G. Unassigned / ambiguous
 
-D. Isolated Issues (signals with weak theme support)
-For each:
-- Name
-- Signal ID
-- Why not elevated (insufficient signals OR not consequential enough)
-- Monitoring note
+--------------------------------------------------
+15. FINAL SELF-CHECK
+--------------------------------------------------
 
-E. Unassigned / Ambiguous
-- Signal IDs
-- Why unresolved
-
-## QUALITY GATE
-
-Before final output, verify:
-- [ ] Every signal appears exactly once
-- [ ] Missing signal types are not silently dropped
-- [ ] Strengths section exists if positive data exists
-- [ ] Weak signals are isolated, not inflated
-- [ ] Theme boundaries are clean (no mixed concerns)
-For each theme:
-- Name
-- Definition
-- Signal IDs
-- Why these signals belong together
-- Representative evidence
-- User need
-- Product implication
-- Recommendation
-- Recommendation type
-- Confidence
-
-C. Strengths
-For each:
-- Name
-- Signal IDs
-- Why it matters
-- How to preserve or expand it
-
-D. Isolated issues
-For each:
-- Name
-- Signal IDs
-- Why not elevated into a broader theme
-- Monitoring note
-
-E. Unassigned / ambiguous
-- Signal IDs
-- Why unresolved
-
-F. Revised deep themes
-For each:
-- Name
-- Connected top-level themes
-- What deeper pattern it explains
-- Why it matters strategically
-- Confidence
-
-## FINAL QUALITY GATE
-
-Before finalizing, silently check:
-- Did I account for every signal exactly once at the primary layer?
-- Did I restore the missing signals?
-- Did I keep strengths visible?
-- Did I stop deep themes from rescuing top-level omissions?
-- Did I improve over-merged boundaries?
-- Are the top-level names plain and product-usable?
+Before finalizing, verify:
+- Did I account for every signal exactly once?
+- Did I code before theming?
+- Are these themes, not topic buckets?
+- Does each theme have a central organizing concept?
+- Are theme boundaries clean?
+- Did I preserve strengths?
+- Did I preserve isolated issues?
+- Did I keep ambiguity visible?
+- Are the names plain and product-usable?
+- Would this help a product team decide what to improve?
 
 If any answer is no, revise before output.
 
-### DATASET (MESSAGES):
+--------------------------------------------------
+DATASET (MESSAGES):
 ${JSON.stringify(simplifiedMessages)}`;
 
   return await performAnalysis(prompt, idMap, 'primary');
