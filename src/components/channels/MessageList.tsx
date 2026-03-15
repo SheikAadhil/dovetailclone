@@ -46,9 +46,18 @@ export function MessageList({ channelId }: MessageListProps) {
   const [tagging, setTagging] = useState(false);
   const [expandedMessage, setExpandedMessage] = useState<DataPoint | null>(null);
   const [analysisProgressOpen, setAnalysisProgressOpen] = useState(false);
+  
   const [analysisProgress, setAnalysisProgress] = useState("");
   const [analysisStep, setAnalysisStep] = useState(0);
-  const [progressLogs, setProgressLogs] = useState<{ time: string; message: string; type: 'info' | 'success' | 'error' }[]>([]);
+  const [worklogEntries, setWorklogEntries] = useState<Array<{
+    stage: string;
+    goal: string;
+    doing: string[];
+    observations: string[];
+    decisions: string[];
+    open_questions: string[];
+    progress: string;
+  }>>([]);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -138,7 +147,7 @@ export function MessageList({ channelId }: MessageListProps) {
     setAnalysisProgressOpen(true);
     setAnalysisProgress("Starting analysis...");
     setAnalysisStep(0);
-    setProgressLogs([{ time: new Date().toLocaleTimeString(), message: "Starting analysis...", type: 'info' }]);
+    setWorklogEntries([]);
     setAnalysisError(null);
 
     try {
@@ -154,7 +163,6 @@ export function MessageList({ channelId }: MessageListProps) {
       if (!res.ok) {
         const errorData = await res.json();
         setAnalysisError(errorData.error || 'Analysis failed');
-        setProgressLogs(prev => [...prev, { time: new Date().toLocaleTimeString(), message: `Error: ${errorData.error || 'Analysis failed'}`, type: 'error' }]);
         return;
       }
 
@@ -179,15 +187,28 @@ export function MessageList({ channelId }: MessageListProps) {
                 const parsed = JSON.parse(data);
                 if (parsed.error) {
                   setAnalysisError(parsed.error);
-                  setProgressLogs(prev => [...prev, { time: new Date().toLocaleTimeString(), message: `Error: ${parsed.error}`, type: 'error' }]);
                 } else if (parsed.progress) {
                   setAnalysisProgress(parsed.progress);
                   if (parsed.step) setAnalysisStep(parsed.step);
-                  setProgressLogs(prev => [...prev, { time: new Date().toLocaleTimeString(), message: parsed.progress, type: 'info' }]);
+                  
+                  // Parse worklog entry
+                  const worklogMatch = parsed.progress.match(/\[([^\]]+)\]\s*GOAL:\s*([^|]+)\s*\|\s*DOING:\s*([^|]+)\s*\|\s*OBSERVATIONS:\s*([^|]*)\s*\|\s*DECISIONS:\s*([^|]*)\s*\|\s*QUESTIONS:\s*([^|]*)\s*\|\s*PROGRESS:\s*(.*)/);
+                  if (worklogMatch) {
+                    const [, stage, goal, doing, observations, decisions, questions, progressStr] = worklogMatch;
+                    const newEntry = {
+                      stage: stage.trim(),
+                      goal: goal.trim(),
+                      doing: doing.trim().split(';').map((s: string) => s.trim()).filter(Boolean),
+                      observations: observations.trim().split(';').map((s: string) => s.trim()).filter(Boolean),
+                      decisions: decisions.trim().split(';').map((s: string) => s.trim()).filter(Boolean),
+                      open_questions: questions.trim().split(';').map((s: string) => s.trim()).filter(Boolean),
+                      progress: progressStr.trim()
+                    };
+                    setWorklogEntries(prev => [...prev, newEntry]);
+                  }
                 }
               } catch (e) {
                 setAnalysisProgress(data);
-                setProgressLogs(prev => [...prev, { time: new Date().toLocaleTimeString(), message: data, type: 'info' }]);
               }
             }
           }
@@ -196,7 +217,6 @@ export function MessageList({ channelId }: MessageListProps) {
 
       setSelectedIds(new Set());
       setAnalysisProgress("Analysis complete!");
-      setProgressLogs(prev => [...prev, { time: new Date().toLocaleTimeString(), message: "Analysis complete!", type: 'success' }]);
       router.refresh();
 
       // Close dialog after a short delay
@@ -204,12 +224,11 @@ export function MessageList({ channelId }: MessageListProps) {
         setAnalysisProgressOpen(false);
         setAnalysisProgress("");
         setAnalysisStep(0);
-        setProgressLogs([]);
+        setWorklogEntries([]);
       }, 3000);
 
     } catch (e: any) {
       setAnalysisError(e.message || "Analysis failed");
-      setProgressLogs(prev => [...prev, { time: new Date().toLocaleTimeString(), message: `Error: ${e.message || "Analysis failed"}`, type: 'error' }]);
     } finally {
       setAnalyzingBatch(false);
     }
@@ -457,47 +476,86 @@ export function MessageList({ channelId }: MessageListProps) {
               </div>
             </div>
 
-            {/* Progress Log - Scrollable */}
-            <div className="bg-gray-900 rounded-lg p-3 max-h-64 overflow-y-auto">
-              <div className="space-y-1.5">
-                {progressLogs.map((log, index) => {
-                  const progressMatch = log.message.match(/\[([^\]]+)\]\s+GOAL:\s*([^|]+)\s*\|\s*DOING:\s*([^|]+)\s*\|\s*OBSERVATIONS:\s*([^|]+)\s*\|\s*DECISIONS:\s*([^|]+)\s*\|\s*QUESTIONS:\s*([^|]+)\s*\|\s*PROGRESS:\s*(.+)/);
-                  return (
-                    <div key={index} className="flex items-start gap-2 text-xs font-mono">
-                      <span className="text-gray-500 shrink-0">[{log.time}]</span>
-                      {log.type === 'error' && <span className="text-red-400">✗</span>}
-                      {log.type === 'success' && <span className="text-green-400">✓</span>}
-                      {log.type === 'info' && <span className="text-blue-400">›</span>}
-                      <div className="flex-1">
-                        {progressMatch ? (
-                          <div className="space-y-0.5">
-                            <span className="font-semibold text-indigo-600">{progressMatch[1].trim()}</span>
-                            <div className="grid grid-cols-2 gap-x-2 gap-y-1 text-xs">
-                              <div><span className="text-gray-400">GOAL:</span> <span className="text-gray-200">{progressMatch[2].trim()}</span></div>
-                              <div><span className="text-gray-400">DOING:</span> <span className="text-gray-200">{progressMatch[3].trim()}</span></div>
-                              <div><span className="text-gray-400">OBSERVATIONS:</span> <span className="text-gray-200">{progressMatch[4].trim()}</span></div>
-                              <div><span className="text-gray-400">DECISIONS:</span> <span className="text-gray-200">{progressMatch[5].trim()}</span></div>
-                              <div><span className="text-gray-400">QUESTIONS:</span> <span className="text-gray-200">{progressMatch[6].trim()}</span></div>
-                              <div><span className="text-gray-400">PROGRESS:</span> <span className="text-gray-200">{progressMatch[7].trim()}</span></div>
-                            </div>
-                          </div>
-                        ) : (
-                          <span className={log.type === 'error' ? 'text-red-300' : log.type === 'success' ? 'text-green-300' : 'text-gray-300'}>
-                            {log.message}
-                          </span>
-                        )}
-                      </div>
+            {/* Worklog Entries */}
+            {worklogEntries.length > 0 ? (
+              <div className="mt-3 space-y-2 max-h-64 overflow-y-auto">
+                {worklogEntries.map((entry, idx) => (
+                  <div key={idx} className="bg-gray-50 rounded-lg p-3 border border-gray-100 shadow-sm">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-xs font-bold text-indigo-600 uppercase tracking-wide">
+                        {entry.stage}
+                      </span>
+                      {entry.progress && (
+                        <span className="text-xs text-gray-500">• {entry.progress}</span>
+                      )}
                     </div>
-                  );
-                })}
-                {analyzingBatch && (
-                  <div className="flex items-center gap-2 text-xs font-mono text-gray-500">
-                    <Loader2 className="w-3 h-3 animate-spin" />
-                    <span>Waiting for response...</span>
+                    {entry.goal && (
+                      <div className="mt-1">
+                        <span className="text-[10px] font-medium text-purple-600 uppercase">Goal:</span>
+                        <span className="text-xs text-purple-700 ml-1">{entry.goal}</span>
+                      </div>
+                    )}
+                    {entry.doing.length > 0 && (
+                      <div className="mt-2">
+                        <span className="text-[10px] font-medium text-gray-400 uppercase">What I'm doing:</span>
+                        <ul className="mt-1 space-y-0.5">
+                          {entry.doing.map((item, i) => (
+                            <li key={i} className="text-xs text-gray-700 flex items-start gap-1.5">
+                              <span className="text-indigo-400 mt-0.5">→</span>
+                              {item}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    {entry.observations.length > 0 && (
+                      <div className="mt-2">
+                        <span className="text-[10px] font-medium text-gray-400 uppercase">Observations:</span>
+                        <ul className="mt-1 space-y-0.5">
+                          {entry.observations.map((item, i) => (
+                            <li key={i} className="text-xs text-gray-600 flex items-start gap-1.5">
+                              <span className="text-amber-500 mt-0.5">•</span>
+                              {item}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    {entry.decisions.length > 0 && (
+                      <div className="mt-2">
+                        <span className="text-[10px] font-medium text-gray-400 uppercase">Decisions:</span>
+                        <ul className="mt-1 space-y-0.5">
+                          {entry.decisions.map((item, i) => (
+                            <li key={i} className="text-xs text-emerald-700 flex items-start gap-1.5">
+                              <CheckSquare className="w-3 h-3 mt-0.5 text-emerald-500" />
+                              {item}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    {entry.open_questions.length > 0 && (
+                      <div className="mt-2">
+                        <span className="text-[10px] font-medium text-gray-400 uppercase">Open Questions:</span>
+                        <ul className="mt-1 space-y-0.5">
+                          {entry.open_questions.map((item, i) => (
+                            <li key={i} className="text-xs text-rose-600 flex items-start gap-1.5">
+                              <span className="text-rose-400 mt-0.5">?</span>
+                              {item}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
                   </div>
-                )}
+                ))}
               </div>
-            </div>
+            ) : (
+              <div className="flex items-center gap-2 text-xs text-gray-500 p-4 justify-center bg-gray-50 rounded-lg border border-dashed border-gray-200">
+                <Loader2 className="w-3 h-3 animate-spin" />
+                <span>{analysisProgress || "Initializing analysis..."}</span>
+              </div>
+            )}
 
             {/* Error Display */}
             {analysisError && (
@@ -513,7 +571,7 @@ export function MessageList({ channelId }: MessageListProps) {
               onClick={() => {
                 setAnalysisProgressOpen(false);
                 setAnalyzingBatch(false);
-                setProgressLogs([]);
+                setWorklogEntries([]);
                 setAnalysisError(null);
               }}
               disabled={analyzingBatch}
