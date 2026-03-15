@@ -306,8 +306,10 @@ async function handleAnalysis(
     }
 
     await processLayer(layer1Themes, TOPIC_NAME);
-  } catch (e) {
+  } catch (e: any) {
     console.error("Error processing themes:", e);
+    sendProgress?.(`[ERROR] GOAL: Save themes | DOING: Database insertion | OBSERVATIONS: Failed to save themes: ${e.message} | DECISIONS: Aborting save | QUESTIONS: Is schema up to date? | PROGRESS: Error saving results`, 2);
+    throw new Error(`Failed to save themes to database: ${e.message}`);
   }
 
   // 6. Create theme snapshots
