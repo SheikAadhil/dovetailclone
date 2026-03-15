@@ -21,24 +21,16 @@ export function ThemeDrawer({ theme, isOpen, onClose }: ThemeDrawerProps) {
       ? { color: 'text-red-600', icon: <TrendingDown className="w-4 h-4" /> }
       : { color: 'text-gray-400', icon: <Minus className="w-4 h-4" /> };
 
-  const isDeep = theme.topic_name?.includes("Layer 2") || theme.topic_name?.includes("Deep Analysis");
-
   return (
     <Sheet open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <SheetContent className="w-full sm:w-[480px] md:w-[540px] p-0 flex flex-col h-full max-w-full">
         <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-200">
           <div className="flex flex-col min-h-full">
-            <SheetHeader className={`p-6 border-b ${isDeep ? 'bg-amber-50/30' : 'bg-indigo-50/30'}`}>
+            <SheetHeader className="p-6 border-b bg-indigo-50/30">
               <div className="flex items-center gap-2 mb-2">
-                {isDeep ? (
-                  <Badge className="bg-amber-100 text-amber-700 border-none font-black text-[9px] uppercase tracking-widest gap-1">
-                    <Lightbulb className="w-3 h-3" /> Deep Analysis
-                  </Badge>
-                ) : (
-                  <Badge className="bg-indigo-100 text-indigo-700 border-none font-black text-[9px] uppercase tracking-widest gap-1">
-                    <Zap className="w-3 h-3" /> Product Insight
-                  </Badge>
-                )}
+                <Badge className="bg-indigo-100 text-indigo-700 border-none font-black text-[9px] uppercase tracking-widest gap-1">
+                  <Zap className="w-3 h-3" /> Product Insight
+                </Badge>
               </div>
               <SheetTitle className="text-xl font-black tracking-tight">{theme.name}</SheetTitle>
               

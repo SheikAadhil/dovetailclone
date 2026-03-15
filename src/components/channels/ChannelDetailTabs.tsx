@@ -635,11 +635,7 @@ export function ChannelDetailTabs({ channel }: ChannelDetailTabsProps) {
                   <div className="px-3 py-2 space-y-2">
                     <div className="flex items-center gap-2">
                       <div className={`w-2 h-2 rounded-full ${analysisStep >= 1 ? 'bg-green-500' : (analysisStep === 0 ? 'bg-yellow-500 animate-pulse' : 'bg-gray-300')}`} />
-                      <span className="text-xs text-gray-600">Layer 1: Primary Analysis</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className={`w-2 h-2 rounded-full ${analysisStep >= 2 ? 'bg-green-500' : (analysisStep === 1 ? 'bg-yellow-500 animate-pulse' : 'bg-gray-300')}`} />
-                      <span className="text-xs text-gray-600">Layer 2: Deep Review</span>
+                      <span className="text-xs text-gray-600">Analyzing Signals</span>
                     </div>
                     {analysisProgress ? (
                       <div className="mt-2 pt-2 border-t border-gray-100">
@@ -674,9 +670,7 @@ export function ChannelDetailTabs({ channel }: ChannelDetailTabsProps) {
                 </div>
                 <div className="ml-auto flex items-center gap-2">
                   <div className={`w-2 h-2 rounded-full ${analysisStep >= 1 ? 'bg-green-500' : 'bg-yellow-500 animate-pulse'}`} />
-                  <span className="text-xs text-gray-600">Layer 1</span>
-                  <div className={`w-2 h-2 rounded-full ${analysisStep >= 2 ? 'bg-green-500' : (analysisStep === 1 ? 'bg-yellow-500 animate-pulse' : 'bg-gray-300')}`} />
-                  <span className="text-xs text-gray-600">Layer 2</span>
+                  <span className="text-xs text-gray-600">Analyzing</span>
                 </div>
               </div>
 

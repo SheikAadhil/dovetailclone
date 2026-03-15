@@ -1,7 +1,7 @@
 import { auth } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
 import { createSupabaseServerClient, createSupabaseAdminClient } from '@/lib/supabase-server';
-import { analyzeThemesLayer1, analyzeThemesLayer2, ThemeResult, setProgressCallback } from '@/lib/ai';
+import { analyzeThemesLayer1, ThemeResult, setProgressCallback } from '@/lib/ai';
 
 function sendProgress(writer: any, progress: string, step?: number) {
   if (writer && typeof writer.write === 'function') {
@@ -156,28 +156,18 @@ async function handleAnalysis(
     content: dp.content
   }));
 
-  // 2. STAGE 1: PRIMARY ANALYSIS
-  sendProgress?.(`[LAYER 1] GOAL: Extract product-level themes from signals | DOING: Analyzing ${messagesForAi.length} signals for patterns and themes | OBSERVATIONS: Processing feedback through UX research methodology | DECISIONS: Using 8-stage thematic analysis framework | QUESTIONS: What patterns emerge from the data? | PROGRESS: Starting primary analysis...`, 1);
+  // 2. STAGE 1: PRODUCT-LEVEL ANALYSIS
+  sendProgress?.(`[ANALYSIS] GOAL: Extract product-level themes from signals | DOING: Analyzing ${messagesForAi.length} signals for patterns and themes | OBSERVATIONS: Processing feedback through UX research methodology | DECISIONS: Using comprehensive thematic analysis framework | QUESTIONS: What patterns emerge from the data? | PROGRESS: Starting analysis...`, 1);
   const layer1Themes = await analyzeThemesLayer1(messagesForAi, channel?.ai_context);
-  console.log(`Layer 1 returned ${layer1Themes?.length || 0} themes`);
+  console.log(`Analysis returned ${layer1Themes?.length || 0} themes`);
 
-  // 3. STAGE 2: DEEP REVIEW - always run to get deep themes
-  let layer2Themes: ThemeResult[] = [];
-  sendProgress?.(`[LAYER 1 COMPLETE] GOAL: Synthesize findings | DOING: Layer 1 analysis complete - found ${layer1Themes?.length || 0} themes | OBSERVATIONS: ${layer1Themes?.length || 0} product-level themes identified | DECISIONS: Proceeding to deep review for cross-theme patterns | QUESTIONS: What systemic patterns exist across themes? | PROGRESS: Found ${layer1Themes?.length || 0} themes`, 1);
-  sendProgress?.(`[LAYER 2] GOAL: Identify latent patterns across themes | DOING: Running deep thematic analysis to find systemic dynamics | OBSERVATIONS: Looking for cross-theme patterns and underlying assumptions | DECISIONS: Using reflexive thematic analysis methodology | QUESTIONS: What connects these themes at a deeper level? | PROGRESS: Starting deep review...`, 2);
-  layer2Themes = await analyzeThemesLayer2(messagesForAi, channel?.ai_context);
-  console.log(`Layer 2 returned ${layer2Themes?.length || 0} themes`);
-
-  // 4. Ensure System Topics exist for categorization
-  const LAYER_TOPICS = [
-    { name: 'Product Insights (Layer 1)', description: 'Immediate actionable feedback and product improvements.' },
-    { name: 'Deep Analysis (Layer 2)', description: 'Latent patterns, systemic dynamics, and reflexive research insights.' }
-  ];
+  // 3. Ensure Topic exists for categorization
+  const TOPIC_NAME = 'Product Insights';
 
   const processedThemeIds: string[] = [];
 
   const processLayer = async (themesResult: ThemeResult[], topicName: string) => {
-    // Get or create the topic for this layer
+    // Get or create the topic
     let { data: topic } = await supabase
       .from('topics')
       .select('id')
@@ -192,7 +182,7 @@ async function handleAnalysis(
           channel_id: channelId,
           workspace_id: channel?.workspace_id,
           name: topicName,
-          description: LAYER_TOPICS.find(t => t.name === topicName)?.description,
+          description: 'Product-level themes extracted from user feedback.',
           is_ai_generated: true,
           created_by: 'system'
         })
@@ -282,19 +272,14 @@ async function handleAnalysis(
     }
   };
 
-  sendProgress?.(`[SAVING] GOAL: Persist analysis results | DOING: Saving themes to database and creating topic categories | OBSERVATIONS: Writing ${layer1Themes?.length || 0} Layer 1 themes and ${layer2Themes?.length || 0} Layer 2 themes | DECISIONS: Creating topic categories for organization | QUESTIONS: | PROGRESS: Saving themes...`, 2);
+  sendProgress?.(`[SAVING] GOAL: Persist analysis results | DOING: Saving themes to database | OBSERVATIONS: Writing ${layer1Themes?.length || 0} themes to database | DECISIONS: Creating topic category for organization | QUESTIONS: | PROGRESS: Saving themes...`, 2);
   try {
-    await processLayer(layer1Themes, 'Product Insights (Layer 1)');
+    await processLayer(layer1Themes, TOPIC_NAME);
   } catch (e) {
-    console.error("Error processing Layer 1 themes:", e);
-  }
-  try {
-    await processLayer(layer2Themes, 'Deep Analysis (Layer 2)');
-  } catch (e) {
-    console.error("Error processing Layer 2 themes:", e);
+    console.error("Error processing themes:", e);
   }
 
-  // 5. Update channel timestamp
+  // 4. Update channel timestamp
   await supabase
     .from('channels')
     .update({ last_analyzed_at: new Date().toISOString() })
@@ -327,7 +312,6 @@ async function handleAnalysis(
   setProgressCallback(null);
 
   return NextResponse.json({
-    themes: processedThemeIds.length,
-    layers: 2
+    themes: processedThemeIds.length
   });
 }

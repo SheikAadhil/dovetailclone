@@ -446,18 +446,12 @@ export function MessageList({ channelId }: MessageListProps) {
               <div className="flex items-center gap-2">
                 <div className={`w-3 h-3 rounded-full ${analysisStep >= 1 ? 'bg-green-500' : 'bg-gray-300'} ${analyzingBatch && analysisStep < 1 ? 'animate-pulse' : ''}`} />
                 <span className={analysisStep >= 1 ? 'text-gray-900 font-medium' : 'text-gray-500'}>
-                  Layer 1
+                  Analyzing
                 </span>
               </div>
               <div className="flex items-center gap-2">
-                <div className={`w-3 h-3 rounded-full ${analysisStep >= 2 ? 'bg-green-500' : 'bg-gray-300'} ${analyzingBatch && analysisStep >= 1 && analysisStep < 2 ? 'animate-pulse' : ''}`} />
-                <span className={analysisStep >= 2 ? 'text-gray-900 font-medium' : 'text-gray-500'}>
-                  Layer 2
-                </span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className={`w-3 h-3 rounded-full ${!analyzingBatch && analysisStep >= 2 ? 'bg-green-500' : 'bg-gray-300'}`} />
-                <span className={!analyzingBatch && analysisStep >= 2 ? 'text-gray-900 font-medium' : 'text-gray-500'}>
+                <div className={`w-3 h-3 rounded-full ${!analyzingBatch && analysisStep >= 1 ? 'bg-green-500' : 'bg-gray-300'}`} />
+                <span className={!analyzingBatch && analysisStep >= 1 ? 'text-gray-900 font-medium' : 'text-gray-500'}>
                   Save
                 </span>
               </div>
