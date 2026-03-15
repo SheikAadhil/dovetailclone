@@ -89,6 +89,15 @@ export function ChannelDetailTabs({ channel }: ChannelDetailTabsProps) {
   const [analyzing, setAnalyzing] = useState(false);
   const [analysisProgress, setAnalysisProgress] = useState<string>("");
   const [analysisStep, setAnalysisStep] = useState<number>(0);
+  const [worklogEntries, setWorklogEntries] = useState<Array<{
+    stage: string;
+    goal: string;
+    doing: string[];
+    observations: string[];
+    decisions: string[];
+    open_questions: string[];
+    progress: string;
+  }>>([]);
   const [channelAlerts, setChannelAlerts] = useState<AnomalyAlert[]>([]);
   
   const [selectedTheme, setSelectedTheme] = useState<Theme | null>(null);
@@ -176,6 +185,7 @@ export function ChannelDetailTabs({ channel }: ChannelDetailTabsProps) {
     setAnalyzing(true);
     setAnalysisProgress("Connecting to analysis service...");
     setAnalysisStep(0);
+    setWorklogEntries([]);
     try {
       const res = await fetch(`/api/channels/${channel.id}/analyze`, {
         method: 'POST',
@@ -214,6 +224,23 @@ export function ChannelDetailTabs({ channel }: ChannelDetailTabsProps) {
                 if (parsed.progress) {
                   setAnalysisProgress(parsed.progress);
                   if (parsed.step) setAnalysisStep(parsed.step);
+
+                  // Try to parse worklog entry from progress message
+                  // New format: [STAGE] GOAL: goal | DOING: doing | OBSERVATIONS: obs | DECISIONS: dec | QUESTIONS: qs | PROGRESS: prog
+                  const worklogMatch = parsed.progress.match(/\[([^\]]+)\]\s*GOAL:\s*([^|]+)\s*\|\s*DOING:\s*([^|]+)\s*\|\s*OBSERVATIONS:\s*([^|]*)\s*\|\s*DECISIONS:\s*([^|]*)\s*\|\s*QUESTIONS:\s*([^|]*)\s*\|\s*PROGRESS:\s*(.*)/);
+                  if (worklogMatch) {
+                    const [, stage, goal, doing, observations, decisions, questions, progressStr] = worklogMatch;
+                    const newEntry = {
+                      stage: stage.trim(),
+                      goal: goal.trim(),
+                      doing: doing.trim().split(';').map((s: string) => s.trim()).filter(Boolean),
+                      observations: observations.trim().split(';').map((s: string) => s.trim()).filter(Boolean),
+                      decisions: decisions.trim().split(';').map((s: string) => s.trim()).filter(Boolean),
+                      open_questions: questions.trim().split(';').map((s: string) => s.trim()).filter(Boolean),
+                      progress: progressStr.trim()
+                    };
+                    setWorklogEntries(prev => [...prev, newEntry]);
+                  }
                 }
               } catch (e) {
                 // Try to show raw progress message
@@ -233,6 +260,7 @@ export function ChannelDetailTabs({ channel }: ChannelDetailTabsProps) {
       setAnalyzing(false);
       setAnalysisProgress("");
       setAnalysisStep(0);
+      setWorklogEntries([]);
     }
   };
 
@@ -631,6 +659,112 @@ export function ChannelDetailTabs({ channel }: ChannelDetailTabsProps) {
             </DropdownMenu>
           </div>
         </header>
+
+        {/* Analysis Progress Panel */}
+        {analyzing && (
+          <div className="bg-gradient-to-r from-indigo-50 to-purple-50 border-b border-indigo-100 p-4 animate-in slide-in-from-top-2 duration-300">
+            <div className="max-w-7xl mx-auto">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="p-2 bg-indigo-100 rounded-lg">
+                  <Brain className="w-5 h-5 text-indigo-600 animate-pulse" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-indigo-900">Analyzing Signals</h3>
+                  <p className="text-xs text-indigo-700">{analysisProgress || "Initializing..."}</p>
+                </div>
+                <div className="ml-auto flex items-center gap-2">
+                  <div className={`w-2 h-2 rounded-full ${analysisStep >= 1 ? 'bg-green-500' : 'bg-yellow-500 animate-pulse'}`} />
+                  <span className="text-xs text-gray-600">Layer 1</span>
+                  <div className={`w-2 h-2 rounded-full ${analysisStep >= 2 ? 'bg-green-500' : (analysisStep === 1 ? 'bg-yellow-500 animate-pulse' : 'bg-gray-300')}`} />
+                  <span className="text-xs text-gray-600">Layer 2</span>
+                </div>
+              </div>
+
+              {/* Worklog Entries */}
+              {worklogEntries.length > 0 && (
+                <div className="mt-3 space-y-2 max-h-64 overflow-y-auto">
+                  {worklogEntries.map((entry, idx) => (
+                    <div key={idx} className="bg-white/80 rounded-lg p-3 border border-indigo-100 shadow-sm">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-xs font-bold text-indigo-600 uppercase tracking-wide">
+                          {entry.stage}
+                        </span>
+                        {entry.progress && (
+                          <span className="text-xs text-gray-500">• {entry.progress}</span>
+                        )}
+                      </div>
+                      {entry.goal && (
+                        <div className="mt-1">
+                          <span className="text-[10px] font-medium text-purple-600 uppercase">Goal:</span>
+                          <span className="text-xs text-purple-700 ml-1">{entry.goal}</span>
+                        </div>
+                      )}
+                      {entry.doing.length > 0 && (
+                        <div className="mt-2">
+                          <span className="text-[10px] font-medium text-gray-400 uppercase">What I'm doing:</span>
+                          <ul className="mt-1 space-y-0.5">
+                            {entry.doing.map((item, i) => (
+                              <li key={i} className="text-xs text-gray-700 flex items-start gap-1.5">
+                                <span className="text-indigo-400 mt-0.5">→</span>
+                                {item}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                      {entry.observations.length > 0 && (
+                        <div className="mt-2">
+                          <span className="text-[10px] font-medium text-gray-400 uppercase">Observations:</span>
+                          <ul className="mt-1 space-y-0.5">
+                            {entry.observations.map((item, i) => (
+                              <li key={i} className="text-xs text-gray-600 flex items-start gap-1.5">
+                                <span className="text-amber-500 mt-0.5">•</span>
+                                {item}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                      {entry.decisions.length > 0 && (
+                        <div className="mt-2">
+                          <span className="text-[10px] font-medium text-gray-400 uppercase">Decisions:</span>
+                          <ul className="mt-1 space-y-0.5">
+                            {entry.decisions.map((item, i) => (
+                              <li key={i} className="text-xs text-emerald-700 flex items-start gap-1.5">
+                                <Check className="w-3 h-3 mt-0.5 text-emerald-500" />
+                                {item}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                      {entry.open_questions.length > 0 && (
+                        <div className="mt-2">
+                          <span className="text-[10px] font-medium text-gray-400 uppercase">Open Questions:</span>
+                          <ul className="mt-1 space-y-0.5">
+                            {entry.open_questions.map((item, i) => (
+                              <li key={i} className="text-xs text-rose-600 flex items-start gap-1.5">
+                                <span className="text-rose-400 mt-0.5">?</span>
+                                {item}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {worklogEntries.length === 0 && (
+                <div className="flex items-center gap-2 text-xs text-indigo-600">
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                  <span>Processing signals through AI analysis pipeline...</span>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         <ScrollArea className="flex-1 min-h-0">
           <div className="p-4 max-w-7xl mx-auto w-full pb-16">

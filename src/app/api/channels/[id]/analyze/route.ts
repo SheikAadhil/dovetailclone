@@ -108,7 +108,7 @@ async function handleAnalysis(
   }
 
   // 1. Fetch data points and channel context
-  sendProgress?.("Fetching signals...", 0);
+  sendProgress?.("Fetching signals from database...", 0);
 
   const { data: channel } = await supabase
     .from('channels')
@@ -149,7 +149,7 @@ async function handleAnalysis(
     return NextResponse.json({ error: 'No signals found to analyze' }, { status: 400 });
   }
 
-  sendProgress?.(`Loaded ${dataPoints.length} signals`, 0);
+  sendProgress?.(`[FETCHING] GOAL: Load all signals for analysis | DOING: Retrieved ${dataPoints.length} signals from database | OBSERVATIONS: Found ${dataPoints.length} feedback signals to analyze | DECISIONS: Proceeding with full dataset | QUESTIONS: | PROGRESS: ${dataPoints.length} signals loaded`, 0);
 
   const messagesForAi = dataPoints.map(dp => ({
     id: dp.id,
@@ -157,14 +157,14 @@ async function handleAnalysis(
   }));
 
   // 2. STAGE 1: PRIMARY ANALYSIS
-  sendProgress?.("Running Layer 1: Primary Analysis...", 1);
+  sendProgress?.(`[LAYER 1] GOAL: Extract product-level themes from signals | DOING: Analyzing ${messagesForAi.length} signals for patterns and themes | OBSERVATIONS: Processing feedback through UX research methodology | DECISIONS: Using 8-stage thematic analysis framework | QUESTIONS: What patterns emerge from the data? | PROGRESS: Starting primary analysis...`, 1);
   const layer1Themes = await analyzeThemesLayer1(messagesForAi, channel?.ai_context);
   console.log(`Layer 1 returned ${layer1Themes?.length || 0} themes`);
 
   // 3. STAGE 2: DEEP REVIEW - always run to get deep themes
   let layer2Themes: ThemeResult[] = [];
-  sendProgress?.(`Layer 1 complete. Found ${layer1Themes?.length || 0} themes. Running Layer 2...`, 1);
-  sendProgress?.("Running Layer 2: Deep Review & Audit...", 2);
+  sendProgress?.(`[LAYER 1 COMPLETE] GOAL: Synthesize findings | DOING: Layer 1 analysis complete - found ${layer1Themes?.length || 0} themes | OBSERVATIONS: ${layer1Themes?.length || 0} product-level themes identified | DECISIONS: Proceeding to deep review for cross-theme patterns | QUESTIONS: What systemic patterns exist across themes? | PROGRESS: Found ${layer1Themes?.length || 0} themes`, 1);
+  sendProgress?.(`[LAYER 2] GOAL: Identify latent patterns across themes | DOING: Running deep thematic analysis to find systemic dynamics | OBSERVATIONS: Looking for cross-theme patterns and underlying assumptions | DECISIONS: Using reflexive thematic analysis methodology | QUESTIONS: What connects these themes at a deeper level? | PROGRESS: Starting deep review...`, 2);
   layer2Themes = await analyzeThemesLayer2(messagesForAi, channel?.ai_context);
   console.log(`Layer 2 returned ${layer2Themes?.length || 0} themes`);
 
@@ -282,7 +282,7 @@ async function handleAnalysis(
     }
   };
 
-  sendProgress?.("Saving themes to database...", 2);
+  sendProgress?.(`[SAVING] GOAL: Persist analysis results | DOING: Saving themes to database and creating topic categories | OBSERVATIONS: Writing ${layer1Themes?.length || 0} Layer 1 themes and ${layer2Themes?.length || 0} Layer 2 themes | DECISIONS: Creating topic categories for organization | QUESTIONS: | PROGRESS: Saving themes...`, 2);
   try {
     await processLayer(layer1Themes, 'Product Insights (Layer 1)');
   } catch (e) {
@@ -321,7 +321,7 @@ async function handleAnalysis(
       .upsert(actualSnapshots, { onConflict: 'theme_id,snapshot_date' });
   }
 
-  sendProgress?.(`Analysis complete! Generated ${processedThemeIds.length} themes.`, 2);
+  sendProgress?.(`[COMPLETE] GOAL: Analysis finished | DOING: All themes saved and organized | OBSERVATIONS: Generated ${processedThemeIds.length} total themes across both layers | DECISIONS: Analysis complete - ready for review | QUESTIONS: | PROGRESS: Analysis complete! Generated ${processedThemeIds.length} themes.`, 2);
 
   // Clean up progress callback
   setProgressCallback(null);

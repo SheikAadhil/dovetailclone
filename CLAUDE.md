@@ -140,11 +140,23 @@ The analysis uses:
 
 ## Sensing (Strategic Foresight)
 
-A separate tool for strategic foresight research accessible at `/sensing`:
+A separate tool for strategic foresight research:
+- **Route:** `/sensing` (page: `src/app/(dashboard)/sensing/page.tsx`)
 - AI-powered research queries to discover weak signals and trends
 - Categories: Signals, Weak Signals, Trends, Drivers
 - Results can be copied to a channel as DataPoints
 - API routes: `/api/sensing`, `/api/sensing/[id]`, `/api/sensing/[id]/execute`, `/api/sensing/copy-to-channel`
+
+## Sensing Library
+
+The sensing logic is in `src/lib/sensing.ts` - handles research queries and API integration.
+
+## Routing Structure
+
+The app uses Next.js route groups:
+- `(dashboard)` - Authenticated routes requiring Clerk (includes `/channels` and `/sensing`)
+- API routes are in `src/app/api/`
+- Public landing page is at `src/app/page.tsx`
 
 ## Alerts & Notifications
 

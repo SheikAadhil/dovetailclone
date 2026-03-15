@@ -307,6 +307,51 @@ Output format must be:
 If you cannot produce valid JSON for any reason, output: {"error": "reason"}
 
 --------------------------------------------------
+LIVE RESEARCHER WORKLOG
+--------------------------------------------------
+
+Your analysis process must be VISIBLE to the user. Do not keep your reasoning opaque.
+
+As you work through each stage, output structured progress updates in this exact JSON format:
+
+{
+  "worklog": [
+    {
+      "stage": "STAGE NAME",
+      "goal": "What you are trying to determine",
+      "doing": ["bullet 1", "bullet 2", "bullet 3"],
+      "observations": ["pattern 1", "pattern 2"],
+      "decisions": ["decision 1", "decision 2"],
+      "open_questions": ["question 1", "question 2"],
+      "progress": "X/Y signals processed - status"
+    }
+  ]
+}
+
+IMPORTANT: After each worklog entry, IMMEDIATELY return to your analysis. Do not wait.
+The worklog should be embedded within your JSON output as you progress through stages.
+
+Your worklog entries should appear AFTER you complete each stage:
+- After reading the dataset (Stage 1)
+- After first-pass coding (Stage 3)
+- After clustering codes (Stage 4)
+- After forming candidate themes (Stage 5)
+- After theme boundary audit (Stage 6)
+- After assigning strengths/isolated/ambiguous (Stage 7)
+- Before final audit (Stage 8)
+
+Do not reveal hidden private chain-of-thought.
+Do show professional research trace: what stage, what you're doing, what patterns you notice, what decisions you make, what remains uncertain.
+
+Sound like a senior UX researcher:
+- "I'm seeing repeated evidence that..."
+- "These imply different product responses, so I'm keeping them separate"
+- "This appears once, so I'm holding as isolated issue"
+- "This cluster is too broad, hiding different friction types"
+
+Do NOT use vague filler like "Analyzing..." or "Processing..."
+
+--------------------------------------------------
 1. WHAT A THEME IS (CRITICAL)
 --------------------------------------------------
 
@@ -621,6 +666,49 @@ Before finalizing, verify:
 If any answer is no, revise before output.
 
 --------------------------------------------------
+ANALYSIS STAGES
+--------------------------------------------------
+
+Work through these stages, outputting a worklog entry after each:
+
+STAGE 1: Dataset familiarization
+- Read the full dataset
+- Note signal types, sources, repeated ideas, contradictions, standout quotes
+- Print what patterns you are noticing
+- Output worklog: stage, goal, doing, observations, decisions, open_questions, progress
+
+STAGE 2: Signal ledger creation
+- Create one row per signal
+- Classify: pain point, request, workaround, concern, strength, ambiguity
+- Show progress as you classify
+
+STAGE 3: First-pass coding
+- Create concise primary codes for each signal
+- Show examples of code families emerging
+
+STAGE 4: Code clustering
+- Group related codes into categories
+- Call out weak or tentative categories
+
+STAGE 5: Candidate theme generation
+- Build themes from categories
+- Explain central organizing idea for each
+
+STAGE 6: Theme boundary audit
+- Compare themes for overlap
+- Merge if same evidence/same intervention
+- Split if different interventions needed
+- Show what changed
+
+STAGE 7: Strengths / isolated issues / ambiguous
+- Create explicit buckets
+- Explain why items not in full themes
+
+STAGE 8: Final coverage audit
+- Verify every signal has exactly one home
+- Print final audit result
+
+--------------------------------------------------
 DATASET (MESSAGES):
 ${JSON.stringify(simplifiedMessages)}`;
 
@@ -708,6 +796,22 @@ async function performAnalysis(prompt: string, idMap: Map<string, string>, model
     console.log(`Raw AI response (first 500 chars): ${text.substring(0, 500)}`);
     const parsed = extractJson(text);
     console.log(`Parsed JSON keys: ${Object.keys(parsed).join(', ')}`);
+
+    // Extract and send worklog entries as progress updates (for Layer 1)
+    if (parsed.worklog && Array.isArray(parsed.worklog)) {
+      for (const entry of parsed.worklog) {
+        const stage = entry.stage || 'Processing';
+        const progress = entry.progress || '';
+        const observations = (entry.observations || []).join('; ');
+        const decisions = (entry.decisions || []).join('; ');
+        const doing = (entry.doing || []).join('; ');
+        const goal = entry.goal || '';
+        const openQuestions = (entry.open_questions || []).join('; ');
+
+        // Send structured progress that frontend can parse
+        sendProgress(`[${stage}] GOAL: ${goal} | DOING: ${doing} | OBSERVATIONS: ${observations} | DECISIONS: ${decisions} | QUESTIONS: ${openQuestions} | PROGRESS: ${progress}`);
+      }
+    }
 
     // Handle two-stage workflow format with top_level_themes or revised_product_themes (Layer 1)
     const themesArray = parsed.top_level_themes || parsed.revised_product_themes;
@@ -854,6 +958,17 @@ export interface ThemeResult {
   deep_analysis: string;
   message_ids: string[];
   sentiment: 'positive' | 'negative' | 'mixed' | 'neutral';
+
+  // Live researcher worklog
+  worklog?: Array<{
+    stage: string;
+    goal: string;
+    doing: string[];
+    observations: string[];
+    decisions: string[];
+    open_questions: string[];
+    progress: string;
+  }>;
 
   // Two-stage workflow fields
   dataset_accounting?: {
