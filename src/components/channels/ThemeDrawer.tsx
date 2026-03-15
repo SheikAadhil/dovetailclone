@@ -21,6 +21,8 @@ export function ThemeDrawer({ theme, isOpen, onClose }: ThemeDrawerProps) {
       ? { color: 'text-red-600', icon: <TrendingDown className="w-4 h-4" /> }
       : { color: 'text-gray-400', icon: <Minus className="w-4 h-4" /> };
 
+  const isDeep = theme.topic_name?.toLowerCase().includes('deep analysis') || false;
+
   return (
     <Sheet open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <SheetContent className="w-full sm:w-[480px] md:w-[540px] p-0 flex flex-col h-full max-w-full">
