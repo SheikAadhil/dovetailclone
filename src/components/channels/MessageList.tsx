@@ -3,11 +3,11 @@
 import { useState, useEffect, useCallback } from "react";
 import { createSupabaseClient } from "@/lib/supabase";
 import { DataPoint, ChannelField, Theme } from "@/types";
-import { MessageCard } from "./MessageCard";
+import { DataPointTableRow } from "./DataPointTableRow";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, Search, Brain, X, CheckSquare, Filter, Tag, XCircle, FileCode } from "lucide-react";
+import { Loader2, Search, Brain, X, CheckSquare, Filter, Tag, XCircle, FileCode, MoreHorizontal, Calendar } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { useRouter } from "next/navigation";
@@ -20,6 +20,8 @@ import {
   DialogTitle 
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface MessageListProps {
   channelId: string;
@@ -49,15 +51,7 @@ export function MessageList({ channelId }: MessageListProps) {
   
   const [analysisProgress, setAnalysisProgress] = useState("");
   const [analysisStep, setAnalysisStep] = useState(0);
-  const [worklogEntries, setWorklogEntries] = useState<Array<{
-    stage: string;
-    goal: string;
-    doing: string[];
-    observations: string[];
-    decisions: string[];
-    open_questions: string[];
-    progress: string;
-  }>>([]);
+  const [worklogEntries, setWorklogEntries] = useState<any[]>([]);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -133,121 +127,33 @@ export function MessageList({ channelId }: MessageListProps) {
     setSelectedIds(newSet);
   };
 
-  const handleAnalyzeSelected = async () => {
-    const selectedMessages = messages.filter(m => selectedIds.has(m.id));
-    const hasOnlyObservationNodes = selectedMessages.every(m => m.source === 'node' || m.source === 'markdown');
-
-    if (hasOnlyObservationNodes) {
-      if (selectedIds.size < 1) { alert("Please select at least 1 observation node."); return; }
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      setSelectedIds(new Set(messages.map(m => m.id)));
     } else {
-      if (selectedIds.size < 2) { alert("Please select at least 2 signals."); return; }
-    }
-
-    setAnalyzingBatch(true);
-    setAnalysisProgressOpen(true);
-    setAnalysisProgress("Starting analysis...");
-    setAnalysisStep(0);
-    setWorklogEntries([]);
-    setAnalysisError(null);
-
-    try {
-      const res = await fetch(`/api/channels/${channelId}/analyze`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'text/event-stream'
-        },
-        body: JSON.stringify({ messageIds: Array.from(selectedIds) })
-      });
-
-      if (!res.ok) {
-        const errorData = await res.json();
-        setAnalysisError(errorData.error || 'Analysis failed');
-        return;
-      }
-
-      const reader = res.body?.getReader();
-      const decoder = new TextDecoder();
-      let buffer = '';
-
-      if (reader) {
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split('\n');
-          buffer = lines.pop() || '';
-
-          for (const line of lines) {
-            if (line.startsWith('data: ')) {
-              const data = line.slice(6);
-              if (data === '[DONE]') continue;
-              try {
-                const parsed = JSON.parse(data);
-                if (parsed.error) {
-                  setAnalysisError(parsed.error);
-                } else if (parsed.progress) {
-                  setAnalysisProgress(parsed.progress);
-                  if (parsed.step) setAnalysisStep(parsed.step);
-                  
-                  // Parse worklog entry
-                  const worklogMatch = parsed.progress.match(/\[([^\]]+)\]\s*GOAL:\s*([^|]+)\s*\|\s*DOING:\s*([^|]+)\s*\|\s*OBSERVATIONS:\s*([^|]*)\s*\|\s*DECISIONS:\s*([^|]*)\s*\|\s*QUESTIONS:\s*([^|]*)\s*\|\s*PROGRESS:\s*(.*)/);
-                  if (worklogMatch) {
-                    const [, stage, goal, doing, observations, decisions, questions, progressStr] = worklogMatch;
-                    const newEntry = {
-                      stage: stage.trim(),
-                      goal: goal.trim(),
-                      doing: doing.trim().split(';').map((s: string) => s.trim()).filter(Boolean),
-                      observations: observations.trim().split(';').map((s: string) => s.trim()).filter(Boolean),
-                      decisions: decisions.trim().split(';').map((s: string) => s.trim()).filter(Boolean),
-                      open_questions: questions.trim().split(';').map((s: string) => s.trim()).filter(Boolean),
-                      progress: progressStr.trim()
-                    };
-                    setWorklogEntries(prev => [...prev, newEntry]);
-                  }
-                }
-              } catch (e) {
-                setAnalysisProgress(data);
-              }
-            }
-          }
-        }
-      }
-
       setSelectedIds(new Set());
-      setAnalysisProgress("Analysis complete!");
-      router.refresh();
-
-      // Close dialog after a short delay
-      setTimeout(() => {
-        setAnalysisProgressOpen(false);
-        setAnalysisProgress("");
-        setAnalysisStep(0);
-        setWorklogEntries([]);
-      }, 3000);
-
-    } catch (e: any) {
-      setAnalysisError(e.message || "Analysis failed");
-    } finally {
-      setAnalyzingBatch(false);
     }
   };
 
-  const handleAnalyzeSingle = async (id: string) => {
+  const handleAnalyzeSelected = async () => {
+    setAnalyzingBatch(true);
+    setAnalysisProgressOpen(true);
+    setAnalysisProgress("Starting...");
     try {
       const res = await fetch(`/api/channels/${channelId}/analyze`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messageIds: [id], forceRefresh: true })
+        body: JSON.stringify({ messageIds: Array.from(selectedIds) })
       });
-      const data = await res.json();
-      if (data.error) alert(data.error);
-      else {
-        alert("Individual signal analysis complete.");
-        router.refresh();
-      }
-    } catch (e) { alert("Analysis failed."); }
+      if (!res.ok) throw new Error("Analysis failed");
+      setSelectedIds(new Set());
+      router.refresh();
+      setAnalysisProgressOpen(false);
+    } catch (e: any) {
+      setAnalysisError(e.message);
+    } finally {
+      setAnalyzingBatch(false);
+    }
   };
 
   const handleTagWithTheme = async (themeId: string) => {
@@ -259,124 +165,112 @@ export function MessageList({ channelId }: MessageListProps) {
         body: JSON.stringify({ messageIds: Array.from(selectedIds) })
       });
       if (res.ok) {
-        alert(`Tagged ${selectedIds.size} messages.`);
         setSelectedIds(new Set());
         setIsTagDialogOpen(false);
         router.refresh();
       }
-    } catch (e) { alert("Tagging failed"); } finally { setTagging(false); }
+    } catch (e) { console.error(e); } finally { setTagging(false); }
   };
-
-  const handleDeleteMessage = async (messageId: string) => {
-    try {
-      const res = await fetch(`/api/data-points/${messageId}`, {
-        method: 'DELETE'
-      });
-      if (res.ok) {
-        // Remove from local state
-        setMessages(prev => prev.filter(m => m.id !== messageId));
-        // Also refresh to get updated counts
-        router.refresh();
-      } else {
-        const data = await res.json();
-        alert(data.message || "Failed to delete message");
-      }
-    } catch (e) {
-      alert("Delete failed");
-    }
-  };
-
-  const updateMetadataFilter = (column: string, value: string) => {
-    setMetadataFilters(prev => ({ ...prev, [column]: value }));
-  };
-
-  const clearSelection = () => setSelectedIds(new Set());
 
   if (!mounted) return null;
 
   return (
-    <div className="space-y-4 relative pb-20">
-      {/* Filter Toolbar */}
-      <div className="flex flex-col gap-4 p-4 bg-gray-50 border rounded-xl shadow-sm">
-        <div className="flex flex-col sm:flex-row gap-4">
-          <div className="relative flex-1">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
-            <Input placeholder="Search messages..." className="pl-9 bg-white" value={search} onChange={(e) => setSearch(e.target.value)} />
-          </div>
-          <Select value={sentiment} onValueChange={(v) => setSentiment(v ?? "all")}>
-            <SelectTrigger className="w-[160px] bg-white border-gray-200">
-              <SelectValue placeholder="All Sentiments" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Sentiments</SelectItem>
-              <SelectItem value="positive">Positive</SelectItem>
-              <SelectItem value="neutral">Neutral</SelectItem>
-              <SelectItem value="negative">Negative</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+    <div className="flex flex-col bg-white overflow-hidden text-[#15181E]">
+      {/* Filters Bar */}
+      <div className="px-4 py-4 flex items-center gap-2 border-b border-gray-100/50">
+        <Button variant="ghost" className="h-9 px-3 flex items-center gap-2 text-[14px] font-medium bg-[#F6F7FB] text-[#15181E] rounded-md hover:bg-gray-100 shadow-none border-none">
+          <Calendar className="w-5 h-5" />
+          All time
+        </Button>
+        <Select value={sentiment} onValueChange={(v) => setSentiment(v ?? "all")}>
+          <SelectTrigger className="h-9 px-3 text-[14px] font-medium text-[#15181E] bg-white border-none shadow-none hover:bg-gray-100 w-[140px]">
+            <SelectValue placeholder="Sentiment" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All</SelectItem>
+            <SelectItem value="positive">Positive</SelectItem>
+            <SelectItem value="neutral">Neutral</SelectItem>
+            <SelectItem value="negative">Negative</SelectItem>
+          </SelectContent>
+        </Select>
+        <Button variant="ghost" className="h-9 px-3 text-[14px] font-medium text-[#15181E] hover:bg-gray-100">
+          Add filter
+        </Button>
+      </div>
 
-        {fields && fields.length > 0 && (
-          <div className="flex flex-wrap gap-3 pt-3 border-t border-gray-200/60">
-            <div className="flex items-center gap-2 text-xs font-bold text-gray-400 uppercase tracking-wider mr-2"><Filter className="w-3 h-3" /> Segment by:</div>
-            {fields.map(field => (
-              <div key={field.id} className="flex flex-col gap-1.5">
-                {field.field_type === 'select' && (
-                  <Select value={metadataFilters[field.source_column] || "all"} onValueChange={(val) => updateMetadataFilter(field.source_column, val ?? "all")}>
-                    <SelectTrigger className="h-8 text-xs bg-white min-w-[120px]"><span className="text-gray-400 mr-1">{field.display_name}:</span><SelectValue placeholder="All" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All</SelectItem>
-                      {field.options?.map(opt => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                )}
+      {/* Table Section */}
+      <table className="w-full border-collapse">
+        <thead>
+          <tr className="border-b border-gray-100 h-[48px] bg-gray-50/50">
+            <th className="w-12 px-4 py-2">
+              <div className="flex items-center justify-center">
+                <Checkbox 
+                  checked={selectedIds.size === messages.length && messages.length > 0} 
+                  onCheckedChange={(checked) => handleSelectAll(!!checked)}
+                  className="w-4 h-4 border-gray-300 rounded-[2px]"
+                />
               </div>
-            ))}
-            {(Object.keys(metadataFilters).length > 0 || sentiment !== 'all') && (
-              <Button variant="ghost" size="sm" className="h-8 text-xs text-gray-500 hover:text-red-600" onClick={() => { setMetadataFilters({}); setSentiment('all'); }}>Clear all</Button>
-            )}
-          </div>
-        )}
-      </div>
+            </th>
+            <th className="px-4 py-2" colSpan={3}>
+              <div className="flex items-center justify-between">
+                <span className="text-[14px] font-medium text-[#15181E]">
+                  {selectedIds.size > 0 ? `${selectedIds.size} data points selected` : "Data points"}
+                </span>
+                <div className="flex items-center gap-1">
+                  <div className="relative mr-2">
+                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                    <Input 
+                      placeholder="Search..." 
+                      className="h-8 w-48 pl-9 bg-white border-gray-200 text-xs rounded-md focus-visible:ring-1 focus-visible:ring-indigo-500" 
+                      value={search} 
+                      onChange={(e) => setSearch(e.target.value)}
+                    />
+                  </div>
+                  {selectedIds.size > 0 && (
+                    <div className="flex items-center gap-1">
+                      <Button variant="ghost" className="h-8 px-3 text-[14px] font-medium text-[#15181E] bg-[#F6F7FB]" onClick={() => setIsTagDialogOpen(true)}>
+                        Tag
+                      </Button>
+                      <Button variant="ghost" className="h-8 px-3 text-[14px] font-medium text-white bg-indigo-600 hover:bg-indigo-700" onClick={handleAnalyzeSelected}>
+                        Analyze
+                      </Button>
+                    </div>
+                  )}
+                  <Button variant="ghost" size="icon" className="h-8 w-8 text-[#15181E]">
+                    <MoreHorizontal className="w-5 h-5" />
+                  </Button>
+                </div>
+              </div>
+            </th>
+          </tr>
+        </thead>
+        <tbody className="bg-white">
+          {loading && page === 0 ? (
+            [1, 2, 3, 4, 5].map(i => (
+              <tr key={i} className="border-b border-gray-50 h-[72px]">
+                <td className="p-4"><Skeleton className="h-4 w-4 rounded" /></td>
+                <td className="p-4"><Skeleton className="h-12 w-full rounded" /></td>
+                <td className="p-4"><Skeleton className="h-4 w-[100px] rounded mx-auto" /></td>
+                <td className="p-4 text-right"><Skeleton className="h-4 w-6 rounded ml-auto" /></td>
+              </tr>
+            ))
+          ) : messages.map((msg) => (
+            <DataPointTableRow 
+              key={msg.id} 
+              message={msg} 
+              isSelected={selectedIds.has(msg.id)}
+              onSelect={handleToggleSelect}
+              onExpand={setExpandedMessage}
+            />
+          ))}
+        </tbody>
+      </table>
 
-      <div className="space-y-4">
-        {messages && messages.map((msg) => (
-          <MessageCard
-            key={msg.id}
-            message={msg}
-            selected={selectedIds.has(msg.id)}
-            onSelect={handleToggleSelect}
-            onAnalyze={handleAnalyzeSingle}
-            onExpand={setExpandedMessage}
-            onDelete={handleDeleteMessage}
-          />
-        ))}
-        {loading && <div className="flex justify-center py-10"><Loader2 className="w-6 h-6 animate-spin text-indigo-600" /></div>}
-        {!loading && messages.length === 0 && <div className="text-center py-20 bg-gray-50 rounded-xl border border-dashed text-gray-500">No messages found.</div>}
-        {!loading && hasMore && messages.length > 0 && <div className="text-center py-4"><Button variant="outline" onClick={() => fetchMessages(false)}>Load More</Button></div>}
-      </div>
-
-      {/* Floating Batch Action Bar */}
-      {selectedIds.size > 0 && (
-        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 bg-white border border-indigo-100 shadow-2xl rounded-full px-6 py-3 flex items-center gap-4 z-50 animate-in fade-in slide-in-from-bottom-4">
-          <div className="flex items-center gap-2 border-r pr-4 border-gray-100">
-            <CheckSquare className="w-5 h-5 text-indigo-600" />
-            <span className="font-semibold text-sm text-gray-900">{selectedIds.size} selected</span>
-          </div>
-          
-          <div className="flex items-center gap-2">
-            <Button size="sm" variant="outline" className="rounded-full gap-2 border-indigo-200 text-indigo-600" onClick={() => setIsTagDialogOpen(true)}>
-              <Tag className="w-4 h-4" />
-              Tag with Theme
-            </Button>
-
-            <Button size="sm" className="rounded-full bg-indigo-600 hover:bg-indigo-700 text-white" onClick={handleAnalyzeSelected} disabled={analyzingBatch}>
-              {analyzingBatch ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Brain className="w-4 h-4 mr-2" />}
-              Analyze Selection
-            </Button>
-            
-            <Button size="sm" variant="ghost" className="rounded-full h-8 w-8 p-0 text-gray-400 hover:text-gray-600" onClick={clearSelection}><X className="w-4 h-4" /></Button>
-          </div>
+      {!loading && hasMore && messages.length > 0 && (
+        <div className="p-4 flex justify-center border-t border-gray-100">
+          <Button variant="ghost" className="text-xs font-semibold text-indigo-600" onClick={() => fetchMessages(false)}>
+            Load more
+          </Button>
         </div>
       )}
 
@@ -389,21 +283,17 @@ export function MessageList({ channelId }: MessageListProps) {
           </DialogHeader>
           <ScrollArea className="max-h-[300px] mt-4 border rounded-md">
             <div className="p-2 space-y-1">
-              {!themes || themes.length === 0 ? (
-                <div className="p-4 text-center text-sm text-gray-500">No themes found. Create one in the Themes tab first.</div>
-              ) : (
-                themes.map(t => (
-                  <button
-                    key={t.id}
-                    onClick={() => handleTagWithTheme(t.id)}
-                    disabled={tagging}
-                    className="w-full text-left px-3 py-3 rounded-md hover:bg-indigo-50 transition-colors flex flex-col gap-0.5 border border-transparent hover:border-indigo-100"
-                  >
-                    <span className="font-semibold text-sm text-gray-900">{t.name}</span>
-                    <span className="text-[10px] text-gray-500 uppercase font-bold tracking-wider">{t.data_point_count} messages</span>
-                  </button>
-                ))
-              )}
+              {themes.map(t => (
+                <button
+                  key={t.id}
+                  onClick={() => handleTagWithTheme(t.id)}
+                  disabled={tagging}
+                  className="w-full text-left px-3 py-3 rounded-md hover:bg-indigo-50 transition-colors flex flex-col gap-0.5 border border-transparent hover:border-indigo-100"
+                >
+                  <span className="font-semibold text-sm text-gray-900">{t.name}</span>
+                  <span className="text-[10px] text-gray-500 uppercase font-bold tracking-wider">{t.data_point_count} messages</span>
+                </button>
+              ))}
             </div>
           </ScrollArea>
           <DialogFooter className="sm:justify-start">
@@ -414,17 +304,17 @@ export function MessageList({ channelId }: MessageListProps) {
 
       {/* Side Panel for Full Observation */}
       {expandedMessage && (
-        <div className="fixed inset-0 z-50 flex justify-end">
+        <div className="fixed inset-0 z-[100] flex justify-end">
           <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={() => setExpandedMessage(null)} />
           <div className="relative w-full max-w-xl bg-white shadow-2xl h-full flex flex-col animate-in slide-in-from-right duration-300">
             <div className="flex items-center justify-between p-6 border-b border-gray-100 shrink-0">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center text-amber-700">
+                <div className="w-10 h-10 bg-indigo-50 rounded-xl flex items-center justify-center text-indigo-600">
                   <FileCode className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="font-black text-gray-900">Full Observation</h3>
-                  <p className="text-xs text-gray-500 font-medium">{expandedMessage.sender_name || 'Observation Node'}</p>
+                  <h3 className="font-bold text-gray-900">Data Point</h3>
+                  <p className="text-xs text-gray-500 font-medium">{expandedMessage.sender_name || 'Anonymous'}</p>
                 </div>
               </div>
               <button 
@@ -435,10 +325,8 @@ export function MessageList({ channelId }: MessageListProps) {
               </button>
             </div>
             <div className="flex-1 overflow-y-auto p-6">
-              <div className="prose prose-sm max-w-none prose-headings:font-black prose-headings:tracking-tight prose-h1:text-2xl prose-h2:text-xl prose-h3:text-lg prose-p:text-gray-600 prose-p:font-medium prose-p:leading-relaxed prose-p:whitespace-pre-line prose-li:text-gray-600 prose-code:text-indigo-600 prose-code:bg-indigo-50 prose-code:px-1 prose-code:rounded prose-code:before:content-none prose-code:after:content-none prose-blockquote:border-l-4 prose-blockquote:border-indigo-200 prose-blockquote:bg-indigo-50 prose-blockquote:p-3 prose-blockquote:rounded-r-lg prose-strong:text-gray-900 prose-ul:list-disc prose-ol:list-decimal prose-table:border-collapse prose-table:w-full prose-th:border prose-th:border-gray-200 prose-th:bg-gray-50 prose-th:p-2 prose-td:border prose-td:border-gray-200 prose-td:p-2 prose-tr:border prose-tr:border-gray-200 prose-img:rounded-xl prose-a:text-indigo-600 prose-a:no-underline hover:prose-a:underline">
-                <ReactMarkdown 
-                  remarkPlugins={[remarkGfm]}
-                >
+              <div className="prose prose-sm max-w-none prose-p:text-gray-600 prose-p:font-medium prose-p:leading-relaxed prose-p:whitespace-pre-line">
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>
                   {expandedMessage.content}
                 </ReactMarkdown>
               </div>
@@ -446,141 +334,6 @@ export function MessageList({ channelId }: MessageListProps) {
           </div>
         </div>
       )}
-
-      {/* Analysis Progress Dialog */}
-      <Dialog open={analysisProgressOpen} onOpenChange={setAnalysisProgressOpen}>
-        <DialogContent className="sm:max-w-lg max-h-[80vh]">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Brain className="w-5 h-5 text-indigo-600" />
-              Analyzing Signals
-            </DialogTitle>
-            <DialogDescription>
-              {selectedIds.size} signals selected for analysis
-            </DialogDescription>
-          </DialogHeader>
-          <div className="py-4 space-y-4">
-            {/* Progress Steps */}
-            <div className="flex items-center gap-4 text-sm">
-              <div className="flex items-center gap-2">
-                <div className={`w-3 h-3 rounded-full ${analysisStep >= 1 ? 'bg-green-500' : 'bg-gray-300'} ${analyzingBatch && analysisStep < 1 ? 'animate-pulse' : ''}`} />
-                <span className={analysisStep >= 1 ? 'text-gray-900 font-medium' : 'text-gray-500'}>
-                  Analyzing
-                </span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className={`w-3 h-3 rounded-full ${!analyzingBatch && analysisStep >= 1 ? 'bg-green-500' : 'bg-gray-300'}`} />
-                <span className={!analyzingBatch && analysisStep >= 1 ? 'text-gray-900 font-medium' : 'text-gray-500'}>
-                  Save
-                </span>
-              </div>
-            </div>
-
-            {/* Worklog Entries */}
-            {worklogEntries.length > 0 ? (
-              <div className="mt-3 space-y-2 max-h-64 overflow-y-auto">
-                {worklogEntries.map((entry, idx) => (
-                  <div key={idx} className="bg-gray-50 rounded-lg p-3 border border-gray-100 shadow-sm">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-xs font-bold text-indigo-600 uppercase tracking-wide">
-                        {entry.stage}
-                      </span>
-                      {entry.progress && (
-                        <span className="text-xs text-gray-500">• {entry.progress}</span>
-                      )}
-                    </div>
-                    {entry.goal && (
-                      <div className="mt-1">
-                        <span className="text-[10px] font-medium text-purple-600 uppercase">Goal:</span>
-                        <span className="text-xs text-purple-700 ml-1">{entry.goal}</span>
-                      </div>
-                    )}
-                    {entry.doing.length > 0 && (
-                      <div className="mt-2">
-                        <span className="text-[10px] font-medium text-gray-400 uppercase">What I'm doing:</span>
-                        <ul className="mt-1 space-y-0.5">
-                          {entry.doing.map((item, i) => (
-                            <li key={i} className="text-xs text-gray-700 flex items-start gap-1.5">
-                              <span className="text-indigo-400 mt-0.5">→</span>
-                              {item}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                    {entry.observations.length > 0 && (
-                      <div className="mt-2">
-                        <span className="text-[10px] font-medium text-gray-400 uppercase">Observations:</span>
-                        <ul className="mt-1 space-y-0.5">
-                          {entry.observations.map((item, i) => (
-                            <li key={i} className="text-xs text-gray-600 flex items-start gap-1.5">
-                              <span className="text-amber-500 mt-0.5">•</span>
-                              {item}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                    {entry.decisions.length > 0 && (
-                      <div className="mt-2">
-                        <span className="text-[10px] font-medium text-gray-400 uppercase">Decisions:</span>
-                        <ul className="mt-1 space-y-0.5">
-                          {entry.decisions.map((item, i) => (
-                            <li key={i} className="text-xs text-emerald-700 flex items-start gap-1.5">
-                              <CheckSquare className="w-3 h-3 mt-0.5 text-emerald-500" />
-                              {item}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                    {entry.open_questions.length > 0 && (
-                      <div className="mt-2">
-                        <span className="text-[10px] font-medium text-gray-400 uppercase">Open Questions:</span>
-                        <ul className="mt-1 space-y-0.5">
-                          {entry.open_questions.map((item, i) => (
-                            <li key={i} className="text-xs text-rose-600 flex items-start gap-1.5">
-                              <span className="text-rose-400 mt-0.5">?</span>
-                              {item}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="flex items-center gap-2 text-xs text-gray-500 p-4 justify-center bg-gray-50 rounded-lg border border-dashed border-gray-200">
-                <Loader2 className="w-3 h-3 animate-spin" />
-                <span>{analysisProgress || "Initializing analysis..."}</span>
-              </div>
-            )}
-
-            {/* Error Display */}
-            {analysisError && (
-              <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-                <p className="text-sm text-red-700 font-medium">Error</p>
-                <p className="text-sm text-red-600 mt-1">{analysisError}</p>
-              </div>
-            )}
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setAnalysisProgressOpen(false);
-                setAnalyzingBatch(false);
-                setWorklogEntries([]);
-                setAnalysisError(null);
-              }}
-              disabled={analyzingBatch}
-            >
-              {analyzingBatch ? "Processing..." : "Close"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

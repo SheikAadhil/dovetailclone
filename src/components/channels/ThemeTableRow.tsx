@@ -30,7 +30,7 @@ export function ThemeTableRow({
           <Checkbox 
             checked={isSelected} 
             onCheckedChange={(checked) => onSelect(theme.id, !!checked)}
-            className="w-4 h-4 border-gray-300 data-[state=checked]:bg-indigo-600 data-[state=checked]:border-indigo-600"
+            className="w-4 h-4 border-gray-300 rounded-[2px]"
           />
         </div>
       </td>

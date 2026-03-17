@@ -11,7 +11,7 @@ import { NodeImportDialog } from "./NodeImportDialog";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
-  Menu, Home, Slash, Activity, Check, Share2, MoreHorizontal, Search,
+  MoreHorizontal, Search,
   Calendar, Loader2, Plus, X, ChevronRight, Filter
 } from "lucide-react";
 import { format, parseISO, subDays } from "date-fns";
@@ -37,6 +37,19 @@ const THEME_COLORS = [
   "#5550ff", "#ff5c00", "#007750", "#ffb800", "#ec4899", 
   "#8b5cf6", "#06b6d4", "#f97316", "#14b8a6", "#3b82f6"
 ];
+
+const ChannelIcon = ({ className, size = 24 }: { className?: string, size?: number }) => (
+  <span className={className} role="img" style={{ lineHeight: 0, display: "block" }}>
+    <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} fill="none" viewBox="0 0 24 24">
+      <g stroke="currentColor">
+        <g fill="currentColor">
+          <path d="M4.5 15.5h3v3h-3zM7.5 8.5h3v3h-3zM13.5 12.5h3v3h-3zM16.5 5.5h3v3h-3z"></path>
+        </g>
+        <path strokeLinecap="square" strokeLinejoin="round" strokeWidth="2" d="m6 17 3-7 6 4 3-7"></path>
+      </g>
+    </svg>
+  </span>
+);
 
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (active && payload && payload.length) {
@@ -69,7 +82,6 @@ export function ChannelDetailTabs({ channel }: ChannelDetailTabsProps) {
   const [selectedTopicId, setSelectedTopicId] = useState<string>("all");
   const [period] = useState<string>("30");
   
-  // Selection state
   const [selectedThemeIds, setSelectedThemeIds] = useState<string[]>([]);
   const [visibleThemeIds, setVisibleThemeIds] = useState<string[]>([]);
   
@@ -81,7 +93,6 @@ export function ChannelDetailTabs({ channel }: ChannelDetailTabsProps) {
   const [isNodeImportOpen, setIsNodeImportOpen] = useState(false);
   const [isTopicDialogOpen, setIsTopicOpen] = useState(false);
 
-  // Topic Form State
   const [newTopicName, setNewTopicName] = useState("");
   const [newTopicDesc, setNewTopicDesc] = useState("");
   const [creatingTopic, setCreatingTopic] = useState(false);
@@ -159,14 +170,14 @@ export function ChannelDetailTabs({ channel }: ChannelDetailTabsProps) {
     
     if (chartThemes.length === 0) return [];
 
-    const days = 4; // Mock dates like in the screenshot (8 Mar - 11 Mar)
+    const days = 4; 
     
     for (let i = days - 1; i >= 0; i--) {
-      const date = new Date(2026, 2, 11 - i); // Mar 11, 2026
+      const date = new Date(2026, 2, 11 - i);
       const dateStr = format(date, "yyyy-MM-dd");
       dateMap[dateStr] = { date: dateStr };
       chartThemes.forEach(t => {
-        dateMap[dateStr][t.name] = Math.floor(Math.random() * 5); // Mock data for exactly matching visual
+        dateMap[dateStr][t.name] = Math.floor(Math.random() * 5);
       });
     }
 
@@ -189,50 +200,54 @@ export function ChannelDetailTabs({ channel }: ChannelDetailTabsProps) {
       <header className="h-[56px] border-b border-gray-100 flex items-center justify-between px-4 bg-white shrink-0">
         <div className="flex items-center gap-2">
           <Button variant="ghost" size="icon" className="h-8 w-8 text-[#15181E]">
-            <Menu className="w-5 h-5" />
+            <span role="img" style={{ lineHeight: 0, display: "block" }}>
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" strokeLinecap="square" strokeLinejoin="round" strokeWidth="2" d="M5 12h14M5 7h14M5 17h14"></path></svg>
+            </span>
           </Button>
           <div className="w-[1px] h-4 bg-gray-200 mx-1" />
           
           <div className="flex items-center">
             <Link href="/channels" className="h-8 w-8 flex items-center justify-center text-[#15181E] hover:bg-gray-100 rounded-md">
-              <Home className="w-5 h-5" />
+              <span role="img" style={{ lineHeight: 0, display: "block" }}>
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" strokeLinecap="square" strokeLinejoin="round" strokeWidth="2" d="m5 12 7-7 7 7M18 12v7H6v-7"></path></svg>
+              </span>
             </Link>
-            <Slash className="w-5 h-5 text-gray-300 rotate-[15deg] mx-0.5" />
+            <span role="img" style={{ lineHeight: 0, display: "block" }} className="mx-1 text-gray-300">
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" strokeLinecap="square" strokeWidth="2" d="m8 19 8-14"></path></svg>
+            </span>
             <Button variant="ghost" className="h-8 px-2 flex items-center gap-2 text-[#15181E] font-medium hover:bg-gray-100 rounded-md">
-              <div className="p-1 text-[#ff5c00]">
-                <Activity className="w-5 h-5" />
-              </div>
+              <ChannelIcon className="text-[#ff5c00]" />
               <span className="text-[14px]">{channel.name}</span>
             </Button>
           </div>
         </div>
 
-        <div className="flex items-center gap-4">
-          <div className="flex items-center border-b-2 border-transparent">
-            <button 
-              onClick={() => setActiveView("themes")}
-              className={cn(
-                "h-[56px] px-4 text-[14px] font-medium transition-all flex items-center relative",
-                activeView === "themes" ? "text-[#15181E] after:content-[''] after:absolute after:bottom-0 after:left-0 after:right-0 after:h-[2px] after:bg-[#15181E]" : "text-[#6E7684] hover:text-[#15181E]"
-              )}
-            >
-              Themes
-            </button>
-            <button 
-              onClick={() => setActiveView("messages")}
-              className={cn(
-                "h-[56px] px-4 text-[14px] font-medium transition-all flex items-center relative",
-                activeView === "messages" ? "text-[#15181E] after:content-[''] after:absolute after:bottom-0 after:left-0 after:right-0 after:h-[2px] after:bg-[#15181E]" : "text-[#6E7684] hover:text-[#15181E]"
-              )}
-            >
-              Data points
-            </button>
-          </div>
+        <div className="flex items-center gap-0">
+          <button 
+            onClick={() => setActiveView("themes")}
+            className={cn(
+              "h-[56px] px-4 text-[14px] font-medium transition-all flex items-center relative",
+              activeView === "themes" ? "text-[#15181E] after:content-[''] after:absolute after:bottom-0 after:left-0 after:right-0 after:h-[2px] after:bg-[#15181E]" : "text-[#6E7684] hover:text-[#15181E]"
+            )}
+          >
+            Themes
+          </button>
+          <button 
+            onClick={() => setActiveView("messages")}
+            className={cn(
+              "h-[56px] px-4 text-[14px] font-medium transition-all flex items-center relative",
+              activeView === "messages" ? "text-[#15181E] after:content-[''] after:absolute after:bottom-0 after:left-0 after:right-0 after:h-[2px] after:bg-[#15181E]" : "text-[#6E7684] hover:text-[#15181E]"
+            )}
+          >
+            Data points
+          </button>
         </div>
 
         <div className="flex items-center gap-1">
           <Button variant="ghost" className="h-8 px-3 flex items-center gap-1.5 text-[14px] font-medium text-[#15181E] hover:bg-gray-100">
-            <Check className="w-5 h-5 text-[#007750]" />
+            <span role="img" style={{ lineHeight: 0, display: "block" }}>
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" strokeLinecap="square" strokeWidth="2" d="m17 9-7 7-3-3"></path></svg>
+            </span>
             1 source
           </Button>
           <Button variant="ghost" className="h-8 px-3 text-[14px] font-medium text-[#15181E] hover:bg-gray-100">
@@ -242,7 +257,9 @@ export function ChannelDetailTabs({ channel }: ChannelDetailTabsProps) {
             Give feedback
           </Button>
           <Button variant="ghost" size="icon" className="h-8 w-8 text-[#15181E] hover:bg-gray-100">
-            <MoreHorizontal className="w-5 h-5" />
+            <span role="img" style={{ lineHeight: 0, display: "block" }}>
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" strokeLinecap="square" strokeWidth="2" d="M5.5 11.5h1v1h-1zm6 0h1v1h-1zm6 0h1v1h-1z" clip-rule="evenodd"></path></svg>
+            </span>
           </Button>
         </div>
       </header>
@@ -275,6 +292,7 @@ export function ChannelDetailTabs({ channel }: ChannelDetailTabsProps) {
                       )}
                     >
                       <span>{topic.name}</span>
+                      <span className="text-[12px] text-[#6E7684] opacity-60">{topic.theme_count || 0}</span>
                     </button>
                   ))}
                   <button
@@ -293,7 +311,9 @@ export function ChannelDetailTabs({ channel }: ChannelDetailTabsProps) {
                 {/* Filters Row */}
                 <div className="px-4 py-4 flex items-center gap-2 shrink-0">
                   <Button variant="ghost" className="h-9 px-3 flex items-center gap-2 text-[14px] font-medium bg-[#F6F7FB] text-[#15181E] rounded-md hover:bg-gray-100 shadow-none border-none">
-                    <Calendar className="w-5 h-5" />
+                    <span role="img" style={{ lineHeight: 0, display: "block" }}>
+                      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><g stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" d="M5 5h14v14H5z"></path><g strokeLinejoin="round"><path strokeLinecap="square" d="M15 4v3M9 4v3"></path><path strokeLinecap="round" d="M5 11h14"></path></g></g></svg>
+                    </span>
                     8 Mar — 11 Mar 2026
                   </Button>
                   <Button variant="ghost" className="h-9 px-3 text-[14px] font-medium text-[#15181E] hover:bg-gray-100">
@@ -311,8 +331,8 @@ export function ChannelDetailTabs({ channel }: ChannelDetailTabsProps) {
                       Showing {visibleThemeIds.length} of {filteredThemes.length} selected themes
                     </h3>
                   </div>
-                  <div className="h-[210px] w-full ml-[-12px]">
-                    <ResponsiveContainer width="100%" height="100%">
+                  <div className="h-[210px] w-full ml-[-12px]" style={{ minWidth: 0 }}>
+                    <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                       <BarChart data={chartData} margin={{ top: 30, right: 50, left: 12, bottom: 0 }}>
                         <CartesianGrid strokeDasharray="0" vertical={false} stroke="#ccc" opacity={0.3} />
                         <XAxis 
@@ -366,7 +386,9 @@ export function ChannelDetailTabs({ channel }: ChannelDetailTabsProps) {
                           </span>
                           <div className="flex items-center gap-1">
                             <Button variant="ghost" size="icon" className="h-8 w-8 text-[#15181E]">
-                              <Search className="w-5 h-5" />
+                              <span role="img" style={{ lineHeight: 0, display: "block" }}>
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" strokeLinecap="square" strokeLinejoin="round" strokeWidth="2" d="m19 19-3.052-3m1.91-4.571a6.428 6.428 0 1 1-12.858 0 6.428 6.428 0 0 1 12.857 0z"></path></svg>
+                              </span>
                             </Button>
                             {selectedThemeIds.length > 0 && (
                               <Button variant="ghost" className="h-8 px-3 text-[14px] font-medium text-[#15181E] bg-[#F6F7FB]">
@@ -374,7 +396,9 @@ export function ChannelDetailTabs({ channel }: ChannelDetailTabsProps) {
                               </Button>
                             )}
                             <Button variant="ghost" size="icon" className="h-8 w-8 text-[#15181E]">
-                              <MoreHorizontal className="w-5 h-5" />
+                              <span role="img" style={{ lineHeight: 0, display: "block" }}>
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" strokeLinecap="square" strokeWidth="2" d="M5.5 11.5h1v1h-1zm6 0h1v1h-1zm6 0h1v1h-1z" clip-rule="evenodd"></path></svg>
+                              </span>
                             </Button>
                           </div>
                         </div>
