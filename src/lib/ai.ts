@@ -622,9 +622,42 @@ async function performAnalysis(prompt: string, idMap: Map<string, string>, model
     }
 
     // Handle standard format with top_level_themes (Layer 1)
-    const themesArray = parsed.top_level_themes;
+    let themesArray = parsed.top_level_themes || [];
+    
+    // FALLBACK: If no themes but signals exist, try to use "isolated_issues" or "unassigned" as themes
+    if (themesArray.length === 0 && messages.length > 0) {
+      console.log("No top-level themes found, attempting fallback from isolated_issues or signal_ledger");
+      
+      const isolated = parsed.isolated_issues || [];
+      if (isolated.length > 0) {
+        themesArray = isolated.map((iss: any) => ({
+          name: iss.name || "Signal Cluster",
+          definition: iss.issue_description || "Cluster of related signals",
+          signal_ids: iss.signal_ids || [],
+          confidence: "Medium",
+          recommendation_type: "UX fix"
+        }));
+      } else if (parsed.signal_ledger && parsed.signal_ledger.length > 0) {
+        // Last resort: group by primary code
+        const groups: Record<string, any[]> = {};
+        parsed.signal_ledger.forEach((sig: any) => {
+          const code = sig.primary_code || "General Feedback";
+          if (!groups[code]) groups[code] = [];
+          groups[code].push(sig.signal_id);
+        });
+        
+        themesArray = Object.entries(groups).map(([name, ids]) => ({
+          name: `Feedback: ${name}`,
+          definition: `Consolidated feedback regarding ${name.toLowerCase()}.`,
+          signal_ids: ids,
+          confidence: "Low",
+          recommendation_type: "UX fix"
+        }));
+      }
+    }
+
     if (themesArray && Array.isArray(themesArray)) {
-      console.log(`Found ${themesArray.length} top-level themes`);
+      console.log(`Finalizing ${themesArray.length} themes`);
       const finalThemes = themesArray.map((theme: any) => ({
         name: theme.name,
         summary: theme.definition || theme.summary || "",

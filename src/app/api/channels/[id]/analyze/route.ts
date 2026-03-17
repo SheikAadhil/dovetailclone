@@ -196,14 +196,14 @@ async function handleAnalysis(
     for (const theme of themesResult) {
       console.log(`Processing theme: ${theme.name}, message_ids: ${JSON.stringify(theme.message_ids)}`);
 
-      const validMessageIds = (theme.message_ids || []).filter(id =>
-        dataPoints.some(dp => dp.id.trim() === id.trim())
-      );
+      const validMessageIds = (theme.message_ids || [])
+        .map(id => id?.toString().trim())
+        .filter(id => !!id && dataPoints.some(dp => dp.id.trim() === id));
 
       console.log(`Valid message IDs for theme ${theme.name}: ${validMessageIds.length} out of ${theme.message_ids?.length || 0}`);
 
       if (validMessageIds.length === 0) {
-        console.log(`Skipping theme ${theme.name} - no matching data points`);
+        console.log(`Skipping theme ${theme.name} - no matching data points in this channel`);
         continue;
       }
 

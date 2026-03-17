@@ -12,10 +12,10 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   MoreHorizontal, Search,
-  Calendar, Loader2, Plus, X, ChevronRight, Filter
+  Calendar, Loader2, Plus, X, ChevronRight, Filter, Brain, CheckSquare, RefreshCcw, Sparkles, Zap
 } from "lucide-react";
 import { format, parseISO, subDays } from "date-fns";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -93,6 +93,14 @@ export function ChannelDetailTabs({ channel }: ChannelDetailTabsProps) {
   const [isNodeImportOpen, setIsNodeImportOpen] = useState(false);
   const [isTopicDialogOpen, setIsTopicOpen] = useState(false);
 
+  // Analysis State
+  const [analyzing, setAnalyzing] = useState(false);
+  const [analysisProgress, setAnalysisProgress] = useState("");
+  const [analysisStep, setAnalysisStep] = useState(0);
+  const [analysisProgressOpen, setAnalysisProgressOpen] = useState(false);
+  const [worklogEntries, setWorklogEntries] = useState<any[]>([]);
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
+
   const [newTopicName, setNewTopicName] = useState("");
   const [newTopicDesc, setNewTopicDesc] = useState("");
   const [creatingTopic, setCreatingTopic] = useState(false);
@@ -135,6 +143,91 @@ export function ChannelDetailTabs({ channel }: ChannelDetailTabsProps) {
   useEffect(() => {
     fetchThemes(selectedTopicId);
   }, [fetchThemes, selectedTopicId]);
+
+  const handleAnalyze = async (forceRefresh = false) => {
+    setAnalyzing(true);
+    setAnalysisProgressOpen(true);
+    setAnalysisProgress("Connecting...");
+    setAnalysisStep(0);
+    setWorklogEntries([]);
+    setAnalysisError(null);
+
+    try {
+      const res = await fetch(`/api/channels/${channel.id}/analyze`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Accept': 'text/event-stream'
+        },
+        body: JSON.stringify({ forceRefresh })
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || 'Analysis failed');
+      }
+
+      const reader = res.body?.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      if (reader) {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              const data = line.slice(6);
+              if (data === '[DONE]') continue;
+              try {
+                const parsed = JSON.parse(data);
+                if (parsed.error) {
+                  setAnalysisError(parsed.error);
+                } else if (parsed.progress) {
+                  setAnalysisProgress(parsed.progress);
+                  if (parsed.step) setAnalysisStep(parsed.step);
+                  
+                  const worklogMatch = parsed.progress.match(/\[([^\]]+)\]\s*GOAL:\s*([^|]+)\s*\|\s*DOING:\s*([^|]+)\s*\|\s*OBSERVATIONS:\s*([^|]*)\s*\|\s*DECISIONS:\s*([^|]*)\s*\|\s*QUESTIONS:\s*([^|]*)\s*\|\s*PROGRESS:\s*(.*)/);
+                  if (worklogMatch) {
+                    const [, stage, goal, doing, observations, decisions, questions, progressStr] = worklogMatch;
+                    const newEntry = {
+                      stage: stage.trim(),
+                      goal: goal.trim(),
+                      doing: doing.trim().split(';').map((s: string) => s.trim()).filter(Boolean),
+                      observations: observations.trim().split(';').map((s: string) => s.trim()).filter(Boolean),
+                      decisions: decisions.trim().split(';').map((s: string) => s.trim()).filter(Boolean),
+                      open_questions: questions.trim().split(';').map((s: string) => s.trim()).filter(Boolean),
+                      progress: progressStr.trim()
+                    };
+                    setWorklogEntries(prev => [...prev, newEntry]);
+                  }
+                }
+              } catch (e) {
+                setAnalysisProgress(data);
+              }
+            }
+          }
+        }
+      }
+
+      await fetchTopics();
+      await fetchThemes();
+      
+      setTimeout(() => {
+        setAnalysisProgressOpen(false);
+        setAnalyzing(false);
+      }, 2000);
+
+    } catch (e: any) {
+      setAnalysisError(e.message);
+      setAnalyzing(false);
+    }
+  };
 
   const handleCreateTopic = async () => {
     if (!newTopicName) return;
@@ -213,7 +306,7 @@ export function ChannelDetailTabs({ channel }: ChannelDetailTabsProps) {
               </span>
             </Link>
             <span role="img" style={{ lineHeight: 0, display: "block" }} className="mx-1 text-gray-300">
-              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" strokeLinecap="square" strokeWidth="2" d="m8 19 8-14"></path></svg>
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" strokeLinecap="square" strokeLinejoin="round" strokeWidth="2" d="m8 19 8-14"></path></svg>
             </span>
             <Button variant="ghost" className="h-8 px-2 flex items-center gap-2 text-[#15181E] font-medium hover:bg-gray-100 rounded-md">
               <ChannelIcon className="text-[#ff5c00]" />
@@ -244,6 +337,15 @@ export function ChannelDetailTabs({ channel }: ChannelDetailTabsProps) {
         </div>
 
         <div className="flex items-center gap-1">
+          <Button 
+            variant="ghost" 
+            className="h-8 px-3 flex items-center gap-1.5 text-[14px] font-medium text-[#15181E] hover:bg-gray-100"
+            onClick={() => handleAnalyze()}
+            disabled={analyzing}
+          >
+            {analyzing ? <Loader2 className="w-5 h-5 animate-spin" /> : <Sparkles className="w-5 h-5 text-indigo-600" />}
+            Analyze
+          </Button>
           <Button variant="ghost" className="h-8 px-3 flex items-center gap-1.5 text-[14px] font-medium text-[#15181E] hover:bg-gray-100">
             <span role="img" style={{ lineHeight: 0, display: "block" }}>
               <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" strokeLinecap="square" strokeWidth="2" d="m17 9-7 7-3-3"></path></svg>
@@ -252,9 +354,6 @@ export function ChannelDetailTabs({ channel }: ChannelDetailTabsProps) {
           </Button>
           <Button variant="ghost" className="h-8 px-3 text-[14px] font-medium text-[#15181E] hover:bg-gray-100">
             Share
-          </Button>
-          <Button variant="ghost" className="h-8 px-3 text-[14px] font-medium text-[#15181E] hover:bg-gray-100">
-            Give feedback
           </Button>
           <Button variant="ghost" size="icon" className="h-8 w-8 text-[#15181E] hover:bg-gray-100">
             <span role="img" style={{ lineHeight: 0, display: "block" }}>
@@ -408,7 +507,7 @@ export function ChannelDetailTabs({ channel }: ChannelDetailTabsProps) {
                   <tbody className="bg-white">
                     {loadingThemes ? (
                       [1, 2, 3, 4, 5].map(i => (
-                        <tr key={i} className="border-b border-gray-50 h-[72px]">
+                        <tr key={i} className="border-b border-gray-100 h-[72px]">
                           <td className="p-4"><Skeleton className="h-4 w-4 rounded" /></td>
                           <td className="p-4"><Skeleton className="h-12 w-full rounded" /></td>
                           <td className="p-4"><Skeleton className="h-2 w-[180px] rounded" /></td>
@@ -455,6 +554,95 @@ export function ChannelDetailTabs({ channel }: ChannelDetailTabsProps) {
           />
         )}
       </aside>
+
+      {/* Analysis Progress Dialog */}
+      <Dialog open={analysisProgressOpen} onOpenChange={setAnalysisProgressOpen}>
+        <DialogContent className="sm:max-w-lg max-h-[80vh]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Brain className="w-5 h-5 text-indigo-600" />
+              Analyzing Signals
+            </DialogTitle>
+            <DialogDescription>
+              Processing feedback using thematic analysis framework...
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4 space-y-4">
+            <div className="flex items-center gap-4 text-sm">
+              <div className="flex items-center gap-2">
+                <div className={`w-3 h-3 rounded-full ${analysisStep >= 1 ? 'bg-green-500' : 'bg-gray-300'} ${analyzing && analysisStep < 1 ? 'animate-pulse' : ''}`} />
+                <span className={analysisStep >= 1 ? 'text-gray-900 font-medium' : 'text-gray-500'}>
+                  Analyzing
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className={`w-3 h-3 rounded-full ${!analyzing && analysisStep >= 1 ? 'bg-green-500' : 'bg-gray-300'}`} />
+                <span className={!analyzing && analysisStep >= 1 ? 'text-gray-900 font-medium' : 'text-gray-500'}>
+                  Save
+                </span>
+              </div>
+            </div>
+
+            {worklogEntries.length > 0 ? (
+              <div className="mt-3 space-y-2 max-h-64 overflow-y-auto">
+                {worklogEntries.map((entry, idx) => (
+                  <div key={idx} className="bg-gray-50 rounded-lg p-3 border border-gray-100 shadow-sm">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-xs font-bold text-indigo-600 uppercase tracking-wide">{entry.stage}</span>
+                      {entry.progress && <span className="text-xs text-gray-500">• {entry.progress}</span>}
+                    </div>
+                    {entry.goal && (
+                      <div className="mt-1">
+                        <span className="text-[10px] font-medium text-purple-600 uppercase tracking-widest">Goal:</span>
+                        <span className="text-xs text-purple-700 ml-1">{entry.goal}</span>
+                      </div>
+                    )}
+                    {entry.doing.length > 0 && (
+                      <div className="mt-2">
+                        <span className="text-[10px] font-medium text-gray-400 uppercase tracking-widest">Doing:</span>
+                        <ul className="mt-1 space-y-0.5">
+                          {entry.doing.map((item, i) => (
+                            <li key={i} className="text-xs text-gray-700 flex items-start gap-1.5">
+                              <span className="text-indigo-400 mt-0.5">→</span>
+                              {item}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 text-xs text-gray-500 p-4 justify-center bg-gray-50 rounded-lg border border-dashed border-gray-200">
+                <Loader2 className="w-3 h-3 animate-spin" />
+                <span>{analysisProgress || "Initializing analysis..."}</span>
+              </div>
+            )}
+
+            {analysisError && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                <p className="text-sm text-red-700 font-medium">Error</p>
+                <p className="text-sm text-red-600 mt-1">{analysisError}</p>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setAnalysisProgressOpen(false);
+                setAnalyzing(false);
+                setWorklogEntries([]);
+                setAnalysisError(null);
+              }}
+              disabled={analyzing}
+            >
+              {analyzing ? "Processing..." : "Close"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <BackfillDialog channelId={channel.id} isOpen={isBackfillOpen} onClose={() => setIsBackfillOpen(false)} onSuccess={() => fetchThemes()} />
       <NodeImportDialog channelId={channel.id} isOpen={isNodeImportOpen} onClose={() => setIsNodeImportOpen(false)} onSuccess={() => fetchThemes()} />
